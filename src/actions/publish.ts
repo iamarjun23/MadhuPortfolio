@@ -6,12 +6,7 @@ import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
 import { revalidateContent } from "@/lib/revalidate";
 import { sectionKeys } from "@/lib/sections";
-
-type PublishResult =
-  Readonly<{ ok: true; publishedSections: number }> | Readonly<{ ok: false; error: string }>;
-
-type RevertResult =
-  Readonly<{ ok: true; revertedSections: number }> | Readonly<{ ok: false; error: string }>;
+import type { PublishResult, RevertResult } from "@/actions/publish-types";
 
 function toInputJsonValue(value: unknown): Prisma.InputJsonValue | null {
   if (value === null) return null;
@@ -123,4 +118,3 @@ export async function revertDraftsToPublished(): Promise<RevertResult> {
   }
 }
 
-export type { PublishResult, RevertResult };

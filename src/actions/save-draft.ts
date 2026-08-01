@@ -7,8 +7,9 @@ import { sectionSchemas } from "@/lib/studio-drafts";
 import type { SectionKey } from "@/lib/sections";
 import { studioSectionLabels } from "@/lib/studio-nav";
 
-export type DraftSaveResult =
-  Readonly<{ ok: true; data: unknown }> | Readonly<{ ok: false; error: string }>;
+type DraftSaveResult =
+  | Readonly<{ ok: true; data: unknown }>
+  | Readonly<{ ok: false; error: string }>;
 
 function toInputJsonValue(value: unknown): Prisma.InputJsonValue | null {
   if (value === null) {
