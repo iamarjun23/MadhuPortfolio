@@ -1,7 +1,7 @@
 allowBuilds:
   "@prisma/engines": true
   esbuild: true
-  msgpackr-extract: set this to true or false
+  msgpackr-extract: true
   prisma: true
   sharp: true
   unrs-resolver: true
@@ -21,6 +21,7 @@ minimumReleaseAgeExclude:
 onlyBuiltDependencies:
   - "@prisma/engines"
   - "esbuild"
+  - "msgpackr-extract"
   - "prisma"
   - "sharp"
   - "unrs-resolver"
