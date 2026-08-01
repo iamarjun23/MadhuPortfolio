@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  role      Role      @default(OWNER)
+  password  String?
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+}
+
+enum Role {
+  OWNER
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  key       String
+  status    Status
+  data      Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@unique([key, status])
+}
+
+enum Status {
+  DRAFT
+  PUBLISHED
+}
+
+model Media {
+  id        String    @id @default(cuid())
+  url       String
+  key       String
+  kind      MediaKind
+  width     Int?
+  height    Int?
+  bytes     Int?
+  mime      String?
+  alt       String?
+  createdAt DateTime  @default(now())
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  kind      String
+  section   String
+  message   String
+  createdAt DateTime @default(now())
+}

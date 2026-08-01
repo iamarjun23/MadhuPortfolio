@@ -1,0 +1,82 @@
+# dependencies
+node_modules/
+.pnpm-store/
+.yarn/
+.pnp.*
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# builds
+build/
+dist/
+
+# typescript
+*.tsbuildinfo
+
+# env — never commit real secrets
+.env
+.env.*
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dev-server.log
+dev-server.err.log
+
+# runtime
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# testing / coverage
+coverage/
+.nyc_output/
+
+# caches
+.cache/
+.turbo/
+.vercel/
+.swc/
+.eslintcache
+.stylelintcache
+
+# prisma — keep schema & migrations, drop generated client + local db files
+src/generated/
+prisma/*.db
+prisma/*.db-journal
+
+# uploads / local media dumps
+/uploads/
+public/uploads/
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# claude / agent scratch
+.claude/
+scratchpad/
+
+# docker local overrides
+docker-compose.override.yml
+
+# misc
+*.local
+tmp/
+temp/
+AGENTS.md
+MEMORY.md
+index_6.html
+admin_1.html
