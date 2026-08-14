@@ -7,6 +7,7 @@ import { ImpactStrip } from "@/components/public/ImpactStrip";
 import { Photobooth } from "@/components/public/Photobooth";
 import { Testimonials } from "@/components/public/Testimonials";
 import { WorkConsole } from "@/components/public/WorkConsole";
+import { defaultSiteSettings } from "@/schemas/settings";
 import {
   getAbout,
   getBooth,
@@ -38,7 +39,7 @@ export default async function PortfolioPage() {
   return (
     <main id="top" className="landing">
       <a href="#work" className="skip">
-        {settings.site.navigation.skipLinkLabel}
+        {settings.site?.navigation?.skipLinkLabel ?? defaultSiteSettings.navigation.skipLinkLabel}
       </a>
       <Hero data={hero} />
       <AboutBlock data={about} />

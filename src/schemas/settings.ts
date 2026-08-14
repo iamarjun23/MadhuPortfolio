@@ -39,7 +39,7 @@ const defaultFooter = {
   closingLine: "Stories shaped in Bengaluru",
 };
 
-const defaultSite = {
+export const defaultSiteSettings = {
   ownerName: "N Madhu Kumar",
   brand: defaultBrand,
   navigation: defaultNavigation,
@@ -60,7 +60,7 @@ export const SettingsSchema = z.object({
   domain: z.string().max(60),
   site: z
     .object({
-      ownerName: z.string().max(80).default(defaultSite.ownerName),
+      ownerName: z.string().max(80).default(defaultSiteSettings.ownerName),
       brand: z
         .object({
           name: z.string().max(30).default(defaultBrand.name),
@@ -103,7 +103,7 @@ export const SettingsSchema = z.object({
         })
         .default(defaultFooter),
     })
-    .default(defaultSite),
+    .default(defaultSiteSettings),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;

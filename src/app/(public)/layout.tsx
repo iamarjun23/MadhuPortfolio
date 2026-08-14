@@ -4,6 +4,7 @@ import { Footer } from "@/components/public/Footer";
 import { Nav } from "@/components/public/Nav";
 import { getContact, getSettings } from "@/lib/content";
 import { getSiteUrl } from "@/lib/site-url";
+import { defaultSiteSettings } from "@/schemas/settings";
 
 type PublicLayoutProps = Readonly<{
   children: React.ReactNode;
@@ -48,7 +49,7 @@ export default async function PublicLayout({ children }: PublicLayoutProps) {
     {
       "@context": "https://schema.org",
       "@type": "Person",
-      name: settings.site.ownerName,
+      name: settings.site?.ownerName ?? defaultSiteSettings.ownerName,
       url: siteUrl,
       email: contact.email,
       sameAs,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ThemeToggle, type ThemeName } from "@/components/public/ThemeToggle";
+import { defaultSiteSettings } from "@/schemas/settings";
 import type { Contact, Settings } from "@/schemas";
 
 type NavProps = Readonly<{
@@ -18,7 +19,9 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
   const [isScrolled, setIsScrolled] = useState(false);
   const [isPastHero, setIsPastHero] = useState(false);
   const isDrawingRoom = pathname === "/room";
-  const { brand, navigation } = settings.site;
+  const site = settings.site ?? defaultSiteSettings;
+  const brand = site.brand ?? defaultSiteSettings.brand;
+  const navigation = site.navigation ?? defaultSiteSettings.navigation;
 
   useEffect(() => {
     const updateScrolledState = () => {

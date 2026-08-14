@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { defaultSiteSettings } from "@/schemas/settings";
 import type { Contact, Settings } from "@/schemas";
 
 type FooterProps = Readonly<{
@@ -24,7 +25,9 @@ function ExternalLink({ href, label }: Readonly<{ href: string | null; label: st
 
 export function Footer({ contact, settings }: FooterProps) {
   const year = new Date().getFullYear();
-  const { brand, footer } = settings.site;
+  const site = settings.site ?? defaultSiteSettings;
+  const brand = site.brand ?? defaultSiteSettings.brand;
+  const footer = site.footer ?? defaultSiteSettings.footer;
 
   return (
     <footer className="public-footer">
@@ -82,7 +85,7 @@ export function Footer({ contact, settings }: FooterProps) {
 
       <div className="wrap public-footer__bottom">
         <span>
-          {footer.copyrightPrefix} {year} {settings.site.ownerName}
+          {footer.copyrightPrefix} {year} {site.ownerName ?? defaultSiteSettings.ownerName}
         </span>
         <span>{footer.closingLine}</span>
       </div>
