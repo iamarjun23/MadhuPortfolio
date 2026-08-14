@@ -1,6 +1,20 @@
 import { z } from "zod";
 
 export const ExperienceSchema = z.object({
+  eyebrow: z.string().max(40).default("Experience"),
+  heading: z.string().max(100).default("A career cut into scenes."),
+  intro: z
+    .string()
+    .max(220)
+    .default(
+      "Move through the rooms that shaped the way I find rhythm, build tension, and land a story.",
+    ),
+  reelLabel: z.string().max(40).default("Career reel"),
+  defaultLocation: z.string().max(50).default("Creative room"),
+  sceneLabel: z.string().max(30).default("Scene"),
+  scenesLabel: z.string().max(30).default("scenes"),
+  previousLabel: z.string().max(40).default("Previous scene"),
+  nextLabel: z.string().max(40).default("Next scene"),
   roles: z
     .array(
       z.object({

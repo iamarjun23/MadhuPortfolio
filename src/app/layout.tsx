@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Bricolage_Grotesque, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import {
+  Bricolage_Grotesque,
+  Hanken_Grotesk,
+  Instrument_Serif,
+  JetBrains_Mono,
+} from "next/font/google";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({
@@ -16,6 +21,13 @@ const body = Hanken_Grotesk({
 const mono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--f-mono",
+});
+
+const serif = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  variable: "--f-serif",
 });
 
 export const metadata: Metadata = {
@@ -41,7 +53,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
     <html
       lang="en"
       data-theme={theme}
-      className={`${display.variable} ${body.variable} ${mono.variable}`}
+      data-scroll-behavior="smooth"
+      className={`${display.variable} ${body.variable} ${mono.variable} ${serif.variable}`}
       suppressHydrationWarning
     >
       <body>{children}</body>

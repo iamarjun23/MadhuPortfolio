@@ -18,11 +18,37 @@ export type StudioDashboardData = Readonly<{
   }>;
 }>;
 
-function hasNewerDraft(
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && !Array.isArray(value) && typeof value === "object";
+}
+
+function jsonValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return (
+      left.length === right.length &&
+      left.every((value, index) => jsonValuesEqual(value, right[index]))
+    );
+  }
+
+  if (!isJsonRecord(left) || !isJsonRecord(right)) return false;
+
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every(
+      (key, index) => key === rightKeys[index] && jsonValuesEqual(left[key], right[key]),
+    )
+  );
+}
+
+function hasChangedDraft(
   sections: ReadonlyArray<{
     key: string;
     status: Status;
-    updatedAt: Date;
+    data: unknown;
   }>,
 ) {
   return sectionKeys.some((key) => {
@@ -33,7 +59,7 @@ function hasNewerDraft(
       (section) => section.key === key && section.status === Status.PUBLISHED,
     );
 
-    return Boolean(draft && (!published || draft.updatedAt > published.updatedAt));
+    return Boolean(draft && (!published || !jsonValuesEqual(draft.data, published.data)));
   });
 }
 
@@ -42,10 +68,10 @@ export async function hasPendingChanges() {
 
   const sections = await getDb().section.findMany({
     where: { key: { in: [...sectionKeys] } },
-    select: { key: true, status: true, updatedAt: true },
+    select: { key: true, status: true, data: true },
   });
 
-  return hasNewerDraft(sections);
+  return hasChangedDraft(sections);
 }
 
 export async function getStudioShellData(): Promise<StudioShellData> {

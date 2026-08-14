@@ -1,21 +1,50 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PlaceholderImage } from "@/components/public/PlaceholderImage";
+import { placeholderImageUrl } from "@/lib/placeholders";
 import type { Room } from "@/schemas";
 
 type MoodBoardProps = Readonly<{ data: Room }>;
 type Position = Pick<Room["cards"][number], "fx" | "fy" | "rot">;
+type Direction = "left" | "right" | "up" | "down";
+
+const keyboardStep = 0.05;
+const safeBoardPosition = (value: number) => Math.min(0.78, Math.max(0.02, value));
+
+function getCardLabel(card: Room["cards"][number]) {
+  switch (card.type) {
+    case "polaroid":
+      return card.caption;
+    case "note":
+    case "quote":
+      return card.text;
+    case "ig":
+      return card.handle;
+    case "tags":
+      return card.kicker;
+  }
+}
 
 function cardContent(card: Room["cards"][number]) {
   switch (card.type) {
-    case "polaroid":
+    case "polaroid": {
+      const image = card.image ?? {
+        url: placeholderImageUrl(card.caption),
+        alt: `Placeholder photo for ${card.caption}`,
+      };
+
       return (
         <>
-          <span className={`mood-card__image ${card.tint}`}>{card.tag}</span>
+          <span className={`mood-card__image ${card.tint}`}>
+            <PlaceholderImage src={image.url} alt={image.alt} fill sizes="220px" />
+            <span className="mood-card__image-label">{card.tag}</span>
+          </span>
           <b>{card.caption}</b>
           <small>{card.subCaption}</small>
         </>
       );
+    }
     case "note":
       return (
         <>
@@ -69,6 +98,9 @@ export function MoodBoard({ data }: MoodBoardProps) {
     ),
   );
   const [dragged, setDragged] = useState<string | null>(null);
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
+  const [moveAnnouncement, setMoveAnnouncement] = useState("");
+  const canReposition = data.allowDrag && isDesktopLayout;
 
   const reset = useCallback(
     () =>
@@ -85,8 +117,8 @@ export function MoodBoard({ data }: MoodBoardProps) {
         data.cards.map((card) => [
           card.id,
           {
-            fx: 0.02 + Math.random() * 0.8,
-            fy: 0.02 + Math.random() * 0.8,
+            fx: 0.04 + Math.random() * 0.66,
+            fy: 0.04 + Math.random() * 0.66,
             rot: -6 + Math.random() * 12,
           },
         ]),
@@ -94,7 +126,28 @@ export function MoodBoard({ data }: MoodBoardProps) {
     );
 
   useEffect(() => {
+    const desktopQuery = window.matchMedia("(min-width: 821px)");
+    const updateLayout = () => setIsDesktopLayout(desktopQuery.matches);
+
+    updateLayout();
+    desktopQuery.addEventListener("change", updateLayout);
+    return () => desktopQuery.removeEventListener("change", updateLayout);
+  }, []);
+
+  useEffect(() => {
     const finish = () => {
+      setPositions((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([id, position]) => [
+            id,
+            {
+              ...position,
+              fx: safeBoardPosition(position.fx),
+              fy: safeBoardPosition(position.fy),
+            },
+          ]),
+        ),
+      );
       dragRef.current = null;
       setDragged(null);
     };
@@ -107,7 +160,7 @@ export function MoodBoard({ data }: MoodBoardProps) {
   }, []);
 
   function pointerDown(event: React.PointerEvent<HTMLDivElement>, id: string) {
-    if (!data.allowDrag || window.matchMedia("(max-width: 820px)").matches) return;
+    if (!canReposition) return;
     const card = event.currentTarget;
     const rect = card.getBoundingClientRect();
     dragRef.current = { id, x: event.clientX - rect.left, y: event.clientY - rect.top };
@@ -121,16 +174,13 @@ export function MoodBoard({ data }: MoodBoardProps) {
     const card = event.currentTarget;
     const boardRect = board.getBoundingClientRect();
     const x = Math.max(
-      -card.offsetWidth * 0.25,
-      Math.min(
-        board.clientWidth - card.offsetWidth * 0.75,
-        event.clientX - boardRect.left - drag.x,
-      ),
+      -card.offsetWidth * 0.6,
+      Math.min(board.clientWidth - card.offsetWidth * 0.4, event.clientX - boardRect.left - drag.x),
     );
     const y = Math.max(
-      -8,
+      -card.offsetHeight * 0.6,
       Math.min(
-        board.clientHeight - card.offsetHeight * 0.35,
+        board.clientHeight - card.offsetHeight * 0.4,
         event.clientY - boardRect.top - drag.y,
       ),
     );
@@ -138,28 +188,55 @@ export function MoodBoard({ data }: MoodBoardProps) {
       ...current,
       [drag.id]: {
         ...current[drag.id]!,
-        fx: x / Math.max(1, board.clientWidth - card.offsetWidth),
-        fy: y / Math.max(1, board.clientHeight - card.offsetHeight),
+        fx: x / Math.max(1, board.clientWidth),
+        fy: y / Math.max(1, board.clientHeight),
       },
     }));
+  }
+
+  function moveCardByKeyboard(
+    event: React.KeyboardEvent<HTMLDivElement>,
+    id: string,
+    label: string,
+  ) {
+    if (!canReposition || event.target !== event.currentTarget) return;
+
+    const movement: Record<string, Readonly<{ direction: Direction; fx: number; fy: number }>> = {
+      ArrowLeft: { direction: "left", fx: -keyboardStep, fy: 0 },
+      ArrowRight: { direction: "right", fx: keyboardStep, fy: 0 },
+      ArrowUp: { direction: "up", fx: 0, fy: -keyboardStep },
+      ArrowDown: { direction: "down", fx: 0, fy: keyboardStep },
+    };
+    const nextMovement = movement[event.key];
+
+    if (!nextMovement) return;
+
+    event.preventDefault();
+    setPositions((current) => ({
+      ...current,
+      [id]: {
+        ...current[id]!,
+        fx: safeBoardPosition(current[id]!.fx + nextMovement.fx),
+        fy: safeBoardPosition(current[id]!.fy + nextMovement.fy),
+      },
+    }));
+    setMoveAnnouncement(`Moved ${label} ${nextMovement.direction}.`);
   }
 
   return (
     <main className="room-page">
       <section className="room-hero">
         <div className="wrap">
-          <span className="slate">Off the clock</span>
-          <h1>
-            The <em>Drawing Room</em>
-          </h1>
+          <span className="slate">{data.eyebrow}</span>
+          <h1>{data.title}</h1>
           <p>{data.intro}</p>
           {data.showShuffle ? (
             <div>
               <button type="button" onClick={shuffle}>
-                Shuffle the board
+                {data.shuffleLabel}
               </button>
               <button type="button" onClick={reset}>
-                Reset
+                {data.resetLabel}
               </button>
             </div>
           ) : null}
@@ -167,12 +244,19 @@ export function MoodBoard({ data }: MoodBoardProps) {
       </section>
       <section className="wrap">
         <div className="mood-board" ref={boardRef}>
+          <p className="sr-only" id="mood-board-instructions">
+            On larger screens, focus a card and use the arrow keys to reposition it.
+          </p>
+          <p className="sr-only" aria-live="polite" aria-atomic="true">
+            {moveAnnouncement}
+          </p>
           {data.cards.map((card) => {
             const position = positions[card.id]!;
+            const label = getCardLabel(card);
             return (
               <div
                 key={card.id}
-                className={`mood-card mood-card--${card.type} ${dragged === card.id ? "is-dragging" : ""}`}
+                className={`mood-card mood-card--${card.type} mood-card--${card.pinType} ${dragged === card.id ? "is-dragging" : ""}`}
                 style={{
                   left: `${position.fx * 100}%`,
                   top: `${position.fy * 100}%`,
@@ -180,6 +264,12 @@ export function MoodBoard({ data }: MoodBoardProps) {
                 }}
                 onPointerDown={(event) => pointerDown(event, card.id)}
                 onPointerMove={pointerMove}
+                onKeyDown={(event) => moveCardByKeyboard(event, card.id, label)}
+                tabIndex={canReposition ? 0 : undefined}
+                role={canReposition ? "group" : undefined}
+                aria-label={canReposition ? `Reposition ${label}` : undefined}
+                aria-describedby={canReposition ? "mood-board-instructions" : undefined}
+                aria-roledescription={canReposition ? "draggable card" : undefined}
               >
                 {cardContent(card)}
               </div>
@@ -188,8 +278,8 @@ export function MoodBoard({ data }: MoodBoardProps) {
         </div>
       </section>
       <section className="room-close">
-        <span className="slate">That&apos;s the room</span>
-        <h2>Back to business?</h2>
+        <span className="slate">{data.closeEyebrow}</span>
+        <h2>{data.closeHeading}</h2>
       </section>
     </main>
   );

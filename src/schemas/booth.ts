@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 export const BoothSchema = z.object({
+  eyebrow: z.string().max(40).default("Photobooth"),
+  heading: z.string().max(80).default("On set & in the room"),
+  lightboxCloseLabel: z.string().max(30).default("Close"),
+  lightboxPreviousLabel: z.string().max(30).default("Previous"),
+  lightboxNextLabel: z.string().max(30).default("Next"),
   slots: z
     .array(
       z.object({

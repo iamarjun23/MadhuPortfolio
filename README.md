@@ -4,7 +4,7 @@ Next.js foundation for N Madhu Kumar's portfolio, Drawing Room, and Studio CMS.
 
 ## Phase
 
-Current implementation: Phase 10 draft publishing and revalidation from the PRD.
+Current implementation: Phase 12 deployment hardening from the PRD.
 
 ## Requirements
 
@@ -55,6 +55,9 @@ restore every draft from the last published site.
 ## Environment
 
 See `.env.example` for required variables.
+
+Production configuration, database migration, release, and smoke-check steps are in
+[`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 For UploadThing v7, create an app in the UploadThing dashboard and add its V7
 `UPLOADTHING_TOKEN` to `.env.local`. The upload controls deliberately remain disabled until that

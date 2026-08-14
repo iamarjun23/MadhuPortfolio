@@ -18,10 +18,14 @@ export function SaveBar() {
   }
 
   return (
-    <div className="studio-save-bar" role="status">
-      <p>
-        Unsaved changes in <strong>{sectionLabel || dirtySection}</strong>
-      </p>
+    <section className="studio-save-bar" aria-label="Draft changes">
+      <div className="studio-save-bar__copy">
+        <span>Draft changes</span>
+        <p>
+          <strong>{sectionLabel || dirtySection}</strong> is ready to save.
+        </p>
+        <small>Save this section first, then publish all saved changes from the top bar.</small>
+      </div>
       <div>
         <button
           className="button button--ghost"
@@ -29,7 +33,7 @@ export function SaveBar() {
           onClick={discard}
           disabled={isSaving}
         >
-          Discard
+          Undo
         </button>
         <button
           className="button button--primary"
@@ -37,9 +41,9 @@ export function SaveBar() {
           onClick={() => void saveDraft()}
           disabled={isSaving}
         >
-          {isSaving ? "Saving..." : "Save draft"}
+          {isSaving ? "Saving..." : "Save section"}
         </button>
       </div>
-    </div>
+    </section>
   );
 }

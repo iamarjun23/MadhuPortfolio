@@ -8,11 +8,6 @@ type ThemeToggleProps = Readonly<{
   initialTheme: ThemeName;
 }>;
 
-const themeLabels: Record<ThemeName, string> = {
-  dark: "Suite",
-  light: "Sheet",
-};
-
 function getNextTheme(theme: ThemeName): ThemeName {
   return theme === "dark" ? "light" : "dark";
 }
@@ -32,12 +27,16 @@ export function ThemeToggle({ initialTheme }: ThemeToggleProps) {
   return (
     <button
       type="button"
-      className="theme-toggle"
+      className={`theme-toggle theme-toggle--${theme}`}
+      data-theme-mode={theme}
       aria-label={`Switch to ${getNextTheme(theme)} theme`}
+      aria-pressed={theme === "light"}
+      title={`Switch to ${getNextTheme(theme)} theme`}
       onClick={() => setTheme(getNextTheme)}
     >
-      <span className="theme-toggle__dot" aria-hidden="true" />
-      <span className="theme-toggle__label">{themeLabels[theme]}</span>
+      <span className="theme-toggle__switch" aria-hidden="true">
+        <span className="theme-toggle__thumb" />
+      </span>
     </button>
   );
 }

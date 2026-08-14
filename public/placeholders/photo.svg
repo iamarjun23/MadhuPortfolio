@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+  <title id="title">Placeholder media</title>
+  <desc id="desc">A placeholder image for pending portfolio media.</desc>
+  <rect width="1200" height="900" fill="#10161b"/>
+  <path d="M0 710 260 500l170 118 250-260 520 430v112H0z" fill="#26333b"/>
+  <circle cx="850" cy="250" r="90" fill="#e86a2c"/>
+  <rect x="72" y="72" width="1056" height="756" fill="none" stroke="#f5f5f7" stroke-opacity=".26" stroke-width="10"/>
+  <text x="96" y="142" fill="#f57b42" font-family="Arial, sans-serif" font-size="44" font-weight="700" letter-spacing="8">PLACEHOLDER</text>
+  <text x="96" y="206" fill="#f5f5f7" fill-opacity=".82" font-family="Arial, sans-serif" font-size="28">Add final photo or video thumbnail</text>
+</svg>

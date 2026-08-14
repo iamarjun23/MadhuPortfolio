@@ -1,101 +1,285 @@
 "use client";
-import { useState } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import type { Work } from "@/schemas";
+
+type WorkProject = Work["lanes"][number]["projects"][number];
+
+type PreviewSelection = {
+  project: WorkProject;
+  laneLabel: string;
+};
+
+type CardOffset = {
+  x: number;
+  y: number;
+};
+
+type CloudCardStyle = React.CSSProperties & {
+  "--cloud-left": string;
+  "--cloud-top": string;
+  "--cloud-rotate": string;
+  "--card-offset-x": string;
+  "--card-offset-y": string;
+};
+
+function getCloudPosition(index: number, total: number) {
+  const outerCount = Math.min(total, 10);
+  const isOuter = index < outerCount;
+  const ringIndex = isOuter ? index : index - outerCount;
+  const ringCount = isOuter ? outerCount : Math.max(total - outerCount, 1);
+  const angle = -Math.PI / 2 + (Math.PI * 2 * ringIndex) / ringCount;
+  const radius = isOuter ? 1 : 0.48;
+
+  return {
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+    rotate: Math.sin(angle * 1.7) * 2.2,
+  };
+}
+
+function playPreview(event: React.MouseEvent<HTMLElement>) {
+  const video = event.currentTarget.querySelector("video");
+  void video?.play().catch(() => {});
+}
+
+function stopPreview(event: React.MouseEvent<HTMLElement>) {
+  const video = event.currentTarget.querySelector("video");
+  if (!video) return;
+  video.pause();
+  video.currentTime = 0;
+}
+
 export function WorkConsole({
   data,
   contactEmail,
 }: Readonly<{ data: Work; contactEmail: string }>) {
-  const [active, setActive] = useState(0);
-  const lane = data.lanes[active] ?? data.lanes[0];
-  if (!lane) return null;
-  function activate(index: number) {
-    setActive(index);
+  const [activeLane, setActiveLane] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewSelection | null>(null);
+  const [cardOffsets, setCardOffsets] = useState<Record<string, CardOffset>>({});
+  const cardDrag = useRef({
+    active: false,
+    moved: false,
+    id: "",
+    x: 0,
+    y: 0,
+    offsetX: 0,
+    offsetY: 0,
+  });
+  const allProjects = data.lanes.flatMap((lane) =>
+    lane.projects.map((project) => ({ project, laneLabel: lane.label })),
+  );
+  const projects = activeLane
+    ? allProjects.filter(({ laneLabel }) => laneLabel === activeLane)
+    : allProjects;
+  function filterProjects(laneLabel: string | null) {
+    setActiveLane(laneLabel);
+    setPreview(null);
   }
-  function keydown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
-    const count = data.lanes.length;
-    if (["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft", "Home", "End"].includes(event.key))
-      event.preventDefault();
-    if (event.key === "Home") activate(0);
-    else if (event.key === "End") activate(count - 1);
-    else if (event.key === "ArrowDown" || event.key === "ArrowRight") activate((index + 1) % count);
-    else if (event.key === "ArrowUp" || event.key === "ArrowLeft")
-      activate((index - 1 + count) % count);
+
+  function cardPointerDown(event: React.PointerEvent<HTMLButtonElement>, id: string) {
+    event.stopPropagation();
+    const offset = cardOffsets[id] ?? { x: 0, y: 0 };
+    cardDrag.current = {
+      active: true,
+      moved: false,
+      id,
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: offset.x,
+      offsetY: offset.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
   }
-  const brief = `mailto:${contactEmail}?subject=${encodeURIComponent(`Brief: ${lane.briefLabel}`)}`;
+
+  function cardPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!cardDrag.current.active) return;
+    const deltaX = event.clientX - cardDrag.current.x;
+    const deltaY = event.clientY - cardDrag.current.y;
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 5) cardDrag.current.moved = true;
+
+    setCardOffsets((current) => ({
+      ...current,
+      [cardDrag.current.id]: {
+        x: cardDrag.current.offsetX + deltaX,
+        y: cardDrag.current.offsetY + deltaY,
+      },
+    }));
+  }
+
+  function cardPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    cardDrag.current.active = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  useEffect(() => {
+    if (!preview) return;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreview(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [preview]);
+
+  const brief = `mailto:${contactEmail}?subject=${encodeURIComponent("Brief: Selected work")}`;
+
   return (
     <section className="work section" id="work">
       <div className="wrap">
         <header className="section-heading">
-          <span className="slate">Selected work</span>
-          <h2>
-            What are you <em>making?</em>
-          </h2>
-          <p className="lede">
-            Pick a lane - the screen loads that craft and the real cuts behind it.
-          </p>
+          <span className="slate">{data.eyebrow}</span>
+          <h2>{data.heading}</h2>
+          <p className="lede">{data.intro}</p>
         </header>
-        <div className="work__deck">
-          <div className="work__rail" role="tablist" aria-label="Choose a category">
-            {data.lanes.map((item, index) => (
+        <article className="work__panel work__panel--all">
+          <div className="work__panel-head">
+            <div className="work__panel-meta">
+              <span>{activeLane ?? data.allProjectsLabel}</span>
+              <span>
+                {projects.length} {data.videoCountLabel}
+              </span>
+            </div>
+            <div className="work__filters" role="tablist" aria-label="Filter projects">
               <button
-                key={item.id}
                 type="button"
                 role="tab"
-                aria-selected={active === index}
-                aria-controls={`panel-${item.id}`}
-                tabIndex={active === index ? 0 : -1}
-                onClick={() => activate(index)}
-                onKeyDown={(event) => keydown(event, index)}
+                aria-selected={activeLane === null}
+                onClick={() => filterProjects(null)}
               >
-                <b>{String(index + 1).padStart(2, "0")}</b>
-                <span>
-                  {item.label}
-                  <small>{item.subLabel}</small>
-                </span>
+                {data.allFilterLabel}
               </button>
-            ))}
+              {data.lanes.map((lane) => (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeLane === lane.label}
+                  onClick={() => filterProjects(lane.label)}
+                  key={lane.id}
+                >
+                  {lane.label}
+                </button>
+              ))}
+            </div>
+            <a className="work__brief" href={brief}>
+              <span>{data.briefPrompt}</span>
+              <strong>
+                {data.briefCta} <i aria-hidden="true">&nearr;</i>
+              </strong>
+            </a>
           </div>
-          <article
-            className={`work__panel work__panel--${lane.projects[0]?.thumbHint ?? "bd-1"}`}
-            id={`panel-${lane.id}`}
-            role="tabpanel"
-          >
-            <div className="work__panel-meta">
-              <span>Now showing - {lane.label}</span>
-              <span>{lane.loadTc}</span>
+          <div className="work__cloud-toolbar">
+            <span>{data.canvasHint}</span>
+          </div>
+          <div className="work__cloud" role="group" aria-label="Floating cloud of video projects">
+            <div className="work__cloud-canvas">
+              {projects.map(({ project, laneLabel }, index) => {
+                const position = getCloudPosition(index, projects.length);
+                const cardId = `${laneLabel}-${project.id}`;
+                const offset = cardOffsets[cardId] ?? { x: 0, y: 0 };
+                const cardStyle: CloudCardStyle = {
+                  "--cloud-left": `${50 + position.x * 41}%`,
+                  "--cloud-top": `${50 + position.y * 38}%`,
+                  "--cloud-rotate": `${position.rotate}deg`,
+                  "--card-offset-x": `${offset.x}px`,
+                  "--card-offset-y": `${offset.y}px`,
+                };
+
+                return (
+                  <button
+                    className="work__cloud-card"
+                    style={cardStyle}
+                    type="button"
+                    key={cardId}
+                    onClick={() => {
+                      if (cardDrag.current.moved) {
+                        cardDrag.current.moved = false;
+                        return;
+                      }
+                      setPreview({ project, laneLabel });
+                    }}
+                    onPointerDown={(event) => cardPointerDown(event, cardId)}
+                    onPointerMove={cardPointerMove}
+                    onPointerUp={cardPointerUp}
+                    onPointerCancel={cardPointerUp}
+                    onMouseEnter={playPreview}
+                    onMouseLeave={stopPreview}
+                    aria-label={`Preview ${project.title}`}
+                  >
+                    <span className={`work__thumb ${project.thumbHint}`}>
+                      {project.preview ? (
+                        <video muted loop playsInline preload="metadata">
+                          <source src={project.preview} type="video/mp4" />
+                        </video>
+                      ) : null}
+                    </span>
+                    <span className="work__cloud-card-copy">
+                      <small>{laneLabel}</small>
+                      <b>{project.title}</b>
+                      <em>{project.subtitle}</em>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            <h3>{lane.headline}</h3>
-            <p>{lane.approach}</p>
-            <div className="work__projects">
-              {lane.projects.map((project) =>
-                project.href ? (
-                  <a key={project.id} href={project.href} target="_blank" rel="noreferrer">
-                    <span className={`work__thumb ${project.thumbHint}`} />
-                    <b>{project.title}</b>
-                    <small>{project.subtitle}</small>
-                    <em>{project.hrefLabel}</em>
-                  </a>
-                ) : (
-                  <div key={project.id}>
-                    <span className={`work__thumb ${project.thumbHint}`} />
-                    <b>{project.title}</b>
-                    <small>{project.subtitle}</small>
+            {preview ? (
+              <>
+                <div
+                  className="work__preview-scrim"
+                  aria-hidden="true"
+                  onClick={() => setPreview(null)}
+                />
+                <div
+                  className="work__preview"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label={`${preview.project.title} preview`}
+                >
+                  <button
+                    type="button"
+                    className="work__preview-close"
+                    onClick={() => setPreview(null)}
+                    aria-label="Close video preview"
+                  >
+                    &times;
+                  </button>
+                  <div className="work__preview-media">
+                    {preview.project.preview ? (
+                      <video key={preview.project.id} controls autoPlay muted playsInline>
+                        <source src={preview.project.preview} type="video/mp4" />
+                      </video>
+                    ) : (
+                      <span>{data.previewUnavailableLabel}</span>
+                    )}
                   </div>
-                ),
-              )}
-            </div>
-            <footer>
-              <div>
-                {lane.chips.map((chip) => (
-                  <span key={chip}>{chip}</span>
-                ))}
-              </div>
-              <a href={brief}>
-                Brief me for this <span aria-hidden="true">&rarr;</span>
-              </a>
-            </footer>
-          </article>
-        </div>
+                  <div className="work__preview-copy">
+                    <small>{preview.laneLabel}</small>
+                    <h3>{preview.project.title}</h3>
+                    <p>{preview.project.subtitle}</p>
+                    {preview.project.href ? (
+                      <a href={preview.project.href} target="_blank" rel="noreferrer">
+                        {preview.project.hrefLabel ?? "Watch full video"}{" "}
+                        <span aria-hidden="true">&rarr;</span>
+                      </a>
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        </article>
       </div>
     </section>
   );

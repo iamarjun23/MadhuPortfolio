@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { Prisma, Status } from "@/generated/prisma";
 import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
-import { revalidateContent } from "@/lib/revalidate";
+import { updateContent } from "@/lib/revalidate";
 import { sectionKeys } from "@/lib/sections";
 import type { PublishResult, RevertResult } from "@/actions/publish-types";
 
@@ -32,7 +32,7 @@ function toSectionInputJson(value: unknown): Prisma.InputJsonObject {
 }
 
 function revalidatePublishedContent() {
-  for (const key of sectionKeys) revalidateContent(key);
+  for (const key of sectionKeys) updateContent(key);
   revalidatePath("/", "layout");
   revalidatePath("/room", "layout");
   revalidatePath("/studio", "layout");
@@ -42,13 +42,20 @@ export async function publishAll(): Promise<PublishResult> {
   try {
     const user = await requireOwner();
     const publishedSections = await getDb().$transaction(async (tx) => {
+      const drafts = await tx.section.findMany({
+        where: { key: { in: [...sectionKeys] }, status: Status.DRAFT },
+      });
+      const draftsByKey = new Map(drafts.map((draft) => [draft.key, draft]));
+
+      if (draftsByKey.size !== sectionKeys.length) {
+        throw new Error("Every section needs a draft before publishing.");
+      }
+
       let count = 0;
 
       for (const key of sectionKeys) {
-        const draft = await tx.section.findUnique({
-          where: { key_status: { key, status: Status.DRAFT } },
-        });
-        if (!draft) continue;
+        const draft = draftsByKey.get(key);
+        if (!draft) throw new Error(`Missing draft content for ${key}.`);
 
         await tx.section.upsert({
           where: { key_status: { key, status: Status.PUBLISHED } },
@@ -80,13 +87,20 @@ export async function revertDraftsToPublished(): Promise<RevertResult> {
   try {
     const user = await requireOwner();
     const revertedSections = await getDb().$transaction(async (tx) => {
+      const publishedSections = await tx.section.findMany({
+        where: { key: { in: [...sectionKeys] }, status: Status.PUBLISHED },
+      });
+      const publishedByKey = new Map(publishedSections.map((section) => [section.key, section]));
+
+      if (publishedByKey.size !== sectionKeys.length) {
+        throw new Error("Every section needs published content before reverting drafts.");
+      }
+
       let count = 0;
 
       for (const key of sectionKeys) {
-        const published = await tx.section.findUnique({
-          where: { key_status: { key, status: Status.PUBLISHED } },
-        });
-        if (!published) continue;
+        const published = publishedByKey.get(key);
+        if (!published) throw new Error(`Missing published content for ${key}.`);
 
         await tx.section.upsert({
           where: { key_status: { key, status: Status.DRAFT } },
@@ -117,4 +131,3 @@ export async function revertDraftsToPublished(): Promise<RevertResult> {
     return { ok: false, error: "Could not revert drafts. Please try again." };
   }
 }
-

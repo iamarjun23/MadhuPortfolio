@@ -20,8 +20,9 @@ export function Rail({ badges, open, onClose }: RailProps) {
   return (
     <aside className={`studio-rail ${open ? "is-open" : ""}`} aria-label="Studio navigation">
       <div className="studio-rail__brand">
-        <Link href="/studio" onClick={onClose}>
-          madhu.edit
+        <Link className="studio-rail__home" href="/studio" onClick={onClose}>
+          <span>madhu.edit</span>
+          <small>Content studio</small>
         </Link>
         <button
           className="studio-icon-button studio-rail__close"
@@ -35,9 +36,12 @@ export function Rail({ badges, open, onClose }: RailProps) {
       <nav>
         {studioNavGroups.map((group) => (
           <section className="studio-rail__group" key={group.label} aria-label={group.label}>
-            <h2>{group.label}</h2>
+            <h2>
+              <span>{group.label}</span>
+              <b>{String(group.items.length).padStart(2, "0")}</b>
+            </h2>
             <ul>
-              {group.items.map((item) => {
+              {group.items.map((item, index) => {
                 const current = isCurrentPath(pathname, item.href);
                 const badge = item.badge ? badges[item.badge] : undefined;
 
@@ -48,8 +52,12 @@ export function Rail({ badges, open, onClose }: RailProps) {
                       aria-current={current ? "page" : undefined}
                       onClick={onClose}
                     >
-                      <span>{item.label}</span>
-                      {badge !== undefined ? <b>{badge}</b> : null}
+                      <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
+                      <span>
+                        <strong>{item.label}</strong>
+                        {item.detail ? <small>{item.detail}</small> : null}
+                      </span>
+                      {badge !== undefined ? <em>{badge}</em> : null}
                     </Link>
                   </li>
                 );

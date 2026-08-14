@@ -13,10 +13,12 @@ type Toast = Readonly<{
 type StudioStore = {
   dirtySection: string | null;
   isSaving: boolean;
+  hasUnpublishedChanges: boolean;
   toasts: Toast[];
   handlers: Record<string, DraftHandlers | undefined>;
   markDirty: (section: string) => void;
   clearDirty: (section?: string) => void;
+  setHasUnpublishedChanges: (hasUnpublishedChanges: boolean) => void;
   registerDraftHandlers: (section: string, handlers: DraftHandlers) => () => void;
   discard: () => void;
   saveDraft: () => Promise<void>;
@@ -34,11 +36,13 @@ let nextToastId = 1;
 export const useStudioStore = create<StudioStore>((set) => ({
   dirtySection: null,
   isSaving: false,
+  hasUnpublishedChanges: false,
   toasts: [],
   handlers: {},
   markDirty: (section) => set({ dirtySection: section }),
   clearDirty: (section) =>
     set((state) => (!section || state.dirtySection === section ? { dirtySection: null } : state)),
+  setHasUnpublishedChanges: (hasUnpublishedChanges) => set({ hasUnpublishedChanges }),
   registerDraftHandlers: (section, handlers) => {
     set((state) => ({ handlers: { ...state.handlers, [section]: handlers } }));
     return () =>
@@ -62,7 +66,7 @@ export const useStudioStore = create<StudioStore>((set) => ({
     set({ isSaving: true });
     const saved = await handlers[dirtySection].save();
     set({ isSaving: false });
-    if (saved) set({ dirtySection: null });
+    if (saved) set({ dirtySection: null, hasUnpublishedChanges: true });
   },
   pushToast: (message, tone = "info") =>
     set((state) => ({

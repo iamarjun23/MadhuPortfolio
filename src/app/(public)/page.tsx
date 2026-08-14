@@ -15,25 +15,30 @@ import {
   getHero,
   getImpact,
   getPraise,
+  getRoom,
+  getSettings,
   getWork,
 } from "@/lib/content";
 
 export default async function PortfolioPage() {
-  const [hero, about, impact, work, booth, praise, experience, contact] = await Promise.all([
-    getHero(),
-    getAbout(),
-    getImpact(),
-    getWork(),
-    getBooth(),
-    getPraise(),
-    getExperience(),
-    getContact(),
-  ]);
+  const [hero, about, impact, work, booth, praise, experience, room, contact, settings] =
+    await Promise.all([
+      getHero(),
+      getAbout(),
+      getImpact(),
+      getWork(),
+      getBooth(),
+      getPraise(),
+      getExperience(),
+      getRoom(),
+      getContact(),
+      getSettings(),
+    ]);
 
   return (
-    <main id="top">
+    <main id="top" className="landing">
       <a href="#work" className="skip">
-        Skip to the work
+        {settings.site.navigation.skipLinkLabel}
       </a>
       <Hero data={hero} />
       <AboutBlock data={about} />
@@ -42,7 +47,7 @@ export default async function PortfolioPage() {
       <Photobooth data={booth} />
       <Testimonials data={praise} />
       <Experience data={experience} />
-      <DrawingRoomTeaser />
+      <DrawingRoomTeaser data={room} />
       <ContactBlock contact={contact} />
     </main>
   );

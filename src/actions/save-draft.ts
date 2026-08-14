@@ -3,13 +3,13 @@
 import { Prisma, Status } from "@/generated/prisma";
 import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
+import { updateContent } from "@/lib/revalidate";
 import { sectionSchemas } from "@/lib/studio-drafts";
 import type { SectionKey } from "@/lib/sections";
 import { studioSectionLabels } from "@/lib/studio-nav";
 
 type DraftSaveResult =
-  | Readonly<{ ok: true; data: unknown }>
-  | Readonly<{ ok: false; error: string }>;
+  Readonly<{ ok: true; data: unknown }> | Readonly<{ ok: false; error: string }>;
 
 function toInputJsonValue(value: unknown): Prisma.InputJsonValue | null {
   if (value === null) {
@@ -65,6 +65,8 @@ export async function saveDraft(section: SectionKey, data: unknown): Promise<Dra
         },
       });
     });
+
+    updateContent(section);
 
     return { ok: true, data: parsed.data };
   } catch {

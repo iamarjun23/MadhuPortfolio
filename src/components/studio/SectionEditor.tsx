@@ -23,6 +23,8 @@ import { useForm } from "react-hook-form";
 import { saveDraft } from "@/actions/save-draft";
 import { Dropzone, type UploadEndpoint } from "@/components/studio/Dropzone";
 import { HeroPreview } from "@/components/studio/HeroPreview";
+import { SaveBar } from "@/components/studio/SaveBar";
+import { StudioSectionPreview } from "@/components/studio/StudioSectionPreview";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { HeroSchema } from "@/schemas";
 import type { SectionKey } from "@/lib/sections";
@@ -117,6 +119,17 @@ function reorder(values: EditorValue[], activeId: string, overId: string) {
   const oldIndex = values.findIndex((value) => isEditorObject(value) && value.id === activeId);
   const newIndex = values.findIndex((value) => isEditorObject(value) && value.id === overId);
   return oldIndex < 0 || newIndex < 0 ? values : arrayMove(values, oldIndex, newIndex);
+}
+
+function itemTitle(value: EditorValue, fallback: string) {
+  if (!isEditorObject(value)) return fallback;
+
+  for (const key of ["title", "name", "company", "label", "caption", "kicker", "id"]) {
+    const entry = value[key];
+    if (typeof entry === "string" && entry) return entry;
+  }
+
+  return fallback;
 }
 
 function SortableCard({ id, children }: Readonly<{ id: string; children: React.ReactNode }>) {
@@ -242,6 +255,7 @@ type MediaConfig = Readonly<{
   endpoint: UploadEndpoint;
   acceptsAlt: boolean;
   isVideo?: boolean;
+  isOptional?: boolean;
 }>;
 
 function getMediaConfig(
@@ -251,6 +265,9 @@ function getMediaConfig(
   const key = String(path[path.length - 1] ?? "");
   if (key === "bgVideo" && isEditorObject(value)) {
     return { endpoint: "heroVideo", acceptsAlt: false, isVideo: true };
+  }
+  if (key === "portraitVideo" && (value === null || isEditorObject(value))) {
+    return { endpoint: "heroVideo", acceptsAlt: false, isVideo: true, isOptional: true };
   }
   if (key === "portrait" && (value === null || isEditorObject(value))) {
     return { endpoint: "portrait", acceptsAlt: true };
@@ -288,7 +305,7 @@ function MediaEditor({ value, label, path, onChange, uploadEnabled }: ValueEdito
   const duotone = object.duotone === true;
 
   const setUrl = (nextUrl: string) => {
-    if (!nextUrl && !config.isVideo) {
+    if (!nextUrl && (!config.isVideo || config.isOptional)) {
       onChange(path, null);
       return;
     }
@@ -370,71 +387,121 @@ function ArrayEditor({
     isEditorObject(item) && typeof item.id === "string" ? [item.id] : [],
   );
   const isSortable = sortableIds.length === value.length && value.length > 1;
-  const template = value[0];
+  const [lastTemplate, setLastTemplate] = useState<EditorValue | undefined>(value[0]);
+  const template = value[0] ?? lastTemplate;
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const activeIndex = Math.min(selectedIndex, Math.max(0, value.length - 1));
+  const selectedItem = value[activeIndex];
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (!event.over || event.active.id === event.over.id) return;
     onChange(path, reorder(value, String(event.active.id), String(event.over.id)));
   };
 
-  const content = value.map((item, index) => {
-    const itemPath = [...path, index];
-    const row = (
-      <div className="studio-editor-row">
-        <ValueEditor
-          value={item}
-          label={`${label} ${index + 1}`}
-          path={itemPath}
-          onChange={onChange}
-          uploadEnabled={uploadEnabled}
-        />
-        <button
-          className="studio-row-remove"
-          type="button"
-          aria-label={`Remove ${label} ${index + 1}`}
-          onClick={() =>
-            onChange(
-              path,
-              value.filter((_, itemIndex) => itemIndex !== index),
-            )
-          }
-        >
-          x
-        </button>
-      </div>
+  const records = value.map((item, index) => {
+    const record = (
+      <button
+        className={`studio-array__record${activeIndex === index ? " is-active" : ""}`}
+        type="button"
+        onClick={() => setSelectedIndex(index)}
+        aria-pressed={activeIndex === index}
+      >
+        <span>
+          <b>{itemTitle(item, `${label} ${index + 1}`)}</b>
+          <small>{`${label} ${index + 1}`}</small>
+        </span>
+        <i aria-hidden="true">→</i>
+      </button>
     );
 
-    if (!isSortable || !isEditorObject(item) || typeof item.id !== "string")
-      return <div key={`${label}-${index}`}>{row}</div>;
+    if (!isSortable || !isEditorObject(item) || typeof item.id !== "string") {
+      return (
+        <div className="studio-array__record-wrap" key={`${label}-${index}`}>
+          {record}
+        </div>
+      );
+    }
+
     return (
       <SortableCard key={item.id} id={item.id}>
-        {row}
+        {record}
       </SortableCard>
     );
   });
+
+  const addItem = () => {
+    if (template === undefined) return;
+    onChange(path, [...value, emptyFromTemplate(template)]);
+    setSelectedIndex(value.length);
+  };
+
+  const removeSelectedItem = () => {
+    if (selectedItem === undefined) return;
+    setLastTemplate(selectedItem);
+    onChange(
+      path,
+      value.filter((_, index) => index !== activeIndex),
+    );
+    setSelectedIndex(Math.max(0, activeIndex - 1));
+  };
 
   return (
     <section className="studio-array" aria-label={label}>
       <header>
         <h2>{label}</h2>
         {template !== undefined ? (
-          <button
-            className="studio-add-row"
-            type="button"
-            onClick={() => onChange(path, [...value, emptyFromTemplate(template)])}
-          >
-            Add
+          <button className="studio-add-row" type="button" onClick={addItem}>
+            Add item
           </button>
         ) : null}
       </header>
-      {isSortable ? (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-            {content}
-          </SortableContext>
-        </DndContext>
+      {value.length > 0 ? (
+        <div className="studio-array__workspace">
+          <div className="studio-array__records" aria-label={`${label} list`}>
+            {isSortable ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                  {records}
+                </SortableContext>
+              </DndContext>
+            ) : (
+              records
+            )}
+          </div>
+          {selectedItem !== undefined ? (
+            <div className="studio-array__detail">
+              <header>
+                <div>
+                  <span>Editing item</span>
+                  <strong>{itemTitle(selectedItem, `${label} ${activeIndex + 1}`)}</strong>
+                </div>
+                <button
+                  className="studio-row-remove"
+                  type="button"
+                  aria-label={`Remove ${label} ${activeIndex + 1}`}
+                  onClick={removeSelectedItem}
+                >
+                  Remove
+                </button>
+              </header>
+              <ValueEditor
+                value={selectedItem}
+                label={`${label} ${activeIndex + 1}`}
+                path={[...path, activeIndex]}
+                onChange={onChange}
+                uploadEnabled={uploadEnabled}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : (
-        content
+        <p className="studio-array__empty">
+          No {label.toLowerCase()} yet. Add the first item to begin.
+        </p>
       )}
     </section>
   );
@@ -575,35 +642,46 @@ export function SectionEditor({ section, data, uploadEnabled }: SectionEditorPro
         <div>
           <span className="slate">Page content</span>
           <h1 id="studio-section-title">{studioSectionLabels[section]}</h1>
-          <p>Changes save to the draft only. Uploads are stored as media records.</p>
+          <p>
+            Change a field, open only the content card you need, then save this section as a draft.
+          </p>
         </div>
-        <button className="button button--primary" type="button" onClick={() => void handleSave()}>
-          Save draft
-        </button>
       </div>
-      <div
-        className={
-          section === "hero"
-            ? "studio-editor__layout studio-editor__layout--hero"
-            : "studio-editor__layout"
-        }
-      >
+      <div className="studio-editor__layout">
         <form
           className="studio-editor__form"
           onSubmit={(event) => void handleSubmit(() => undefined)(event)}
         >
-          {Object.entries(currentData).map(([key, value]) => (
-            <ValueEditor
-              key={key}
-              value={value}
-              label={labelFor(key)}
-              path={[key]}
-              onChange={updateValue}
-              uploadEnabled={uploadEnabled}
-            />
-          ))}
+          {Object.entries(currentData).map(([key, value]) => {
+            const isCompact = !Array.isArray(value) && !isEditorObject(value);
+
+            return (
+              <section
+                className={`studio-editor__group${isCompact ? " studio-editor__group--compact" : ""}`}
+                key={key}
+              >
+                {!isCompact ? (
+                  <header>
+                    <span>{labelFor(key)}</span>
+                    <small>Editable content</small>
+                  </header>
+                ) : null}
+                <ValueEditor
+                  value={value}
+                  label={labelFor(key)}
+                  path={[key]}
+                  onChange={updateValue}
+                  uploadEnabled={uploadEnabled}
+                />
+              </section>
+            );
+          })}
         </form>
-        {hero?.success ? <HeroPreview data={hero.data} /> : null}
+        <div className="studio-editor__preview-stack">
+          <StudioSectionPreview section={section} data={currentData} />
+          {hero?.success ? <HeroPreview data={hero.data} /> : null}
+          <SaveBar />
+        </div>
       </div>
       {section === "settings" ? <SettingsDangerZone /> : null}
     </section>

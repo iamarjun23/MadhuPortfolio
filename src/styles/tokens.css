@@ -113,6 +113,12 @@
   --sh-lg: 0 22px 48px -16px rgba(0, 0, 0, 0.65);
 }
 
+[data-theme="light"] {
+  --d-text: #211e19;
+  --d-text2: #4a4339;
+  --d-muted: #786d5e;
+}
+
 @keyframes page-in {
   from {
     opacity: 0;

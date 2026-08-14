@@ -1,28 +1,42 @@
 "use client";
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+
+function getSafeRedirect(callbackUrl: string | null) {
+  if (!callbackUrl) return "/studio";
+
+  try {
+    const target = new URL(callbackUrl, window.location.origin);
+    if (target.origin !== window.location.origin) return "/studio";
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return "/studio";
+  }
+}
 
 export function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    const authError = params.get("error");
+    if (authError === "CredentialsSignin") return "Email or password is incorrect.";
+    return authError ? "Sign-in could not be completed. Please try again." : "";
+  });
   const [pending, setPending] = useState(false);
   async function submit(formData: FormData) {
     setPending(true);
     setError("");
-    const result = await signIn("credentials", {
-      redirect: false,
-      email: formData.get("email"),
-      password: formData.get("password"),
-    });
-    setPending(false);
-    if (result?.error) {
-      setError("Email or password is incorrect.");
-      return;
+
+    try {
+      await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        redirectTo: getSafeRedirect(params.get("callbackUrl")),
+      });
+    } catch {
+      setPending(false);
+      setError("Sign-in could not be completed. Please try again.");
     }
-    router.push(params.get("callbackUrl") ?? "/studio");
-    router.refresh();
   }
   return (
     <form className="login-form" action={submit}>

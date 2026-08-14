@@ -10,6 +10,13 @@ export function Hero({ data }: HeroProps) {
   const [wordIndex, setWordIndex] = useState(0);
   const [timecode, setTimecode] = useState("00:00:00:00");
   const backgroundRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // The autoPlay attribute alone is unreliable under browser autoplay policies;
+  // a muted play() call is permitted. Falls back to the poster if it still refuses.
+  useEffect(() => {
+    videoRef.current?.play().catch(() => {});
+  }, []);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -58,6 +65,7 @@ export function Hero({ data }: HeroProps) {
         <div className="hero__fallback" />
         <video
           className="hero__video"
+          ref={videoRef}
           autoPlay
           muted
           loop
@@ -71,8 +79,8 @@ export function Hero({ data }: HeroProps) {
         <div className="hero__scrim" />
       </div>
       <div className="hero__letterbox hero__letterbox--top">
-        <span>REEL 01 - N MADHU KUMAR</span>
-        <span>2.39 : 1</span>
+        <span>{data.reelLabel}</span>
+        <span>{data.aspectRatioLabel}</span>
       </div>
       <div className="hero__timecode">
         <span className="hero__record" />
@@ -99,13 +107,13 @@ export function Hero({ data }: HeroProps) {
         </div>
       </div>
       <div className="hero__credit">
-        CUT BY N. MADHU KUMAR
+        {data.creditLine1}
         <br />
-        BENGALURU - 23.976 FPS
+        {data.creditLine2}
       </div>
       <div className="hero__letterbox hero__letterbox--bottom">
-        <span>EST. 2023</span>
-        <span>FRAME BY FRAME</span>
+        <span>{data.footerLeftLabel}</span>
+        <span>{data.footerRightLabel}</span>
       </div>
     </section>
   );
