@@ -1,9 +1,9 @@
 import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { Status } from "@/generated/prisma";
 import { getDb } from "@/lib/db";
 import { contentTag } from "@/lib/revalidate";
 import type { SectionKey } from "@/lib/sections";
-import { sectionData } from "../../prisma/seed";
 import {
   AboutSchema,
   BoothSchema,
@@ -26,6 +26,9 @@ async function getSection<TSchema extends z.ZodType>(
   const read = unstable_cache(
     async () => {
       if (!process.env.DATABASE_URL) {
+        // Imported on demand: the seed module parses every section's defaults at
+        // module scope, so keeping it off the configured path saves that work.
+        const { sectionData } = await import("../../prisma/seed");
         return schema.parse(sectionData[key]);
       }
 
@@ -46,42 +49,45 @@ async function getSection<TSchema extends z.ZodType>(
   return read();
 }
 
-export function getHero(status: Status = Status.PUBLISHED) {
-  return getSection("hero", status, HeroSchema);
-}
+// Memoised per request: a landing render asks for the settings section from
+// generateMetadata, the layout and the page, and for contact from two of them.
+// Without this each caller repeats the cache lookup and the schema decode.
+export const getHero = cache((status: Status = Status.PUBLISHED) =>
+  getSection("hero", status, HeroSchema),
+);
 
-export function getAbout(status: Status = Status.PUBLISHED) {
-  return getSection("about", status, AboutSchema);
-}
+export const getAbout = cache((status: Status = Status.PUBLISHED) =>
+  getSection("about", status, AboutSchema),
+);
 
-export function getImpact(status: Status = Status.PUBLISHED) {
-  return getSection("impact", status, ImpactSchema);
-}
+export const getImpact = cache((status: Status = Status.PUBLISHED) =>
+  getSection("impact", status, ImpactSchema),
+);
 
-export function getWork(status: Status = Status.PUBLISHED) {
-  return getSection("work", status, WorkSchema);
-}
+export const getWork = cache((status: Status = Status.PUBLISHED) =>
+  getSection("work", status, WorkSchema),
+);
 
-export function getBooth(status: Status = Status.PUBLISHED) {
-  return getSection("booth", status, BoothSchema);
-}
+export const getBooth = cache((status: Status = Status.PUBLISHED) =>
+  getSection("booth", status, BoothSchema),
+);
 
-export function getPraise(status: Status = Status.PUBLISHED) {
-  return getSection("praise", status, PraiseSchema);
-}
+export const getPraise = cache((status: Status = Status.PUBLISHED) =>
+  getSection("praise", status, PraiseSchema),
+);
 
-export function getExperience(status: Status = Status.PUBLISHED) {
-  return getSection("experience", status, ExperienceSchema);
-}
+export const getExperience = cache((status: Status = Status.PUBLISHED) =>
+  getSection("experience", status, ExperienceSchema),
+);
 
-export function getRoom(status: Status = Status.PUBLISHED) {
-  return getSection("room", status, RoomSchema);
-}
+export const getRoom = cache((status: Status = Status.PUBLISHED) =>
+  getSection("room", status, RoomSchema),
+);
 
-export function getContact(status: Status = Status.PUBLISHED) {
-  return getSection("contact", status, ContactSchema);
-}
+export const getContact = cache((status: Status = Status.PUBLISHED) =>
+  getSection("contact", status, ContactSchema),
+);
 
-export function getSettings(status: Status = Status.PUBLISHED) {
-  return getSection("settings", status, SettingsSchema);
-}
+export const getSettings = cache((status: Status = Status.PUBLISHED) =>
+  getSection("settings", status, SettingsSchema),
+);

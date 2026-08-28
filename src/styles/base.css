@@ -233,7 +233,10 @@ button {
       transparent 60%
     ),
     color-mix(in srgb, var(--bg) 80%, transparent);
-  backdrop-filter: blur(16px);
+  /* Radius kept modest on purpose: this bar is sticky and full width, so the
+     compositor re-blurs its backdrop on every scrolled frame. */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   transition:
     background 0.3s var(--e-cut),
     box-shadow 0.3s var(--e-cut),
@@ -292,8 +295,8 @@ button {
   box-shadow:
     0 14px 30px -18px rgba(0, 0, 0, 0.75),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(22px) saturate(145%);
-  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
 }
 .public-nav.is-past-hero .brand__caption {
   display: none;
@@ -327,6 +330,10 @@ button {
   min-width: 0;
 }
 
+.public-nav__left {
+  gap: clamp(1rem, 1.8vw, 1.4rem);
+}
+
 .public-nav__right {
   justify-content: flex-end;
   gap: 1.4rem;
@@ -348,6 +355,15 @@ button {
 .brand:hover {
   color: var(--text);
 }
+
+.public-nav .brand {
+  gap: 0.1em;
+  font-family: var(--f-display);
+  font-size: 1.08rem;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
 .brand__name {
   color: var(--text);
 }
@@ -468,10 +484,10 @@ button {
 .public-nav__link,
 .public-nav__back-link {
   color: color-mix(in srgb, var(--text) 78%, transparent);
-  font-family: var(--f-serif), Georgia, "Times New Roman", serif;
-  font-size: 0.98rem;
-  font-weight: 400;
-  letter-spacing: 0;
+  font-family: var(--f-body);
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   text-transform: none;
   white-space: nowrap;
   transition: color 200ms ease;
@@ -537,9 +553,10 @@ button {
   padding-bottom: 2px;
   border-bottom: 1px solid var(--accent);
   color: var(--accent-text, var(--accent));
-  font-family: var(--f-serif), Georgia, "Times New Roman", serif;
-  font-size: 0.95rem;
-  font-weight: 400;
+  font-family: var(--f-body);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   text-decoration: none;
   transition: color 200ms ease;
@@ -745,11 +762,13 @@ button {
   display: block;
   margin-bottom: 0.55rem;
   color: var(--text-2);
+  font-family: var(--f-body);
   font-size: 0.92rem;
 }
 .public-footer__column > a {
   position: relative;
   padding-left: 0.8rem;
+  font-weight: 600;
 }
 .public-footer__column > a::before {
   position: absolute;
@@ -1662,10 +1681,11 @@ button {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: var(--r-md);
+  /* Opaque rather than a blurred backdrop: every card in the cloud is its own
+     backdrop-filter layer, and the compositor re-blurs all of them on each
+     frame the cloud moves. The raised alpha keeps the panel reading the same. */
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 44%), rgba(18, 25, 31, 0.76);
-  backdrop-filter: blur(12px) saturate(125%);
-  -webkit-backdrop-filter: blur(12px) saturate(125%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 44%), rgba(18, 25, 31, 0.94);
   color: var(--ink-100);
   box-shadow: 0 16px 38px -18px rgba(0, 0, 0, 0.9);
   text-align: left;
@@ -2620,7 +2640,10 @@ button {
   padding: 1rem;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 3px;
-  background: var(--surface);
+  background: #fff;
+  color: var(--paper-900);
+  font-family: var(--f-body);
+  line-height: 1.35;
   box-shadow:
     0 18px 24px -16px rgba(0, 0, 0, 0.96),
     0 3px 0 rgba(255, 255, 255, 0.08);
@@ -2691,12 +2714,28 @@ button {
   transition: none;
 }
 .mood-card small {
-  color: var(--text-muted);
+  color: var(--paper-600);
   font-family: var(--f-mono);
   font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  text-transform: uppercase;
+}
+.mood-card > b {
+  font-family: var(--f-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 .mood-card--note {
   background: var(--paper-100);
+}
+.mood-card--note > b {
+  font-size: 1.08rem;
 }
 .mood-card--quote {
   background: var(--ink-850);
@@ -2704,7 +2743,13 @@ button {
 }
 .mood-card--quote blockquote {
   font-family: var(--f-display);
-  font-size: 1.1rem;
+  font-size: 1.16rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-wrap: pretty;
+}
+.mood-card--quote small {
+  color: var(--ink-300);
 }
 .mood-card--ig {
   background: var(--ink-900);
@@ -2735,6 +2780,9 @@ button {
   padding: 0.18rem 0.35rem;
   border-radius: 2px;
   background: rgba(6, 7, 10, 0.72);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .mood-card__image.rg3 {
   background: var(--ember-600);
@@ -2764,6 +2812,10 @@ button {
   color: var(--ember-400);
   font-family: var(--f-mono);
   font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  line-height: 1.4;
+  text-transform: uppercase;
 }
 .mood-card__tags {
   display: flex;
@@ -2773,9 +2825,14 @@ button {
 .mood-card__tags i {
   padding: 0.25rem 0.4rem;
   border-radius: 3px;
-  background: var(--surface-2);
-  font-size: 0.7rem;
+  background: var(--paper-100);
+  color: var(--paper-900);
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
   font-style: normal;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
 }
 .mood-card__tags .ember {
   background: var(--ember-500);
@@ -2909,7 +2966,9 @@ button {
   border-left: 2px solid transparent;
   border-radius: var(--r-sm);
   color: var(--text-2);
+  font-family: var(--f-body);
   font-size: 0.87rem;
+  font-weight: 600;
   transition:
     background 0.16s var(--e-cut),
     border-color 0.16s var(--e-cut),
@@ -3010,6 +3069,7 @@ button {
   color: var(--text-2);
   font-family: var(--f-mono);
   font-size: 0.72rem;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -3034,6 +3094,7 @@ button {
   color: var(--text-2);
   font-family: var(--f-mono);
   font-size: 0.68rem;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -4260,6 +4321,232 @@ button {
 .theme-toggle:focus-visible .theme-toggle__switch {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(226, 104, 46, 0.18);
+}
+
+/* Developer handoff: content structures added for the launch copy. */
+.landing {
+  overflow-x: clip;
+}
+
+.brand__caption {
+  max-width: min(24ch, 28vw);
+}
+
+.about__skill-groups {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.about__skill-groups > div {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.about__skill-groups b {
+  color: var(--text-muted);
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.impact__campaigns {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.7fr) minmax(0, 1.3fr);
+  gap: clamp(1.5rem, 4vw, 3rem);
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.impact__campaigns h3 {
+  margin: 0.65rem 0;
+  font-size: clamp(1.5rem, 3vw, 2.35rem);
+}
+
+.impact__campaigns p {
+  max-width: 42ch;
+  color: var(--text-muted);
+}
+
+.impact__campaigns ul {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.impact__campaigns li {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(0, 1.2fr);
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.impact__campaigns li span {
+  color: var(--text-muted);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+}
+
+.work__preview-media iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.experience-reel__frame h3 {
+  max-width: 14ch;
+  overflow-wrap: anywhere;
+}
+
+.experience-reel__track b {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.contact__callback {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 44px;
+  margin-top: 0.85rem;
+  padding: 0.65rem 0;
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.process-hero {
+  padding: clamp(6rem, 14vw, 11rem) 0 clamp(4rem, 9vw, 7rem);
+  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(
+      circle at 78% 24%,
+      color-mix(in srgb, var(--accent) 20%, transparent),
+      transparent 28%
+    ),
+    var(--bg-subtle);
+}
+
+.process-hero h1 {
+  max-width: 11ch;
+  margin: 0.8rem 0 1.2rem;
+  font-size: clamp(3.4rem, 9vw, 8rem);
+  line-height: 0.92;
+}
+
+.process-hero p {
+  max-width: 58ch;
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+}
+
+.process-method ol {
+  margin: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.process-method li {
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
+  gap: clamp(1rem, 4vw, 3rem);
+  padding: clamp(1.4rem, 3vw, 2.2rem) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.process-method li > span,
+.process-turnaround dt {
+  color: var(--accent-text);
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.process-method h3 {
+  margin: 0 0 0.45rem;
+  font-size: clamp(1.5rem, 3vw, 2.4rem);
+  text-transform: uppercase;
+}
+
+.process-method p {
+  max-width: 62ch;
+}
+
+.process-turnaround {
+  background: var(--bg-subtle);
+}
+
+.process-turnaround dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+
+.process-turnaround dl > div {
+  display: flex;
+  min-height: 8rem;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  background: var(--surface);
+}
+
+.process-turnaround dd {
+  max-width: 15ch;
+  margin: 0;
+  color: var(--text);
+  font-family: var(--f-display);
+  font-size: clamp(1.35rem, 3vw, 2.2rem);
+  font-weight: 700;
+  text-align: right;
+}
+
+.process-turnaround__notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.process-turnaround__notes p {
+  padding: 1rem 1.2rem;
+  border-left: 2px solid var(--accent);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+@media (max-width: 720px) {
+  .about__skill-groups > div,
+  .impact__campaigns,
+  .impact__campaigns li,
+  .process-turnaround__notes {
+    grid-template-columns: 1fr;
+  }
+
+  .process-method li {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+
+  .process-turnaround dl {
+    grid-template-columns: 1fr;
+  }
+
+  .process-turnaround dl > div {
+    min-height: 6rem;
+  }
 }
 
 /* Light Studio uses its own readable ink palette rather than the dark preview
@@ -6085,6 +6372,13 @@ button {
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.public-nav .theme-toggle {
+  width: 74px;
+  min-width: 74px;
+  margin-left: 0.35rem;
+  padding-inline: 0.35rem;
 }
 
 .theme-toggle__glyph {

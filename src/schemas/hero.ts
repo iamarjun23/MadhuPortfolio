@@ -10,7 +10,7 @@ export const HeroSchema = z.object({
   secondaryCta: z.object({ label: z.string(), href: z.string() }),
   reelLabel: z.string().max(80).default("REEL 01 - N MADHU KUMAR"),
   aspectRatioLabel: z.string().max(20).default("2.39 : 1"),
-  creditLine1: z.string().max(80).default("CUT BY N. MADHU KUMAR"),
+  creditLine1: z.string().max(80).default("CUT BY N MADHU KUMAR"),
   creditLine2: z.string().max(80).default("BENGALURU - 23.976 FPS"),
   footerLeftLabel: z.string().max(40).default("EST. 2023"),
   footerRightLabel: z.string().max(40).default("FRAME BY FRAME"),

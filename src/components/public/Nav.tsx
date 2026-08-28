@@ -17,33 +17,58 @@ type NavProps = Readonly<{
 export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavProps) {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [isPastHero, setIsPastHero] = useState(false);
+  const [hasClearedHero, setHasClearedHero] = useState(false);
+  // Only the landing page has a hero to clear, so derive it rather than
+  // resetting the flag from an effect on every other route.
+  const isPastHero = pathname === "/" && hasClearedHero;
   const isDrawingRoom = pathname === "/room";
+  const isProcess = pathname === "/process";
+  const isPortfolioHome = pathname === "/";
   const site = settings.site ?? defaultSiteSettings;
   const brand = site.brand ?? defaultSiteSettings.brand;
   const navigation = site.navigation ?? defaultSiteSettings.navigation;
 
+  // Coalesced into one read per frame. Reacting to every scroll event meant a
+  // forced layout per event, which is what made scrolling feel chunky.
   useEffect(() => {
-    const updateScrolledState = () => {
-      setIsScrolled(window.scrollY > 16);
-
-      if (pathname !== "/") {
-        setIsPastHero(false);
-        return;
-      }
-
-      const hero = document.getElementById("hero");
-      setIsPastHero((hero?.getBoundingClientRect().bottom ?? Infinity) <= 64);
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setIsScrolled(window.scrollY > 16);
+      });
     };
 
-    updateScrolledState();
-    window.addEventListener("scroll", updateScrolledState, { passive: true });
-    return () => window.removeEventListener("scroll", updateScrolledState);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  // The hero crossing is a geometry question, so let the browser answer it off
+  // the main thread rather than measuring the hero on every scroll event.
+  useEffect(() => {
+    if (pathname !== "/") return;
+
+    const hero = document.getElementById("hero");
+    if (!hero) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setHasClearedHero(!(entry?.isIntersecting ?? true)),
+      { rootMargin: "-64px 0px 0px 0px", threshold: 0 },
+    );
+    observer.observe(hero);
+    return () => observer.disconnect();
   }, [pathname]);
 
   const caption = isDrawingRoom
     ? navigation.drawingRoomCaption
-    : (contact?.availabilityLabel ?? "open for briefs");
+    : isProcess
+      ? "How I work"
+      : (contact?.availabilityLabel ?? "open for briefs");
 
   return (
     <header
@@ -68,31 +93,21 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
         </div>
 
         <nav className="public-nav__right nav-stagger" aria-label="Primary navigation">
-          {isDrawingRoom ? (
-            <Link className="public-nav__link" href="/">
-              <span className="link-underline">{navigation.portfolioLabel}</span>
-            </Link>
-          ) : (
-            <>
-              <Link className="public-nav__link" href="#work">
-                <span className="link-underline">{navigation.workLabel}</span>
-              </Link>
-              <Link className="public-nav__link" href="/room">
-                <span className="link-underline">{navigation.drawingRoomLabel}</span>
-              </Link>
-              <Link className="public-nav__link" href="/studio">
-                <span className="link-underline">{navigation.studioLabel}</span>
-              </Link>
-            </>
-          )}
-          {!isDrawingRoom ? (
-            <Link className="public-nav__cta" href="#contact">
-              {navigation.contactLabel}
-              <span className="public-nav__cta-arrow" aria-hidden="true">
-                →
-              </span>
-            </Link>
-          ) : null}
+          <Link className="public-nav__link" href={isPortfolioHome ? "#work" : "/#work"}>
+            <span className="link-underline">{navigation.workLabel}</span>
+          </Link>
+          <Link className="public-nav__link" href="/room">
+            <span className="link-underline">{navigation.drawingRoomLabel}</span>
+          </Link>
+          <Link className="public-nav__link" href={navigation.studioHref}>
+            <span className="link-underline">{navigation.studioLabel}</span>
+          </Link>
+          <Link className="public-nav__cta" href={isPortfolioHome ? "#contact" : "/#contact"}>
+            {navigation.contactLabel}
+            <span className="public-nav__cta-arrow" aria-hidden="true">
+              ↗
+            </span>
+          </Link>
         </nav>
       </div>
     </header>

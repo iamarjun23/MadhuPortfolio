@@ -22,6 +22,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://madhu.edit https://placehold.co https://images.pexels.com https://*.ufs.sh https://*.uploadthing.com",
       "media-src 'self' blob: https://videos.pexels.com https://*.ufs.sh https://*.uploadthing.com",
+      "frame-src 'self' https://www.youtube-nocookie.com",
       "connect-src 'self' https://api.uploadthing.com https://*.ufs.sh https://*.uploadthing.com",
     ].join("; ");
 

@@ -11,6 +11,8 @@ const TEMPORARY_IMPACT_IMAGES = [
   "https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=600",
 ] as const;
 
+const SPONSORSHIP_SHOWS = new Set(["Mahanati", "Bigg Boss Kannada", "Sa Re Ga Ma Pa"]);
+
 function getImpactImage(image: Impact["worked"][number]["image"], index: number, name: string) {
   if (image && !isPlaceholderImageSrc(displayImageSrc(image.url))) {
     return image;
@@ -75,6 +77,16 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
     if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
+  const collaborators = data.worked.filter((person) => !SPONSORSHIP_SHOWS.has(person.name));
+  const campaigns = data.campaigns.length
+    ? data.campaigns
+    : data.worked
+        .filter((person) => SPONSORSHIP_SHOWS.has(person.name))
+        .map((person) => ({
+          name: person.name,
+          context: "Jar sponsorship performance film",
+        }));
+
   return (
     <section className="impact" ref={ref}>
       <div className="wrap">
@@ -94,14 +106,14 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                 {data.heading}
               </h2>
               <span>
-                {data.worked.length} {data.collaboratorsLabel}
+                {collaborators.length} {data.collaboratorsLabel}
               </span>
             </div>
             {/* Grid auto-placement is DOM-order based: inserting the full-width
                 detail panel right after the clicked card forces a new grid row,
                 so it lands directly under that card's row at any column count. */}
             <div className="impact__worked-grid">
-              {data.worked.map((person, index) => {
+              {collaborators.map((person, index) => {
                 const isActive = index === activeIndex;
                 const image = getImpactImage(person.image, index, person.name);
                 return (
@@ -144,6 +156,23 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
               })}
             </div>
           </div>
+          {campaigns.length ? (
+            <div className="impact__campaigns">
+              <div>
+                <span className="slate">Campaign credit</span>
+                <h3>{data.campaignsHeading}</h3>
+                <p>{data.campaignsDescription}</p>
+              </div>
+              <ul>
+                {campaigns.map((campaign) => (
+                  <li key={campaign.name}>
+                    <b>{campaign.name}</b>
+                    <span>{campaign.context}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>

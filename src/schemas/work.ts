@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const WorkSchema = z.object({
   eyebrow: z.string().max(40).default("Selected work"),
-  heading: z.string().max(100).default("Every cut, one view."),
+  heading: z.string().max(100).default("Rearrange the room."),
   intro: z
     .string()
     .max(180)

@@ -11,6 +11,7 @@ export const ContactSchema = z.object({
       "Podcast, campaign, event or documentary — if it needs to move people, I'd love to cut it.",
     ),
   projectCtaLabel: z.string().max(40).default("Start a project"),
+  callbackCtaLabel: z.string().max(40).default("Request a callback"),
   bestForLabel: z.string().max(30).default("Best for"),
   bestFor: z.string().max(120).default("Podcasts · campaigns · events · documentaries"),
   availabilityHeading: z.string().max(30).default("Availability"),

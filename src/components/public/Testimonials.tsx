@@ -1,5 +1,7 @@
 import type { Praise } from "@/schemas";
 export function Testimonials({ data }: Readonly<{ data: Praise }>) {
+  if (!data.visible || data.quotes.length === 0) return null;
+
   return (
     <section className="section" id="testimonials">
       <div className="wrap">

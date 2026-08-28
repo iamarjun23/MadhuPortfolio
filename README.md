@@ -2,6 +2,10 @@
 
 Next.js foundation for N Madhu Kumar's portfolio, Drawing Room, and Studio CMS.
 
+The public navigation label “Studio” opens `/process`, which presents the editing workflow,
+turnaround guidance, and Photobooth. The protected content-management workspace remains at
+`/studio`.
+
 ## Phase
 
 Current implementation: Phase 12 deployment hardening from the PRD.

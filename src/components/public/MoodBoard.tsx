@@ -91,7 +91,22 @@ function cardContent(card: Room["cards"][number]) {
 
 export function MoodBoard({ data }: MoodBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; x: number; y: number } | null>(null);
+  // The board and card geometry is measured once per drag; re-measuring on
+  // every pointer move forced a layout on each event.
+  const dragRef = useRef<{
+    id: string;
+    node: HTMLDivElement;
+    grabX: number;
+    grabY: number;
+    fx: number;
+    fy: number;
+    boardLeft: number;
+    boardTop: number;
+    boardWidth: number;
+    boardHeight: number;
+    cardWidth: number;
+    cardHeight: number;
+  } | null>(null);
   const [positions, setPositions] = useState<Record<string, Position>>(() =>
     Object.fromEntries(
       data.cards.map((card) => [card.id, { fx: card.fx, fy: card.fy, rot: card.rot }]),
@@ -136,18 +151,19 @@ export function MoodBoard({ data }: MoodBoardProps) {
 
   useEffect(() => {
     const finish = () => {
-      setPositions((current) =>
-        Object.fromEntries(
-          Object.entries(current).map(([id, position]) => [
-            id,
-            {
-              ...position,
-              fx: safeBoardPosition(position.fx),
-              fy: safeBoardPosition(position.fy),
-            },
-          ]),
-        ),
-      );
+      const drag = dragRef.current;
+      // Without this guard every pointerup anywhere on the page rebuilt the
+      // whole position map and re-rendered the board.
+      if (!drag) return;
+
+      setPositions((current) => ({
+        ...current,
+        [drag.id]: {
+          ...current[drag.id]!,
+          fx: safeBoardPosition(drag.fx),
+          fy: safeBoardPosition(drag.fy),
+        },
+      }));
       dragRef.current = null;
       setDragged(null);
     };
@@ -160,38 +176,50 @@ export function MoodBoard({ data }: MoodBoardProps) {
   }, []);
 
   function pointerDown(event: React.PointerEvent<HTMLDivElement>, id: string) {
-    if (!canReposition) return;
+    const board = boardRef.current;
+    const position = positions[id];
+    if (!canReposition || !board || !position) return;
     const card = event.currentTarget;
     const rect = card.getBoundingClientRect();
-    dragRef.current = { id, x: event.clientX - rect.left, y: event.clientY - rect.top };
+    const boardRect = board.getBoundingClientRect();
+    dragRef.current = {
+      id,
+      node: card,
+      grabX: event.clientX - rect.left,
+      grabY: event.clientY - rect.top,
+      fx: position.fx,
+      fy: position.fy,
+      boardLeft: boardRect.left,
+      boardTop: boardRect.top,
+      boardWidth: board.clientWidth,
+      boardHeight: board.clientHeight,
+      cardWidth: card.offsetWidth,
+      cardHeight: card.offsetHeight,
+    };
     setDragged(id);
     card.setPointerCapture(event.pointerId);
   }
+
+  // Positioned directly on the node while dragging, then committed to state on
+  // pointerup: routing every move through state re-rendered all board cards.
   function pointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
-    const board = boardRef.current;
-    if (!drag || !board) return;
-    const card = event.currentTarget;
-    const boardRect = board.getBoundingClientRect();
+    if (!drag) return;
     const x = Math.max(
-      -card.offsetWidth * 0.6,
-      Math.min(board.clientWidth - card.offsetWidth * 0.4, event.clientX - boardRect.left - drag.x),
+      -drag.cardWidth * 0.6,
+      Math.min(drag.boardWidth - drag.cardWidth * 0.4, event.clientX - drag.boardLeft - drag.grabX),
     );
     const y = Math.max(
-      -card.offsetHeight * 0.6,
+      -drag.cardHeight * 0.6,
       Math.min(
-        board.clientHeight - card.offsetHeight * 0.4,
-        event.clientY - boardRect.top - drag.y,
+        drag.boardHeight - drag.cardHeight * 0.4,
+        event.clientY - drag.boardTop - drag.grabY,
       ),
     );
-    setPositions((current) => ({
-      ...current,
-      [drag.id]: {
-        ...current[drag.id]!,
-        fx: x / Math.max(1, board.clientWidth),
-        fy: y / Math.max(1, board.clientHeight),
-      },
-    }));
+    drag.fx = x / Math.max(1, drag.boardWidth);
+    drag.fy = y / Math.max(1, drag.boardHeight);
+    drag.node.style.left = `${drag.fx * 100}%`;
+    drag.node.style.top = `${drag.fy * 100}%`;
   }
 
   function moveCardByKeyboard(

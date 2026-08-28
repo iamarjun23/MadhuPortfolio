@@ -50,6 +50,22 @@ function stopPreview(event: React.MouseEvent<HTMLElement>) {
   video.currentTime = 0;
 }
 
+function getYouTubeId(value: string | null) {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, "");
+    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] ?? null;
+    if (host !== "youtube.com" && host !== "m.youtube.com") return null;
+
+    const pathId = url.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1];
+    return url.searchParams.get("v") ?? pathId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function WorkConsole({
   data,
   contactEmail,
@@ -65,6 +81,8 @@ export function WorkConsole({
     y: 0,
     offsetX: 0,
     offsetY: 0,
+    currentX: 0,
+    currentY: 0,
   });
   const allProjects = data.lanes.flatMap((lane) =>
     lane.projects.map((project) => ({ project, laneLabel: lane.label })),
@@ -88,27 +106,36 @@ export function WorkConsole({
       y: event.clientY,
       offsetX: offset.x,
       offsetY: offset.y,
+      currentX: offset.x,
+      currentY: offset.y,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
+  // The card is driven straight through its custom properties while the pointer
+  // is down; committing to state on every move re-rendered every card in the
+  // cloud, each of which carries a video and a blurred backdrop.
   function cardPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
-    if (!cardDrag.current.active) return;
-    const deltaX = event.clientX - cardDrag.current.x;
-    const deltaY = event.clientY - cardDrag.current.y;
-    if (Math.abs(deltaX) + Math.abs(deltaY) > 5) cardDrag.current.moved = true;
+    const drag = cardDrag.current;
+    if (!drag.active) return;
+    const deltaX = event.clientX - drag.x;
+    const deltaY = event.clientY - drag.y;
+    if (Math.abs(deltaX) + Math.abs(deltaY) > 5) drag.moved = true;
 
-    setCardOffsets((current) => ({
-      ...current,
-      [cardDrag.current.id]: {
-        x: cardDrag.current.offsetX + deltaX,
-        y: cardDrag.current.offsetY + deltaY,
-      },
-    }));
+    drag.currentX = drag.offsetX + deltaX;
+    drag.currentY = drag.offsetY + deltaY;
+    const card = event.currentTarget;
+    card.style.setProperty("--card-offset-x", `${drag.currentX}px`);
+    card.style.setProperty("--card-offset-y", `${drag.currentY}px`);
   }
 
   function cardPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
-    cardDrag.current.active = false;
+    const drag = cardDrag.current;
+    if (drag.active) {
+      const { id, currentX, currentY } = drag;
+      setCardOffsets((current) => ({ ...current, [id]: { x: currentX, y: currentY } }));
+    }
+    drag.active = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -135,6 +162,7 @@ export function WorkConsole({
   }, [preview]);
 
   const brief = `mailto:${contactEmail}?subject=${encodeURIComponent("Brief: Selected work")}`;
+  const previewYouTubeId = getYouTubeId(preview?.project.href ?? null);
 
   return (
     <section className="work section" id="work">
@@ -176,7 +204,7 @@ export function WorkConsole({
             <a className="work__brief" href={brief}>
               <span>{data.briefPrompt}</span>
               <strong>
-                {data.briefCta} <i aria-hidden="true">&nearr;</i>
+                {data.briefCta} <i aria-hidden="true">↗</i>
               </strong>
             </a>
           </div>
@@ -220,7 +248,7 @@ export function WorkConsole({
                   >
                     <span className={`work__thumb ${project.thumbHint}`}>
                       {project.preview ? (
-                        <video muted loop playsInline preload="metadata">
+                        <video muted loop playsInline preload="none">
                           <source src={project.preview} type="video/mp4" />
                         </video>
                       ) : null}
@@ -256,7 +284,15 @@ export function WorkConsole({
                     &times;
                   </button>
                   <div className="work__preview-media">
-                    {preview.project.preview ? (
+                    {previewYouTubeId ? (
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${previewYouTubeId}?rel=0`}
+                        title={`${preview.project.title} video`}
+                        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        allowFullScreen
+                      />
+                    ) : preview.project.preview ? (
                       <video key={preview.project.id} controls autoPlay muted playsInline>
                         <source src={preview.project.preview} type="video/mp4" />
                       </video>

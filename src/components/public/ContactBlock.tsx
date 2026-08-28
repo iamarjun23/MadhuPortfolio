@@ -1,20 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { initialTimecode, useTimecode } from "@/lib/use-timecode";
 import type { Contact } from "@/schemas";
 export function ContactBlock({ contact }: Readonly<{ contact: Contact }>) {
-  const [timecode, setTimecode] = useState("00:00:00:00");
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    let frame = 0;
-    const timer = window.setInterval(() => {
-      frame = (frame + 1) % 24;
-      const seconds = Math.floor(performance.now() / 1000);
-      setTimecode(
-        `${String(Math.floor(seconds / 3600)).padStart(2, "0")}:${String(Math.floor(seconds / 60) % 60).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}:${String(frame).padStart(2, "0")}`,
-      );
-    }, 1000 / 24);
-    return () => window.clearInterval(timer);
-  }, []);
+  const timecodeRef = useTimecode();
   return (
     <section className="contact" id="contact">
       <div className="wrap">
@@ -31,7 +19,13 @@ export function ContactBlock({ contact }: Readonly<{ contact: Contact }>) {
             >
               <span>{contact.projectCtaLabel}</span>
               <b>{contact.email}</b>
-              <i aria-hidden="true">&nearr;</i>
+              <i aria-hidden="true">↗</i>
+            </a>
+            <a
+              className="contact__callback"
+              href={`mailto:${contact.email}?subject=${encodeURIComponent("Callback request")}`}
+            >
+              {contact.callbackCtaLabel} <span aria-hidden="true">↗</span>
             </a>
           </div>
           <aside className="contact__details">
@@ -56,7 +50,7 @@ export function ContactBlock({ contact }: Readonly<{ contact: Contact }>) {
                 </a>
               ) : null}
               {contact.phone ? <a href={`tel:${contact.phone}`}>{contact.phone}</a> : null}
-              <span>{timecode}</span>
+              <span ref={timecodeRef}>{initialTimecode}</span>
             </div>
           </aside>
         </div>

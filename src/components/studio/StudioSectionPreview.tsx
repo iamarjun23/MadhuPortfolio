@@ -38,7 +38,7 @@ function getSummary(section: SectionKey, data: PreviewData) {
     case "work":
       return {
         eyebrow: stringValue(data, "eyebrow", "Selected work"),
-        title: stringValue(data, "heading", "Every cut, one view."),
+        title: stringValue(data, "heading", "Rearrange the room."),
         detail: `${arrayLength(data, "lanes")} work categories`,
       };
     case "booth":

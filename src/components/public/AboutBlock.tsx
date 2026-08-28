@@ -12,6 +12,7 @@ const STAND_IN_VIDEO_POSTER =
 
 export function AboutBlock({ data }: Readonly<{ data: About }>) {
   const sectionRef = useRef<HTMLElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const portraitVideo = data.portraitVideo;
   const portraitImage =
@@ -26,6 +27,10 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
       ([entry]) => {
         if (entry?.isIntersecting) {
           setIsVisible(true);
+          // The portrait clip is below the fold, so its source is only fetched
+          // once the section is actually reached instead of competing with the
+          // hero for bandwidth on first paint.
+          videoRef.current?.play().catch(() => {});
           observer.disconnect();
         }
       },
@@ -48,11 +53,11 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
             />
           ) : (
             <video
-              autoPlay
+              ref={videoRef}
               muted
               loop
               playsInline
-              preload="auto"
+              preload="none"
               poster={portraitVideo?.poster ?? portraitImage?.url ?? STAND_IN_VIDEO_POSTER}
               aria-label={portraitImage?.alt ?? "Madhu editing"}
             >
@@ -79,9 +84,16 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
             </div>
             <div>
               <span className="about__specs-label">{data.skillsLabel}</span>
-              <div className="tags">
-                {data.skills.map((skill) => (
-                  <span key={skill}>{skill}</span>
+              <div className="about__skill-groups">
+                {data.skillGroups.map((group) => (
+                  <div key={group.label}>
+                    <b>{group.label}</b>
+                    <div className="tags">
+                      {group.items.map((skill) => (
+                        <span key={skill}>{skill}</span>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

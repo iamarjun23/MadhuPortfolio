@@ -16,7 +16,7 @@ export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
             </h2>
             <p>{teaser.description}</p>
             <Link className="drawing-teaser__link" href="/room">
-              {teaser.ctaLabel} <span aria-hidden="true">&nearr;</span>
+              {teaser.ctaLabel} <span aria-hidden="true">↗</span>
             </Link>
           </div>
           <div className="drawing-teaser__archive" aria-hidden="true">

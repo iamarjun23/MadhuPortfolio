@@ -4,13 +4,11 @@ import { DrawingRoomTeaser } from "@/components/public/DrawingRoomTeaser";
 import { Experience } from "@/components/public/Experience";
 import { Hero } from "@/components/public/Hero";
 import { ImpactStrip } from "@/components/public/ImpactStrip";
-import { Photobooth } from "@/components/public/Photobooth";
 import { Testimonials } from "@/components/public/Testimonials";
 import { WorkConsole } from "@/components/public/WorkConsole";
 import { defaultSiteSettings } from "@/schemas/settings";
 import {
   getAbout,
-  getBooth,
   getContact,
   getExperience,
   getHero,
@@ -22,13 +20,12 @@ import {
 } from "@/lib/content";
 
 export default async function PortfolioPage() {
-  const [hero, about, impact, work, booth, praise, experience, room, contact, settings] =
+  const [hero, about, impact, work, praise, experience, room, contact, settings] =
     await Promise.all([
       getHero(),
       getAbout(),
       getImpact(),
       getWork(),
-      getBooth(),
       getPraise(),
       getExperience(),
       getRoom(),
@@ -45,7 +42,6 @@ export default async function PortfolioPage() {
       <AboutBlock data={about} />
       <ImpactStrip data={impact} />
       <WorkConsole data={work} contactEmail={contact.email} />
-      <Photobooth data={booth} />
       <Testimonials data={praise} />
       <Experience data={experience} />
       <DrawingRoomTeaser data={room} />

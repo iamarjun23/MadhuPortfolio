@@ -64,7 +64,7 @@ export function Footer({ contact, settings }: FooterProps) {
         <nav className="public-footer__column" aria-label={footer.exploreHeading}>
           <h2>{footer.exploreHeading}</h2>
           <Link href="/#work">{footer.selectedWorkLabel}</Link>
-          <Link href="/#photobooth">{footer.photoboothLabel}</Link>
+          <Link href="/process#photobooth">{footer.photoboothLabel}</Link>
           <Link href="/#experience">{footer.experienceLabel}</Link>
           <Link href="/room">{footer.drawingRoomLabel}</Link>
         </nav>

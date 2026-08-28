@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const PraiseSchema = z.object({
+  visible: z.boolean().default(false),
   eyebrow: z.string().max(40).default("Praise"),
   heading: z.string().max(80).default("What people say"),
   sampleLabel: z.string().max(40).default("Sample quote"),
