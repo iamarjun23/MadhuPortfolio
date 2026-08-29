@@ -46,5 +46,10 @@ export default nextConfig;
 
 // Mirrors Cloudflare Workers bindings (Hyperdrive, etc.) into `process.env` for `next dev`,
 // so local dev matches the Workers runtime without touching the config above.
-import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
-await initOpenNextCloudflareForDev();
+// Guarded to dev only: `next build` (both locally and in Cloudflare Workers Builds) always sets
+// NODE_ENV=production, and calling this during a build requires a local binding emulation setup
+// that CI has no reason to have — the real bindings come from the deployed Worker at runtime.
+if (process.env.NODE_ENV === "development") {
+  const { initOpenNextCloudflareForDev } = await import("@opennextjs/cloudflare");
+  await initOpenNextCloudflareForDev();
+}
