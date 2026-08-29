@@ -18,7 +18,9 @@ function withExplicitSslMode(databaseUrl: string) {
 // there is no Cloudflare context, so fall back to DATABASE_URL.
 function resolveConnectionString() {
   try {
-    const { env } = getCloudflareContext();
+    const { env } = getCloudflareContext() as {
+      env: { HYPERDRIVE?: { connectionString: string } };
+    };
     if (env.HYPERDRIVE?.connectionString) return env.HYPERDRIVE.connectionString;
   } catch {
     // Not running inside a Cloudflare Worker request — use DATABASE_URL below.
