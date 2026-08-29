@@ -14,6 +14,14 @@ type NavProps = Readonly<{
   showThemeToggle: boolean;
 }>;
 
+function formatAvailabilityTicker(value: string | undefined) {
+  const label = value?.trim();
+  const expanded =
+    !label || label.toLowerCase() === "available" ? "Available for freelance" : label;
+
+  return expanded.endsWith("·") ? expanded : `${expanded} ·`;
+}
+
 export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavProps) {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -68,7 +76,7 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
     ? navigation.drawingRoomCaption
     : isProcess
       ? "How I work"
-      : (contact?.availabilityLabel ?? "open for briefs");
+      : formatAvailabilityTicker(contact?.availabilityLabel);
 
   return (
     <header
@@ -81,16 +89,20 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
             <span className="brand__name">{brand.name}</span>
             <span className="brand__suffix">{brand.suffix}</span>
           </Link>
-          <span className="brand__caption" aria-live="polite">
-            <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
-            <span
-              className="brand__caption-type"
-              style={{ ["--ch" as string]: `${caption.length}ch` }}
-            >
-              {caption}
+        </div>
+
+        <span className="brand__caption" aria-label={`${navigation.captionPrefix} ${caption}`}>
+          <span className="brand__caption-track" aria-hidden="true">
+            <span className="brand__caption-item">
+              <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
+              <span>{caption}</span>
+            </span>
+            <span className="brand__caption-item brand__caption-item--clone">
+              <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
+              <span>{caption}</span>
             </span>
           </span>
-        </div>
+        </span>
 
         <nav className="public-nav__right nav-stagger" aria-label="Primary navigation">
           <Link className="public-nav__link" href={isPortfolioHome ? "#work" : "/#work"}>

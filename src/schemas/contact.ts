@@ -17,7 +17,7 @@ export const ContactSchema = z.object({
   availabilityHeading: z.string().max(30).default("Availability"),
   locationLabel: z.string().max(30).default("Based in"),
   availableForFreelance: z.boolean().default(true),
-  availabilityLabel: z.string().max(30).default("Available"),
+  availabilityLabel: z.string().max(30).default("Available for freelance ·"),
   footerStatus: z.string().max(60),
   email: z.email(),
   location: z.string().max(80),

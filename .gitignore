@@ -47,6 +47,13 @@ coverage/
 .eslintcache
 .stylelintcache
 
+# cloudflare / opennext
+.open-next/
+.wrangler/
+cloudflare-env.d.ts
+.dev.vars
+.dev.vars.*
+
 # prisma — keep schema & migrations, drop generated client + local db files
 src/generated/
 prisma/*.db

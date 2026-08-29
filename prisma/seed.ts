@@ -676,7 +676,7 @@ export const sectionData = {
   }),
   contact: ContactSchema.parse({
     availableForFreelance: true,
-    availabilityLabel: "Available for freelance",
+    availabilityLabel: "Available for freelance ·",
     footerStatus: "Available for freelance",
     projectCtaLabel: "Book a call",
     callbackCtaLabel: "Request a callback",

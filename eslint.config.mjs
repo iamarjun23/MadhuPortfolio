@@ -3,7 +3,15 @@ import nextTypescript from "eslint-config-next/typescript";
 
 const eslintConfig = [
   {
-    ignores: [".next/**", "node_modules/**", "src/generated/**", "*.tsbuildinfo"],
+    ignores: [
+      ".next/**",
+      "node_modules/**",
+      "src/generated/**",
+      "*.tsbuildinfo",
+      ".open-next/**",
+      ".wrangler/**",
+      "cloudflare-env.d.ts",
+    ],
   },
   ...nextVitals,
   ...nextTypescript,

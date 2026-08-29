@@ -16,7 +16,7 @@ function getTheme(value: string | undefined, defaultTheme: "suite" | "sheet" | "
 }
 
 export const viewport: Viewport = {
-  themeColor: "#10161B",
+  themeColor: "#050505",
 };
 
 export async function generateMetadata(): Promise<Metadata> {

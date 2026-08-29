@@ -5,6 +5,7 @@ allowBuilds:
   prisma: true
   sharp: true
   unrs-resolver: true
+  workerd: true
 minimumReleaseAgeExclude:
   - "@next/eslint-plugin-next@16.2.12"
   - eslint-config-next@16.2.12
@@ -25,3 +26,4 @@ onlyBuiltDependencies:
   - "prisma"
   - "sharp"
   - "unrs-resolver"
+  - "workerd"

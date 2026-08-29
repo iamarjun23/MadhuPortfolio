@@ -271,10 +271,11 @@ button {
 
 .public-nav__inner {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(8rem, 1fr) auto;
   align-items: center;
   min-height: 64px;
-  gap: 1rem;
+  column-gap: clamp(1rem, 2.2vw, 2rem);
   padding-top: env(safe-area-inset-top);
   transition: min-height 0.3s var(--e-cut);
 }
@@ -297,9 +298,6 @@ button {
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(14px) saturate(145%);
   -webkit-backdrop-filter: blur(14px) saturate(145%);
-}
-.public-nav.is-past-hero .brand__caption {
-  display: none;
 }
 .public-nav.is-past-hero .public-nav__right {
   gap: 1rem;
@@ -337,7 +335,6 @@ button {
 .public-nav__right {
   justify-content: flex-end;
   gap: 1.4rem;
-  margin-left: auto;
 }
 
 .brand {
@@ -372,61 +369,86 @@ button {
 }
 
 .brand__caption {
-  display: inline-flex;
-  align-items: baseline;
-  flex: 0 1 auto;
+  display: block;
+  width: min(100%, 24rem);
   min-width: 0;
-  margin-left: 0.9rem;
+  overflow: hidden;
   color: var(--text-muted);
   font-family: var(--f-mono);
   font-size: 0.72rem;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 0.75rem,
+    #000 calc(100% - 0.75rem),
+    transparent
+  );
+}
+
+.brand__caption-track {
+  display: flex;
+  width: max-content;
+  max-width: none;
+  gap: 2rem;
+  animation: nav-ticker 15s linear infinite;
+}
+
+.brand__caption-item {
+  display: inline-flex;
+  align-items: baseline;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .brand__caption-dash {
-  flex: 0 0 auto;
-  color: var(--text-muted);
+  color: var(--accent-text);
 }
 
-.brand__caption-type {
-  display: inline-block;
-  overflow: hidden;
-  white-space: nowrap;
-  vertical-align: bottom;
-  max-width: var(--ch, 22ch);
-  width: 0;
-  border-right: 1px solid var(--accent);
-  animation:
-    brand-type 6s ease-in-out 400ms infinite,
-    brand-caret 0.8s steps(1) infinite;
+.brand__caption-item--clone {
+  display: inline-flex;
 }
 
-@keyframes brand-type {
-  0% {
-    width: 0;
-  }
-  30% {
-    width: var(--ch, 22ch);
-  }
-  70% {
-    width: var(--ch, 22ch);
-  }
-  100% {
-    width: 0;
+@keyframes nav-ticker {
+  to {
+    transform: translateX(calc(-50% - 1rem));
   }
 }
-@keyframes brand-caret {
-  50% {
-    border-color: transparent;
+
+@media (max-width: 1100px) {
+  .public-nav__inner,
+  .public-nav.is-past-hero .public-nav__inner {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.15rem;
+    padding-bottom: 0.42rem;
+  }
+
+  .brand__caption {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: min(100%, 24rem);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand__caption-type {
-    width: var(--ch, 22ch);
-    border-right-color: transparent;
+  .brand__caption {
+    overflow: visible;
+    white-space: normal;
+    mask-image: none;
+  }
+
+  .brand__caption-track {
+    width: auto;
     animation: none;
+  }
+
+  .brand__caption-item {
+    white-space: normal;
+  }
+
+  .brand__caption-item--clone {
+    display: none;
   }
 }
 
@@ -833,22 +855,22 @@ button {
   transform: translate(2px, -2px);
 }
 .public-footer__social--instagram {
-  border-color: color-mix(in srgb, #d34a78 48%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
 }
 .public-footer__social--instagram:hover {
-  background: color-mix(in srgb, #d34a78 14%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 .public-footer__social--youtube {
-  border-color: color-mix(in srgb, #e4574f 52%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
 }
 .public-footer__social--youtube:hover {
-  background: color-mix(in srgb, #e4574f 14%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 .public-footer__social--linkedin {
-  border-color: color-mix(in srgb, #4b91c9 52%, var(--border));
+  border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
 }
 .public-footer__social--linkedin:hover {
-  background: color-mix(in srgb, #4b91c9 14%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
 }
 
 .public-footer__bottom {
@@ -951,8 +973,8 @@ button {
   position: absolute;
   inset: -10%;
   background:
-    radial-gradient(circle at 20% 30%, rgba(226, 104, 46, 0.5), transparent 40%),
-    radial-gradient(circle at 80% 20%, rgba(47, 165, 179, 0.4), transparent 44%), #06070a;
+    radial-gradient(circle at 20% 30%, rgba(255, 106, 0, 0.56), transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(255, 138, 51, 0.24), transparent 44%), #030303;
 }
 .hero__video {
   position: absolute;
@@ -1496,11 +1518,11 @@ button {
   margin-bottom: 1.35rem;
 }
 .work__panel--bd-2 {
-  background: linear-gradient(140deg, rgba(47, 165, 179, 0.2), transparent 55%), var(--ink-850);
+  background: linear-gradient(140deg, rgba(255, 106, 0, 0.2), transparent 55%), var(--ink-850);
 }
 .work__panel--bd-3 {
   background:
-    linear-gradient(140deg, rgba(226, 104, 46, 0.14), rgba(47, 165, 179, 0.13)), var(--ink-850);
+    linear-gradient(140deg, rgba(255, 106, 0, 0.18), rgba(255, 138, 51, 0.08)), var(--ink-850);
 }
 .work__panel--bd-4 {
   background: linear-gradient(140deg, rgba(139, 154, 164, 0.18), transparent 55%), var(--ink-850);
@@ -1771,9 +1793,9 @@ button {
   z-index: 9;
   inset: 0;
   background:
-    radial-gradient(circle at 20% 15%, rgba(226, 104, 46, 0.18), transparent 34%),
-    radial-gradient(circle at 82% 76%, rgba(47, 165, 179, 0.14), transparent 38%),
-    rgba(4, 7, 10, 0.5);
+    radial-gradient(circle at 20% 15%, rgba(255, 106, 0, 0.2), transparent 34%),
+    radial-gradient(circle at 82% 76%, rgba(255, 138, 51, 0.1), transparent 38%),
+    rgba(0, 0, 0, 0.58);
   cursor: pointer;
   backdrop-filter: blur(16px) saturate(82%);
   -webkit-backdrop-filter: blur(16px) saturate(82%);
@@ -2679,9 +2701,9 @@ button {
 .mood-card:nth-of-type(3n)::before {
   background: radial-gradient(
     circle at 35% 30%,
-    #a7e7ed 0 12%,
+    #ffd3b2 0 12%,
     var(--signal-500) 28% 65%,
-    #165965 100%
+    #7a2f00 100%
   );
 }
 .mood-card:nth-of-type(4n)::before {
@@ -2690,9 +2712,9 @@ button {
 .mood-card--pin-signal::before {
   background: radial-gradient(
     circle at 35% 30%,
-    #a7e7ed 0 12%,
+    #ffd3b2 0 12%,
     var(--signal-500) 28% 65%,
-    #165965 100%
+    #7a2f00 100%
   );
 }
 .mood-card--tape::before {
@@ -3722,10 +3744,6 @@ button {
     display: none;
   }
 
-  .brand__caption {
-    display: none;
-  }
-
   .availability-badge {
     padding: 0.4rem 0.5rem;
   }
@@ -4308,7 +4326,7 @@ button {
 
 .theme-toggle--light .theme-toggle__switch {
   border-color: rgba(74, 67, 57, 0.25);
-  background: #d7e8e8;
+  background: #ffd3b2;
   box-shadow: inset 0 1px 2px rgba(74, 67, 57, 0.12);
 }
 
@@ -4329,7 +4347,7 @@ button {
 }
 
 .brand__caption {
-  max-width: min(24ch, 28vw);
+  max-width: none;
 }
 
 .about__skill-groups {
@@ -4549,17 +4567,17 @@ button {
   }
 }
 
-/* Light Studio uses its own readable ink palette rather than the dark preview
-   palette, while retaining the contrast of the editorial controls. */
+/* The alternate theme stays within the same black-and-orange system while
+   using a slightly softer charcoal surface hierarchy. */
 [data-theme="light"] .studio-editor__heading {
-  border-bottom-color: rgba(74, 67, 57, 0.2);
-  background: linear-gradient(90deg, rgba(226, 104, 46, 0.12), transparent 48%);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+  background: linear-gradient(90deg, rgba(255, 106, 0, 0.15), transparent 48%);
 }
 
 [data-theme="light"] .studio-editor__group,
 [data-theme="light"] .studio-array > header,
 [data-theme="light"] .studio-array__detail > header {
-  border-color: rgba(74, 67, 57, 0.18);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="light"] .studio-field > span,
@@ -4572,32 +4590,32 @@ button {
 [data-theme="light"] .studio-field textarea,
 [data-theme="light"] .studio-field select,
 [data-theme="light"] .studio-switch {
-  border-color: rgba(74, 67, 57, 0.28);
+  border-color: rgba(255, 255, 255, 0.18);
   color: var(--d-text);
 }
 
 [data-theme="light"] .studio-field textarea {
-  background: rgba(74, 67, 57, 0.035);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 [data-theme="light"] .studio-array__records,
 [data-theme="light"] .studio-array__records .studio-editor-card,
 [data-theme="light"] .studio-array__record-wrap,
 [data-theme="light"] .studio-array__detail > header {
-  border-color: rgba(74, 67, 57, 0.16);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 [data-theme="light"] .studio-array__record:hover,
 [data-theme="light"] .studio-array__record.is-active {
-  background: linear-gradient(90deg, rgba(226, 104, 46, 0.15), transparent);
+  background: linear-gradient(90deg, rgba(255, 106, 0, 0.18), transparent);
 }
 
 [data-theme="light"] .studio-array__record.is-active b {
-  color: #8f3f1d;
+  color: var(--accent-text);
 }
 
 [data-theme="light"] .studio-section-preview > header {
-  color: #d9e6e8;
+  color: var(--text-2);
 }
 
 /* Keep the rail and top bar in separate stacking contexts at every width. */
@@ -4709,13 +4727,13 @@ button {
 }
 
 .theme-toggle--light {
-  border-color: rgba(31, 101, 110, 0.36);
-  background: rgba(47, 165, 179, 0.1);
-  color: #1f656e;
+  border-color: rgba(185, 71, 0, 0.36);
+  background: rgba(255, 106, 0, 0.1);
+  color: #b94700;
 }
 
 .theme-toggle--light .theme-toggle__track {
-  background: #94cbd0;
+  background: #ffb176;
 }
 
 .theme-toggle--light .theme-toggle__dot {
@@ -4735,8 +4753,8 @@ button {
 }
 
 .public-nav .theme-toggle--light {
-  border-color: rgba(31, 101, 110, 0.32);
-  background: rgba(47, 165, 179, 0.09);
+  border-color: rgba(185, 71, 0, 0.32);
+  background: rgba(255, 106, 0, 0.09);
 }
 
 .public-nav .theme-toggle__label {
@@ -4954,17 +4972,17 @@ button {
 
 [data-theme="light"] .studio-shell {
   background:
-    radial-gradient(circle at 8% 0, rgba(226, 104, 46, 0.15), transparent 25rem),
-    radial-gradient(circle at 95% 18%, rgba(47, 165, 179, 0.14), transparent 28rem), var(--bg);
+    radial-gradient(circle at 8% 0, rgba(255, 106, 0, 0.16), transparent 25rem),
+    radial-gradient(circle at 95% 18%, rgba(255, 138, 51, 0.1), transparent 28rem), var(--bg);
 }
 
 [data-theme="light"] .studio-rail {
-  border-right-color: rgba(74, 67, 57, 0.16);
-  background: rgba(250, 247, 242, 0.86);
+  border-right-color: rgba(255, 255, 255, 0.1);
+  background: rgba(8, 8, 8, 0.9);
 }
 
 [data-theme="light"] .studio-rail__brand {
-  border-bottom-color: rgba(74, 67, 57, 0.14);
+  border-bottom-color: rgba(255, 255, 255, 0.09);
 }
 
 [data-theme="light"] .studio-rail__home > span {
@@ -4978,26 +4996,26 @@ button {
 }
 
 [data-theme="light"] .studio-rail__group a:hover {
-  background: rgba(74, 67, 57, 0.045);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 [data-theme="light"] .studio-rail__group a[aria-current="page"] {
-  background: linear-gradient(90deg, rgba(226, 104, 46, 0.15), transparent 80%);
+  background: linear-gradient(90deg, rgba(255, 106, 0, 0.18), transparent 80%);
 }
 
 [data-theme="light"] .studio-rail__group em {
-  background: rgba(74, 67, 57, 0.09);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text-2);
 }
 
 [data-theme="light"] .studio-topbar {
-  border-bottom-color: rgba(74, 67, 57, 0.15);
-  background: rgba(250, 247, 242, 0.78);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+  background: rgba(5, 5, 5, 0.82);
 }
 
 [data-theme="light"] .studio-save-bar {
-  background: rgba(255, 253, 249, 0.94);
-  box-shadow: 0 18px 40px rgba(74, 67, 57, 0.16);
+  background: rgba(12, 12, 12, 0.96);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
 }
 
 [data-theme="light"] .studio-save-bar__copy p {
@@ -5083,8 +5101,8 @@ button {
 }
 
 [data-theme="light"] .theme-toggle {
-  border-color: rgba(74, 67, 57, 0.28);
-  color: #4a4339;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text-2);
 }
 
 /* Larger touch target and a phone-network style release signal in Studio. */
@@ -5276,7 +5294,7 @@ button {
 }
 
 [data-theme="light"] .theme-toggle__option.is-active {
-  color: #211e19;
+  color: var(--text);
 }
 
 @media (max-width: 580px) {
@@ -5541,8 +5559,8 @@ button {
    scene order visible at all times and content grouped by its public purpose. */
 .studio-shell {
   background:
-    radial-gradient(circle at 12% 4%, rgba(226, 104, 46, 0.14), transparent 24rem),
-    radial-gradient(circle at 94% 28%, rgba(47, 165, 179, 0.1), transparent 26rem), #0d1218;
+    radial-gradient(circle at 12% 4%, rgba(255, 106, 0, 0.16), transparent 24rem),
+    radial-gradient(circle at 94% 28%, rgba(255, 138, 51, 0.08), transparent 26rem), #050505;
 }
 
 .studio-rail {
@@ -5897,12 +5915,12 @@ button {
   min-height: 300px;
   padding: clamp(1.1rem, 3vw, 2rem);
   background:
-    linear-gradient(145deg, rgba(226, 104, 46, 0.22), transparent 55%),
-    radial-gradient(circle at 92% 18%, rgba(47, 165, 179, 0.25), transparent 24%), #17232b;
+    linear-gradient(145deg, rgba(255, 106, 0, 0.24), transparent 55%),
+    radial-gradient(circle at 92% 18%, rgba(255, 138, 51, 0.16), transparent 24%), #111;
 }
 
 .studio-section-preview--settings .studio-section-preview__canvas {
-  background: linear-gradient(145deg, rgba(47, 165, 179, 0.3), transparent 55%), #17232b;
+  background: linear-gradient(145deg, rgba(255, 106, 0, 0.3), transparent 55%), #111;
 }
 
 .studio-section-preview__eyebrow,
@@ -6413,7 +6431,7 @@ button {
 
 .theme-toggle--light .theme-toggle__switch {
   border-color: rgba(74, 67, 57, 0.25);
-  background: #d7e8e8;
+  background: #ffd3b2;
   box-shadow: inset 0 1px 2px rgba(74, 67, 57, 0.12);
 }
 

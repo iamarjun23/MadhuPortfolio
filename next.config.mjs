@@ -43,3 +43,8 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
+// Mirrors Cloudflare Workers bindings (Hyperdrive, etc.) into `process.env` for `next dev`,
+// so local dev matches the Workers runtime without touching the config above.
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+await initOpenNextCloudflareForDev();
