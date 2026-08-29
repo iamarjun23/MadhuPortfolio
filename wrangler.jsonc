@@ -4,6 +4,9 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
+  "build": {
+    "command": "npx pnpm@11.9.0 cf:build",
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
