@@ -1,4 +1,4 @@
-import { Status } from "@/generated/prisma";
+import { Status } from "@prisma/client";
 import { getBooth, getPraise, getWork } from "@/lib/content";
 import { getDb } from "@/lib/db";
 import { sectionKeys } from "@/lib/sections";

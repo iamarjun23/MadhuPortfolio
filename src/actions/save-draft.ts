@@ -1,6 +1,6 @@
 "use server";
 
-import { Prisma, Status } from "@/generated/prisma";
+import { Prisma, Status } from "@prisma/client";
 import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
 import { updateContent } from "@/lib/revalidate";

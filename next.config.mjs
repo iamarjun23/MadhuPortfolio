@@ -6,7 +6,7 @@ const nextConfig = {
   // tracer's default build only copies part of the package — leaving `dist/index.js` missing when
   // OpenNext re-bundles for Workers. Marking these external makes Next copy the packages' full,
   // untraced directories into the standalone output instead, carrying the whole file through.
-  serverExternalPackages: ["pg", "pg-cloudflare"],
+  serverExternalPackages: ["pg", "pg-cloudflare", "@prisma/client"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "madhu.edit" },

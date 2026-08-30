@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient, Status } from "../src/generated/prisma";
+import { Prisma, PrismaClient, Status } from "@prisma/client";
 import { sectionKeys, type SectionKey } from "../src/lib/sections";
 import { placeholderImageUrl } from "../src/lib/placeholders";
 import {
