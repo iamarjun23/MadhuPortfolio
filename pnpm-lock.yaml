@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  pg-cloudflare@1.4.0: 43ab90baa4db5d3693bb7a3621de75cb61ed76ee7df1c22ddaea1eb74cefc9d9
+
 importers:
 
   .:
@@ -43,7 +46,7 @@ importers:
         version: 5.0.0-beta.32(next@16.2.12(@babel/core@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       pg-cloudflare:
         specifier: ^1.4.0
-        version: 1.4.0
+        version: 1.4.0(patch_hash=43ab90baa4db5d3693bb7a3621de75cb61ed76ee7df1c22ddaea1eb74cefc9d9)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -7887,7 +7890,7 @@ snapshots:
 
   perfect-debounce@2.1.0: {}
 
-  pg-cloudflare@1.4.0: {}
+  pg-cloudflare@1.4.0(patch_hash=43ab90baa4db5d3693bb7a3621de75cb61ed76ee7df1c22ddaea1eb74cefc9d9): {}
 
   pg-connection-string@2.14.0: {}
 
@@ -7915,7 +7918,7 @@ snapshots:
       pg-types: 2.2.0
       pgpass: 1.0.5
     optionalDependencies:
-      pg-cloudflare: 1.4.0
+      pg-cloudflare: 1.4.0(patch_hash=43ab90baa4db5d3693bb7a3621de75cb61ed76ee7df1c22ddaea1eb74cefc9d9)
 
   pgpass@1.0.5:
     dependencies:

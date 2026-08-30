@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // `pg`'s Cloudflare Workers support (`pg-cloudflare`) uses a "workerd"-conditional export that
+  // Next's file tracer resolves differently than OpenNext's later esbuild bundle pass, so the
+  // tracer's default build only copies part of the package — leaving `dist/index.js` missing when
+  // OpenNext re-bundles for Workers. Marking these external makes Next copy the packages' full,
+  // untraced directories into the standalone output instead, carrying the whole file through.
+  serverExternalPackages: ["pg", "pg-cloudflare"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "madhu.edit" },
