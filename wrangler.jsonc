@@ -17,6 +17,10 @@
     {
       "binding": "HYPERDRIVE",
       "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      // Never actually connected to — opennextjs-cloudflare's `deploy` command starts a local
+      // Miniflare proxy just to collect env vars/bindings before the real remote deploy, and that
+      // proxy setup fails without *some* Postgres-shaped connection string here. Any dummy value works.
+      "localConnectionString": "postgresql://user:password@localhost:5432/postgres",
     },
   ],
   "r2_buckets": [
