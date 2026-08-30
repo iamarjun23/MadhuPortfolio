@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "madhu-edit",
+  "name": "madhuportfolio",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -16,7 +16,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "REPLACE_WITH_HYPERDRIVE_ID",
+      "id": "52e310b1815c41c1b0e817916036c5f0",
       // Never actually connected to — opennextjs-cloudflare's `deploy` command starts a local
       // Miniflare proxy just to collect env vars/bindings before the real remote deploy, and that
       // proxy setup fails without *some* Postgres-shaped connection string here. Any dummy value works.
