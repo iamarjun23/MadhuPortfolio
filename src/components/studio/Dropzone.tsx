@@ -1,14 +1,14 @@
 "use client";
 
-/* Dynamic object URLs and UploadThing URLs cannot use Next's static image optimization. */
+/* Dynamic object URLs and uploaded media URLs cannot use Next's static image optimization. */
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useId, useState } from "react";
 import { deleteMedia } from "@/actions/media";
-import { useUploadThing } from "@/lib/uploadthing-client";
+import { useMediaUpload } from "@/lib/media-upload-client";
+import type { UploadEndpoint } from "@/lib/media-upload";
 
-export type UploadEndpoint =
-  "heroVideo" | "portrait" | "boothImage" | "logoImage" | "roomImage" | "ogImage";
+export type { UploadEndpoint };
 
 type UploadResult = Readonly<{ id: string; url: string }>;
 
@@ -36,20 +36,7 @@ export function Dropzone({
   const [error, setError] = useState<string>();
   const [uploadedId, setUploadedId] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
-  const { startUpload, isUploading } = useUploadThing(endpoint, {
-    onClientUploadComplete: (files) => {
-      const upload = files[0]?.serverData;
-      if (!upload) {
-        setError("The upload finished without a media record.");
-        return;
-      }
-      setProgress(100);
-      setUploadedId(upload.id);
-      onUploaded({ id: upload.id, url: upload.url });
-    },
-    onUploadError: (uploadError) => setError(uploadError.message),
-    onUploadProgress: setProgress,
-  });
+  const { startUpload, isUploading } = useMediaUpload(endpoint);
 
   useEffect(
     () => () => {
@@ -68,9 +55,12 @@ export function Dropzone({
     setUploadedId(undefined);
 
     try {
-      await startUpload([file]);
-    } catch {
-      setError("Could not start the upload. Check your UploadThing configuration.");
+      const upload = await startUpload(file, setProgress);
+      setProgress(100);
+      setUploadedId(upload.id);
+      onUploaded({ id: upload.id, url: upload.url });
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Could not start the upload.");
     }
   };
 
@@ -114,7 +104,7 @@ export function Dropzone({
         />
         <span>{label}</span>
         <small>
-          {enabled ? "Drop a file or choose one" : "Add UPLOADTHING_TOKEN to enable uploads"}
+          {enabled ? "Drop a file or choose one" : "Uploads are not configured"}
         </small>
       </label>
       {displayUrl ? (
