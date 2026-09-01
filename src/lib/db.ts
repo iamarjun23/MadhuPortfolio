@@ -1,10 +1,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { cache } from "react";
 import { PrismaClient } from "@/generated/prisma/client";
-
-declare global {
-  var madhuPrisma: PrismaClient | undefined;
-}
 
 function withExplicitSslMode(databaseUrl: string) {
   return databaseUrl.replace(
@@ -47,11 +44,13 @@ function resolveConnectionString() {
 
 function createClient() {
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString: resolveConnectionString() }),
+    // Worker requests cannot safely reuse a PostgreSQL connection pool. Limit
+    // each client to the request that created it, then let pg retire the
+    // connection after its first use.
+    adapter: new PrismaPg({ connectionString: resolveConnectionString(), maxUses: 1 }),
   });
 }
 
-export function getDb() {
-  globalThis.madhuPrisma ??= createClient();
-  return globalThis.madhuPrisma;
-}
+// React's request cache shares one client between Server Components rendered
+// for the same request without retaining it in the Worker global scope.
+export const getDb = cache(createClient);
