@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, Role } from "@prisma/client";
+import { PrismaClient, Role } from "../src/generated/prisma/client";
 
 const databaseUrl = process.env.DATABASE_URL;
 const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();

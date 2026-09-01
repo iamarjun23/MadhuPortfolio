@@ -55,6 +55,7 @@ coverage/
 .dev.vars.*
 
 # prisma — keep schema & migrations, drop local db files
+src/generated/prisma/
 prisma/*.db
 prisma/*.db-journal
 

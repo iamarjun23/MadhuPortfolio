@@ -1,4 +1,4 @@
-import { MediaKind } from "@prisma/client";
+import { MediaKind } from "@/generated/prisma/client";
 
 export type UploadEndpoint =
   | "heroVideo"

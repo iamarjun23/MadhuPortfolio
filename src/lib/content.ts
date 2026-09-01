@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
-import { Status } from "@prisma/client";
+import { Status } from "@/generated/prisma/client";
 import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { contentTag } from "@/lib/revalidate";
 import type { SectionKey } from "@/lib/sections";
