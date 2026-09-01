@@ -1,6 +1,6 @@
 import { Status } from "@prisma/client";
 import { getBooth, getPraise, getWork } from "@/lib/content";
-import { getDb } from "@/lib/db";
+import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { sectionKeys } from "@/lib/sections";
 import type { StudioShellData } from "@/lib/studio-nav";
 
@@ -64,7 +64,7 @@ function hasChangedDraft(
 }
 
 export async function hasPendingChanges() {
-  if (!process.env.DATABASE_URL) return false;
+  if (!isDatabaseConfigured()) return false;
 
   const sections = await getDb().section.findMany({
     where: { key: { in: [...sectionKeys] } },
@@ -77,7 +77,7 @@ export async function hasPendingChanges() {
 export async function getStudioShellData(): Promise<StudioShellData> {
   const [work, booth, praise] = await Promise.all([getWork(), getBooth(), getPraise()]);
 
-  if (!process.env.DATABASE_URL) {
+  if (!isDatabaseConfigured()) {
     return {
       badges: {
         work: work.lanes.length,
@@ -112,7 +112,7 @@ export async function getStudioDashboardData(): Promise<StudioDashboardData> {
     workItems: work.lanes.reduce((total, lane) => total + lane.projects.length, 0),
   };
 
-  if (!process.env.DATABASE_URL) return { ...common, activity: [] };
+  if (!isDatabaseConfigured()) return { ...common, activity: [] };
 
   const activity = await getDb().activity.findMany({
     orderBy: { createdAt: "desc" },

@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { Status } from "@prisma/client";
-import { getDb } from "@/lib/db";
+import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { contentTag } from "@/lib/revalidate";
 import type { SectionKey } from "@/lib/sections";
 import {
@@ -25,7 +25,7 @@ async function getSection<TSchema extends z.ZodType>(
 ): Promise<z.output<TSchema>> {
   const read = unstable_cache(
     async () => {
-      if (!process.env.DATABASE_URL) {
+      if (!isDatabaseConfigured()) {
         // Imported on demand: the seed module parses every section's defaults at
         // module scope, so keeping it off the configured path saves that work.
         const { sectionData } = await import("../../prisma/seed");
