@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MediaUrlSchema } from "./media";
 
 export const ImpactSchema = z.object({
   heading: z.string().max(80).default("In the room with"),
@@ -22,7 +23,7 @@ export const ImpactSchema = z.object({
       z.object({
         name: z.string().max(60),
         context: z.string().max(60),
-        image: z.object({ url: z.url(), alt: z.string() }).nullable(),
+        image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable(),
       }),
     )
     .max(60),

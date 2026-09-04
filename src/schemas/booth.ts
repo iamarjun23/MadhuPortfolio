@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MediaUrlSchema } from "./media";
 
 export const BoothSchema = z.object({
   eyebrow: z.string().max(40).default("Photobooth"),
@@ -10,7 +11,7 @@ export const BoothSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        image: z.object({ url: z.url(), alt: z.string() }).nullable(),
+        image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable(),
         title: z.string().max(60),
         subtitle: z.string().max(80),
         lightboxCaption: z.string().max(120),

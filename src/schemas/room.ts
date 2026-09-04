@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MediaUrlSchema } from "./media";
 
 const CardBase = z.object({
   id: z.string(),
@@ -10,7 +11,7 @@ const CardBase = z.object({
 
 const PolaroidSchema = CardBase.extend({
   type: z.literal("polaroid"),
-  image: z.object({ url: z.url(), alt: z.string() }).nullable(),
+  image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable(),
   tint: z.enum(["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"]),
   tag: z.string().max(20),
   caption: z.string().max(60),

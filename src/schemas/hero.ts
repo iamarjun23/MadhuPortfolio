@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MediaUrlSchema } from "./media";
 
 export const HeroSchema = z.object({
   eyebrow: z.string().max(140),
@@ -15,8 +16,8 @@ export const HeroSchema = z.object({
   footerLeftLabel: z.string().max(40).default("EST. 2023"),
   footerRightLabel: z.string().max(40).default("FRAME BY FRAME"),
   bgVideo: z.object({
-    url: z.url(),
-    poster: z.url().optional(),
+    url: MediaUrlSchema,
+    poster: MediaUrlSchema.optional(),
     duotone: z.boolean().default(true),
   }),
 });

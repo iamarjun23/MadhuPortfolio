@@ -31,7 +31,7 @@ export function isDatabaseConfigured() {
 
 function resolveConnectionString() {
   const hyperdriveConnectionString = getHyperdriveConnectionString();
-  if (hyperdriveConnectionString) return hyperdriveConnectionString;
+  if (hyperdriveConnectionString) return withExplicitSslMode(hyperdriveConnectionString);
 
   const databaseUrl = process.env.DATABASE_URL;
 

@@ -36,7 +36,12 @@ export function Dropzone({
   const [error, setError] = useState<string>();
   const [uploadedId, setUploadedId] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { startUpload, isUploading } = useMediaUpload(endpoint);
+
+  const isVideo = endpoint === "heroVideo";
+  const maxBytes = (isVideo ? 32 : 4) * 1024 * 1024;
+  const fileHint = isVideo ? "Video up to 32 MB" : "Image up to 4 MB";
 
   useEffect(
     () => () => {
@@ -47,6 +52,14 @@ export function Dropzone({
 
   const chooseFile = async (file: File | undefined) => {
     if (!file || !enabled || isUploading) return;
+    if (!file.type.startsWith(isVideo ? "video/" : "image/")) {
+      setError(`Choose an ${isVideo ? "video" : "image"} file.`);
+      return;
+    }
+    if (file.size > maxBytes) {
+      setError(`${file.name} is larger than the ${isVideo ? "32" : "4"} MB limit.`);
+      return;
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
     setPreviewIsVideo(file.type.startsWith("video/"));
@@ -65,18 +78,21 @@ export function Dropzone({
   };
 
   const removeUpload = async () => {
-    if (!uploadedId) return;
+    if (!uploadedId || isDeleting) return;
+    setIsDeleting(true);
     const result = await deleteMedia(uploadedId);
     if (!result.ok) {
       setError(result.error);
+      setIsDeleting(false);
       return;
     }
     setUploadedId(undefined);
     setPreviewUrl(undefined);
     onDeleted();
+    setIsDeleting(false);
   };
 
-  const accept = endpoint === "heroVideo" ? "video/*" : "image/*";
+  const accept = isVideo ? "video/*" : "image/*";
   const displayUrl = previewUrl ?? value;
 
   return (
@@ -100,11 +116,14 @@ export function Dropzone({
           type="file"
           accept={accept}
           disabled={!enabled || isUploading}
-          onChange={(event) => void chooseFile(event.target.files?.[0])}
+          onChange={(event) => {
+            void chooseFile(event.target.files?.[0]);
+            event.target.value = "";
+          }}
         />
         <span>{label}</span>
         <small>
-          {enabled ? "Drop a file or choose one" : "Uploads are not configured"}
+          {enabled ? `${fileHint} · Drop a file or choose one` : "Uploads are not configured"}
         </small>
       </label>
       {displayUrl ? (
@@ -116,17 +135,26 @@ export function Dropzone({
           )}
         </div>
       ) : null}
-      {isUploading ? <p className="studio-dropzone__status">Uploading {progress}%</p> : null}
+      {isUploading ? (
+        <p className="studio-dropzone__status" role="status" aria-live="polite">
+          Uploading {progress}%
+        </p>
+      ) : null}
       {uploadedId ? (
         <button
           className="studio-dropzone__delete"
           type="button"
           onClick={() => void removeUpload()}
+          disabled={isDeleting}
         >
-          Delete uploaded file
+          {isDeleting ? "Deleting..." : "Delete uploaded file"}
         </button>
       ) : null}
-      {error ? <p className="studio-dropzone__error">{error}</p> : null}
+      {error ? (
+        <p className="studio-dropzone__error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

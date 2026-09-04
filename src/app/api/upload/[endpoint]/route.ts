@@ -25,8 +25,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: `Expected a ${config.accept}* file.` }, { status: 400 });
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? "0");
-  if (!contentLength || contentLength > config.maxBytes) {
+  const declaredContentLength = Number(request.headers.get("content-length") ?? "0");
+  if (declaredContentLength > config.maxBytes) {
     return NextResponse.json(
       { error: `File must be under ${Math.round(config.maxBytes / (1024 * 1024))}MB.` },
       { status: 413 },
@@ -42,15 +42,28 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Missing file body." }, { status: 400 });
   }
 
+  // R2 requires the length of a streamed upload. Buffering here also verifies
+  // the actual payload size rather than relying on a client-supplied header.
+  const file = await request.arrayBuffer();
+  if (!file.byteLength) {
+    return NextResponse.json({ error: "Missing file body." }, { status: 400 });
+  }
+  if (file.byteLength > config.maxBytes) {
+    return NextResponse.json(
+      { error: `File must be under ${Math.round(config.maxBytes / (1024 * 1024))}MB.` },
+      { status: 413 },
+    );
+  }
+
   const key = `${endpoint}/${randomUUID()}`;
-  await env.MEDIA_BUCKET.put(key, request.body, { httpMetadata: { contentType } });
+  await env.MEDIA_BUCKET.put(key, file, { httpMetadata: { contentType } });
 
   const media = await getDb().media.create({
     data: {
       key,
       url: `/api/media/${key}`,
       kind: config.kind,
-      bytes: contentLength,
+      bytes: file.byteLength,
       mime: contentType,
     },
   });

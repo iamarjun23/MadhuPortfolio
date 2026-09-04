@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MediaUrlSchema } from "./media";
 
 export const ExperienceSchema = z.object({
   eyebrow: z.string().max(40).default("Experience"),
@@ -21,7 +22,7 @@ export const ExperienceSchema = z.object({
         id: z.string(),
         company: z.string().max(60),
         role: z.string().max(60),
-        logo: z.object({ url: z.url() }).nullable(),
+        logo: z.object({ url: MediaUrlSchema }).nullable(),
         logoHint: z.enum(["l-jar", "l-onep", "l-ulc", "l-hb", "custom"]).default("custom"),
         initials: z.string().max(4),
         start: z.string().max(20),

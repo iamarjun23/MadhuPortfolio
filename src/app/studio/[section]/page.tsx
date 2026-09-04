@@ -19,5 +19,12 @@ export default async function StudioSectionPage({ params }: StudioSectionPagePro
   const data = await getStudioDraft(sectionKey);
   const uploadEnabled = await isMediaUploadConfigured();
 
-  return <SectionEditor section={sectionKey} data={data} uploadEnabled={uploadEnabled} />;
+  return (
+    <SectionEditor
+      key={sectionKey}
+      section={sectionKey}
+      data={data}
+      uploadEnabled={uploadEnabled}
+    />
+  );
 }

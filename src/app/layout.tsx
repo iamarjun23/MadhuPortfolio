@@ -1,19 +1,14 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import {
-  Bricolage_Grotesque,
-  Hanken_Grotesk,
-  Instrument_Serif,
-  JetBrains_Mono,
-} from "next/font/google";
+import { DM_Sans, Instrument_Serif, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
+const display = Space_Grotesk({
   subsets: ["latin"],
   variable: "--f-display",
 });
 
-const body = Hanken_Grotesk({
+const body = DM_Sans({
   subsets: ["latin"],
   variable: "--f-body",
 });
