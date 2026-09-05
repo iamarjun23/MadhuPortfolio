@@ -21,6 +21,7 @@ type CloudCardStyle = React.CSSProperties & {
   "--cloud-rotate": string;
   "--card-offset-x": string;
   "--card-offset-y": string;
+  "--cloud-float-delay": string;
 };
 
 function getCloudPosition(index: number, total: number) {
@@ -83,6 +84,10 @@ export function WorkConsole({
     offsetY: 0,
     currentX: 0,
     currentY: 0,
+    minX: Number.NEGATIVE_INFINITY,
+    maxX: Number.POSITIVE_INFINITY,
+    minY: Number.NEGATIVE_INFINITY,
+    maxY: Number.POSITIVE_INFINITY,
   });
   const allProjects = data.lanes.flatMap((lane) =>
     lane.projects.map((project) => ({ project, laneLabel: lane.label })),
@@ -98,6 +103,10 @@ export function WorkConsole({
   function cardPointerDown(event: React.PointerEvent<HTMLButtonElement>, id: string) {
     event.stopPropagation();
     const offset = cardOffsets[id] ?? { x: 0, y: 0 };
+    const canvasBounds = event.currentTarget
+      .closest(".work__cloud-canvas")
+      ?.getBoundingClientRect();
+    const cardBounds = event.currentTarget.getBoundingClientRect();
     cardDrag.current = {
       active: true,
       moved: false,
@@ -108,6 +117,16 @@ export function WorkConsole({
       offsetY: offset.y,
       currentX: offset.x,
       currentY: offset.y,
+      minX: canvasBounds
+        ? offset.x + canvasBounds.left - cardBounds.left
+        : Number.NEGATIVE_INFINITY,
+      maxX: canvasBounds
+        ? offset.x + canvasBounds.right - cardBounds.right
+        : Number.POSITIVE_INFINITY,
+      minY: canvasBounds ? offset.y + canvasBounds.top - cardBounds.top : Number.NEGATIVE_INFINITY,
+      maxY: canvasBounds
+        ? offset.y + canvasBounds.bottom - cardBounds.bottom
+        : Number.POSITIVE_INFINITY,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
@@ -122,8 +141,8 @@ export function WorkConsole({
     const deltaY = event.clientY - drag.y;
     if (Math.abs(deltaX) + Math.abs(deltaY) > 5) drag.moved = true;
 
-    drag.currentX = drag.offsetX + deltaX;
-    drag.currentY = drag.offsetY + deltaY;
+    drag.currentX = Math.min(Math.max(drag.offsetX + deltaX, drag.minX), drag.maxX);
+    drag.currentY = Math.min(Math.max(drag.offsetY + deltaY, drag.minY), drag.maxY);
     const card = event.currentTarget;
     card.style.setProperty("--card-offset-x", `${drag.currentX}px`);
     card.style.setProperty("--card-offset-y", `${drag.currentY}px`);
@@ -223,6 +242,7 @@ export function WorkConsole({
                   "--cloud-rotate": `${position.rotate}deg`,
                   "--card-offset-x": `${offset.x}px`,
                   "--card-offset-y": `${offset.y}px`,
+                  "--cloud-float-delay": `-${(index * 0.77) % 5.8}s`,
                 };
 
                 return (

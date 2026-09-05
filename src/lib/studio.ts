@@ -101,9 +101,9 @@ export async function getStudioShellData(): Promise<StudioShellData> {
 export async function getStudioDashboardData(): Promise<StudioDashboardData> {
   const [shellData, booth, praise, work] = await Promise.all([
     getStudioShellData(),
-    getBooth(),
-    getPraise(),
-    getWork(),
+    getBooth(Status.DRAFT),
+    getPraise(Status.DRAFT),
+    getWork(Status.DRAFT),
   ]);
   const common = {
     hasUnpublishedChanges: shellData.hasUnpublishedChanges,

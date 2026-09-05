@@ -50,7 +50,8 @@ Create the single Studio owner with `pnpm admin:create` after setting `DATABASE_
 `ADMIN_EMAIL`, and `ADMIN_PASSWORD_HASH` in `.env.local`.
 
 The Studio is protected at `/studio`. Every section has a schema-validated draft editor,
-sortable repeated rows, SaveBar integration, a live Hero preview, and media controls. Existing
+sortable repeated rows, SaveBar integration, live previews that render the matching public
+section, and media controls. Existing
 media URLs remain editable; uploaded files are saved as media records and can then be saved into
 the current draft. Every saved draft is logged on the dashboard. Publish copies all drafts to the
 live version in one transaction and refreshes public content; Settings includes a guarded revert to
@@ -67,6 +68,9 @@ For UploadThing v7, create an app in the UploadThing dashboard and add its V7
 `UPLOADTHING_TOKEN` to `.env.local`. The upload controls deliberately remain disabled until that
 token is configured; URL fields continue to work without it. Upload endpoints require an
 authenticated Studio owner.
+
+Hero video uploads are limited to 48 MB. The upload route verifies the limit on both the declared
+content length and the received payload before storing a file.
 
 ## Source References
 

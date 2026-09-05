@@ -58,27 +58,63 @@ function getRelativeTime(date: Date) {
 
 export default async function StudioPage() {
   const dashboard = await getStudioDashboardData();
+  const readiness = [
+    {
+      href: "/studio/work",
+      label: "Selected work",
+      detail:
+        dashboard.workItems > 0 ? `${dashboard.workItems} videos ready` : "Add your first video",
+      ready: dashboard.workItems > 0,
+    },
+    {
+      href: "/studio/booth",
+      label: "Photobooth",
+      detail:
+        dashboard.photos > 0 ? `${dashboard.photos} photographs ready` : "Add on-set photographs",
+      ready: dashboard.photos > 0,
+    },
+    {
+      href: "/studio/praise",
+      label: "Praise",
+      detail:
+        dashboard.testimonials > 0
+          ? `${dashboard.testimonials} testimonials ready`
+          : "Optional · add when quotes arrive",
+      ready: dashboard.testimonials > 0,
+    },
+    {
+      href: "/studio/settings",
+      label: "Site & navigation",
+      detail: "Review menu, footer, SEO, and domain",
+      ready: true,
+    },
+  ] as const;
 
   return (
     <section className="studio-page studio-dashboard" aria-labelledby="studio-dashboard-title">
       <div className="studio-dashboard__intro">
         <div>
-          <span className="slate">Portfolio control room</span>
-          <h1 id="studio-dashboard-title">Edit the story, scene by scene.</h1>
+          <span className="slate">Today in the Studio</span>
+          <h1 id="studio-dashboard-title">What needs attention?</h1>
           <p>
-            Every visible page section is editable here. Save changes as a draft, then publish when
-            the whole edit feels right.
+            Jump straight to unfinished content, review recent changes, or open any page section.
+            Save drafts while you work and publish only when the full site is ready.
           </p>
         </div>
-        <Link className="studio-dashboard__site-link" href="/studio/settings">
-          Edit site chrome <span aria-hidden="true">→</span>
-        </Link>
+        <div className="studio-dashboard__actions">
+          <Link className="studio-dashboard__site-link" href="/studio/work">
+            Edit selected work <span aria-hidden="true">→</span>
+          </Link>
+          <Link className="studio-dashboard__view-link" href="/" target="_blank">
+            View live site <span aria-hidden="true">↗</span>
+          </Link>
+        </div>
       </div>
 
       <dl className="studio-stats">
         <div>
-          <dt>Publish state</dt>
-          <dd>{dashboard.hasUnpublishedChanges ? "Draft ready" : "Live"}</dd>
+          <dt>Site status</dt>
+          <dd>{dashboard.hasUnpublishedChanges ? "Needs publish" : "Up to date"}</dd>
         </div>
         <div>
           <dt>Work pieces</dt>
@@ -94,11 +130,48 @@ export default async function StudioPage() {
         </div>
       </dl>
 
+      <section className="studio-dashboard-grid" aria-label="Studio priorities and activity">
+        <div>
+          <span className="slate">Content readiness</span>
+          <h2>Finish the essentials.</h2>
+          <div className="studio-readiness">
+            {readiness.map((item) => (
+              <Link href={item.href} key={item.href}>
+                <i className={item.ready ? "is-ready" : undefined} aria-hidden="true" />
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </span>
+                <b aria-hidden="true">→</b>
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div>
+          <span className="slate">Recent activity</span>
+          <h2>Latest saved drafts.</h2>
+          {dashboard.activity.length > 0 ? (
+            <ul className="studio-activity">
+              {dashboard.activity.map((item) => (
+                <li key={item.id}>
+                  <span>{item.message}</span>
+                  <time dateTime={item.createdAt.toISOString()}>
+                    {getRelativeTime(item.createdAt)}
+                  </time>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No draft activity yet. Open a section below to start editing.</p>
+          )}
+        </div>
+      </section>
+
       <section className="studio-section-map" aria-labelledby="studio-section-map-title">
         <header>
           <div>
-            <span className="slate">Landing page map</span>
-            <h2 id="studio-section-map-title">Choose what visitors see.</h2>
+            <span className="slate">All editable content</span>
+            <h2 id="studio-section-map-title">Open a page section.</h2>
           </div>
           <span>{sections.length} editable sections</span>
         </header>
@@ -113,35 +186,6 @@ export default async function StudioPage() {
               <b aria-hidden="true">→</b>
             </Link>
           ))}
-        </div>
-      </section>
-
-      <section className="studio-dashboard-grid">
-        <div>
-          <span className="slate">Shared layout</span>
-          <h2>Navigation, footer & SEO</h2>
-          <p>
-            Change the brand, menu labels, footer, default appearance, and search preview in one
-            place.
-          </p>
-          <Link href="/studio/settings">Open Site & Navigation →</Link>
-        </div>
-        <div>
-          <span className="slate">Recent activity</span>
-          {dashboard.activity.length > 0 ? (
-            <ul className="studio-activity">
-              {dashboard.activity.map((item) => (
-                <li key={item.id}>
-                  <span>{item.message}</span>
-                  <time dateTime={item.createdAt.toISOString()}>
-                    {getRelativeTime(item.createdAt)}
-                  </time>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>No draft activity yet. Start with the section that needs attention.</p>
-          )}
         </div>
       </section>
     </section>

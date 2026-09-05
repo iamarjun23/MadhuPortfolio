@@ -17,13 +17,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { memo, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { saveDraft } from "@/actions/save-draft";
 import { Dropzone, type UploadEndpoint } from "@/components/studio/Dropzone";
 import { SaveBar } from "@/components/studio/SaveBar";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
+import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
 import type { SectionKey } from "@/lib/sections";
 import { studioSectionLabels } from "@/lib/studio-nav";
 import { useStudioStore } from "@/stores/studio-store";
@@ -99,6 +100,93 @@ function updateAtPath(
 
   if (current === undefined || !isEditorObject(current)) return data;
   return { ...data, [head]: updateAtPath(current, tail, nextValue) };
+}
+
+function valueAtPath(
+  data: EditorObject,
+  path: readonly (string | number)[],
+): EditorValue | undefined {
+  let current: EditorValue = data;
+
+  for (const segment of path) {
+    let next: EditorValue | undefined;
+    if (typeof segment === "number") {
+      if (!Array.isArray(current)) return undefined;
+      next = current[segment];
+    } else {
+      if (!isEditorObject(current)) return undefined;
+      next = current[segment];
+    }
+
+    if (next === undefined) return undefined;
+    current = next;
+  }
+
+  return current;
+}
+
+function normalizePreviewText(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
+const nonContentKeys = new Set([
+  "id",
+  "url",
+  "href",
+  "type",
+  "tile",
+  "tint",
+  "color",
+  "pinType",
+  "fx",
+  "fy",
+  "rot",
+]);
+
+function findPreviewPath(
+  value: EditorValue,
+  candidates: readonly string[],
+  path: readonly (string | number)[] = [],
+): readonly (string | number)[] | null {
+  const matches: Array<Readonly<{ path: readonly (string | number)[]; score: number }>> = [];
+
+  const visit = (entry: EditorValue, entryPath: readonly (string | number)[]) => {
+    if (typeof entry === "string") {
+      const lastSegment = entryPath.at(-1);
+      if (typeof lastSegment === "string" && nonContentKeys.has(lastSegment)) return;
+      const normalizedEntry = normalizePreviewText(entry);
+      if (!normalizedEntry) return;
+
+      candidates.forEach((candidate, candidateIndex) => {
+        const exact = candidate === normalizedEntry;
+        const contained =
+          candidate.length > normalizedEntry.length && candidate.includes(normalizedEntry);
+        if (!exact && !contained) return;
+        const score = (exact ? 100_000 : 0) + normalizedEntry.length - candidateIndex * 100;
+        matches.push({ path: entryPath, score });
+      });
+      return;
+    }
+
+    if (Array.isArray(entry)) {
+      entry.forEach((item, index) => visit(item, [...entryPath, index]));
+      return;
+    }
+
+    if (isEditorObject(entry)) {
+      Object.entries(entry).forEach(([key, item]) => visit(item, [...entryPath, key]));
+    }
+  };
+
+  visit(value, path);
+  matches.sort((left, right) => right.score - left.score);
+  return matches[0]?.path ?? null;
+}
+
+function pathLabel(path: readonly (string | number)[]) {
+  return path
+    .map((segment) => (typeof segment === "number" ? `Item ${segment + 1}` : labelFor(segment)))
+    .join(" / ");
 }
 
 function emptyFromTemplate(value: EditorValue): EditorValue {
@@ -564,255 +652,24 @@ function ValueEditor({ value, label, path, onChange, uploadEnabled }: ValueEdito
   );
 }
 
-type CanvasTextProps = Readonly<{
-  label: string;
-  value: string;
-  multiline?: boolean;
-  selected?: boolean;
-  onChange: (value: string) => void;
-  onSelect: () => void;
-}>;
-
-function CanvasText({
-  label,
-  value,
-  multiline = false,
-  selected = false,
-  onChange,
-  onSelect,
-}: CanvasTextProps) {
-  const className = `studio-canvas__text${selected ? " is-selected" : ""}`;
-
-  return multiline ? (
-    <textarea
-      className={className}
-      aria-label={`Edit ${label}`}
-      value={value}
-      rows={3}
-      onFocus={onSelect}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  ) : (
-    <input
-      className={className}
-      aria-label={`Edit ${label}`}
-      value={value}
-      onFocus={onSelect}
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
-type EditorCanvasProps = Readonly<{
-  section: SectionKey;
-  data: EditorObject;
-  activeKey: string;
-  device: "desktop" | "mobile";
-  onChange: (path: readonly (string | number)[], value: EditorValue) => void;
-  onSelect: (key: string) => void;
-}>;
-
-function heroString(data: EditorObject, key: string) {
-  const value = data[key];
-  return typeof value === "string" ? value : "";
-}
-
-function HeroCanvas({
-  data,
-  activeKey,
-  onChange,
-  onSelect,
-}: Omit<EditorCanvasProps, "section" | "device">) {
-  const primaryEntry = data.primaryCta;
-  const primaryCta = primaryEntry && isEditorObject(primaryEntry) ? primaryEntry : {};
-  const primaryLabel = typeof primaryCta.label === "string" ? primaryCta.label : "";
-  const bgVideoEntry = data.bgVideo;
-  const bgVideo = bgVideoEntry && isEditorObject(bgVideoEntry) ? bgVideoEntry : {};
-  const videoUrl = typeof bgVideo.url === "string" ? bgVideo.url : undefined;
-  const videoPoster = typeof bgVideo.poster === "string" ? bgVideo.poster : undefined;
-  const cutWords = Array.isArray(data.cutWords)
-    ? data.cutWords.filter((word): word is string => typeof word === "string")
-    : [];
-
-  return (
-    <div className="studio-canvas-hero">
-      {videoUrl ? (
-        <div className="studio-canvas-hero__media" aria-hidden="true">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="metadata"
-            poster={videoPoster}
-            src={videoUrl}
-          />
-        </div>
-      ) : null}
-      <span className="studio-canvas-hero__frame">LIVE / 01</span>
-      <div className="studio-canvas-hero__content">
-        <CanvasText
-          label="eyebrow"
-          value={heroString(data, "eyebrow")}
-          selected={activeKey === "eyebrow"}
-          onSelect={() => onSelect("eyebrow")}
-          onChange={(value) => onChange(["eyebrow"], value)}
-        />
-        <div className="studio-canvas-hero__headline">
-          <CanvasText
-            label="first headline line"
-            value={heroString(data, "line1")}
-            selected={activeKey === "line1"}
-            onSelect={() => onSelect("line1")}
-            onChange={(value) => onChange(["line1"], value)}
-          />
-          <CanvasText
-            label="second headline line"
-            value={heroString(data, "line2")}
-            selected={activeKey === "line2"}
-            onSelect={() => onSelect("line2")}
-            onChange={(value) => onChange(["line2"], value)}
-          />
-          <button
-            className={`studio-canvas-hero__cut-word${activeKey === "cutWords" ? " is-selected" : ""}`}
-            type="button"
-            onClick={() => onSelect("cutWords")}
-            aria-label="Edit rotating cut words"
-          >
-            {cutWords[0] || "Add a cut word"}
-          </button>
-        </div>
-        <CanvasText
-          label="hero description"
-          value={heroString(data, "sub")}
-          multiline
-          selected={activeKey === "sub"}
-          onSelect={() => onSelect("sub")}
-          onChange={(value) => onChange(["sub"], value)}
-        />
-        <CanvasText
-          label="primary button label"
-          value={primaryLabel}
-          selected={activeKey === "primaryCta"}
-          onSelect={() => onSelect("primaryCta")}
-          onChange={(value) => onChange(["primaryCta", "label"], value)}
-        />
-      </div>
-      <span className="studio-canvas-hero__credit">CUT BY N MADHU KUMAR · BENGALURU</span>
-    </div>
-  );
-}
-
-function GenericCanvas({
-  section,
-  data,
-  activeKey,
-  onChange,
-  onSelect,
-}: Omit<EditorCanvasProps, "device">) {
-  const textEntries = Object.entries(data)
-    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-    .slice(0, 3);
-  const detailEntries = Object.entries(data).filter(([, value]) => typeof value !== "string");
-
-  return (
-    <div className="studio-canvas-generic">
-      <span className="studio-canvas-generic__index">SECTION / {studioSectionLabels[section]}</span>
-      <div className="studio-canvas-generic__content">
-        {textEntries.length > 0 ? (
-          textEntries.map(([key, value], index) => (
-            <CanvasText
-              key={key}
-              label={labelFor(key)}
-              value={value}
-              multiline={index === textEntries.length - 1 && value.length > 72}
-              selected={activeKey === key}
-              onSelect={() => onSelect(key)}
-              onChange={(nextValue) => onChange([key], nextValue)}
-            />
-          ))
-        ) : (
-          <button
-            className="studio-canvas-generic__empty"
-            type="button"
-            onClick={() => onSelect(activeKey)}
-          >
-            Select an element to begin editing this section
-          </button>
-        )}
-      </div>
-      {detailEntries.length > 0 ? (
-        <div className="studio-canvas-generic__details" aria-label="Section details">
-          {detailEntries.slice(0, 4).map(([key, value]) => (
-            <button
-              className={activeKey === key ? "is-selected" : ""}
-              type="button"
-              key={key}
-              onClick={() => onSelect(key)}
-            >
-              <span>{labelFor(key)}</span>
-              <small>
-                {Array.isArray(value)
-                  ? `${value.length} items`
-                  : getMediaConfig(value, [key])
-                    ? "Media upload"
-                    : "Open inspector"}
-              </small>
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-const EditorCanvas = memo(function EditorCanvas({
-  section,
-  data,
-  activeKey,
-  device,
-  onChange,
-  onSelect,
-}: EditorCanvasProps) {
-  return (
-    <section
-      className={`studio-canvas studio-canvas--${device}`}
-      aria-label="Editable live preview"
-    >
-      <header className="studio-canvas__topbar">
-        <span>Editing on the site</span>
-        <span>Click copy to edit</span>
-      </header>
-      <div className="studio-canvas__viewport">
-        {section === "hero" ? (
-          <HeroCanvas data={data} activeKey={activeKey} onChange={onChange} onSelect={onSelect} />
-        ) : (
-          <GenericCanvas
-            section={section}
-            data={data}
-            activeKey={activeKey}
-            onChange={onChange}
-            onSelect={onSelect}
-          />
-        )}
-      </div>
-    </section>
-  );
-});
-
 type SectionEditorProps = Readonly<{
   section: SectionKey;
   data: unknown;
   uploadEnabled: boolean;
+  contactData: unknown;
 }>;
 
-export function SectionEditor({ section, data, uploadEnabled }: SectionEditorProps) {
+export function SectionEditor({ section, data, uploadEnabled, contactData }: SectionEditorProps) {
   const router = useRouter();
   const [savedData, setSavedData] = useState(() => normalizeObject(data));
   const [currentData, setCurrentData] = useState(() => normalizeObject(data));
   const currentDataRef = useRef(currentData);
-  const [activeKey, setActiveKey] = useState(() => Object.keys(savedData)[0] ?? "");
+  const [activePath, setActivePath] = useState<readonly (string | number)[]>(() => {
+    const firstKey = Object.keys(savedData)[0];
+    return firstKey ? [firstKey] : [];
+  });
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+  const [inspectorTab, setInspectorTab] = useState<"content" | "media">("content");
   const { formState, handleSubmit, reset, setValue } = useForm<{ data: unknown }>({
     defaultValues: { data: savedData },
   });
@@ -874,8 +731,15 @@ export function SectionEditor({ section, data, uploadEnabled }: SectionEditorPro
     if (formState.isDirty) markDirty(section);
   }, [formState.isDirty, markDirty, section]);
 
-  const selectedKey = activeKey in currentData ? activeKey : (Object.keys(currentData)[0] ?? "");
-  const activeValue = currentData[selectedKey];
+  const fallbackKey = Object.keys(currentData)[0];
+  const selectedPath =
+    activePath.length > 0 && valueAtPath(currentData, activePath) !== undefined
+      ? activePath
+      : fallbackKey
+        ? [fallbackKey]
+        : [];
+  const selectedRootKey = typeof selectedPath[0] === "string" ? selectedPath[0] : "";
+  const activeValue = valueAtPath(currentData, selectedPath);
   const directMediaFields = Object.entries(currentData).filter((entry) =>
     Boolean(getMediaConfig(entry[1], [entry[0]])),
   );
@@ -911,25 +775,75 @@ export function SectionEditor({ section, data, uploadEnabled }: SectionEditorPro
         </div>
       </div>
       <div className="studio-editor__layout">
-        <EditorCanvas
-          section={section}
-          data={previewData}
-          activeKey={selectedKey}
-          device={previewDevice}
-          onChange={updateValue}
-          onSelect={setActiveKey}
-        />
+        <section
+          className={`studio-canvas studio-canvas--${previewDevice}`}
+          aria-label="Landing-page preview"
+        >
+          <header className="studio-canvas__topbar">
+            <span>Click any visible text to edit it</span>
+            <span>Live draft</span>
+          </header>
+          <div
+            className="studio-canvas__viewport studio-canvas__viewport--editable"
+            onClickCapture={(event) => {
+              const target = event.target;
+              if (!(target instanceof HTMLElement)) return;
+
+              const candidates: string[] = [];
+              let node: HTMLElement | null = target;
+              while (node && node !== event.currentTarget) {
+                const text = normalizePreviewText(node.textContent ?? "");
+                if (text && !candidates.includes(text)) candidates.push(text);
+                node = node.parentElement;
+              }
+
+              const path = findPreviewPath(currentData, candidates);
+              if (!path) return;
+              event.preventDefault();
+              event.stopPropagation();
+              setActivePath(path);
+              setInspectorTab("content");
+            }}
+          >
+            <StudioLandingPreview section={section} data={previewData} contactData={contactData} />
+          </div>
+        </section>
         <aside className="studio-inspector" aria-label="Element inspector">
           <header className="studio-inspector__heading">
-            <span>Inspector</span>
-            <p>Choose an element, then fine-tune its content.</p>
+            <div>
+              <span>Inspector</span>
+              <h2>{studioSectionLabels[section]}</h2>
+            </div>
+            <small>{Object.keys(currentData).length} fields</small>
           </header>
-          {directMediaFields.length > 0 ? (
+          <div className="studio-inspector__tabs" role="tablist" aria-label="Inspector mode">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inspectorTab === "content"}
+              className={inspectorTab === "content" ? "is-active" : ""}
+              onClick={() => setInspectorTab("content")}
+            >
+              Content
+            </button>
+            {directMediaFields.length > 0 ? (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={inspectorTab === "media"}
+                className={inspectorTab === "media" ? "is-active" : ""}
+                onClick={() => setInspectorTab("media")}
+              >
+                Media <span>{directMediaFields.length}</span>
+              </button>
+            ) : null}
+          </div>
+          {inspectorTab === "media" && directMediaFields.length > 0 ? (
             <section className="studio-inspector__media" aria-labelledby="studio-media-title">
               <header>
-                <span>Media uploads</span>
+                <span>Uploads</span>
                 <h2 id="studio-media-title">Images &amp; video</h2>
-                <p>Upload files here, then save the draft.</p>
+                <p>Upload a replacement, then save this section.</p>
               </header>
               <div>
                 {directMediaFields.map(([key, value]) => (
@@ -944,47 +858,51 @@ export function SectionEditor({ section, data, uploadEnabled }: SectionEditorPro
                 ))}
               </div>
             </section>
-          ) : null}
-          <nav className="studio-inspector__elements" aria-label="Editable elements">
-            {Object.entries(currentData).map(([key, value]) => (
-              <button
-                className={selectedKey === key ? "is-active" : ""}
-                type="button"
-                key={key}
-                aria-pressed={selectedKey === key}
-                onClick={() => setActiveKey(key)}
-              >
-                <span>{labelFor(key)}</span>
-                <small>
-                  {Array.isArray(value)
-                    ? `${value.length} items`
-                    : getMediaConfig(value, [key])
-                      ? "Media"
-                      : isEditorObject(value)
-                        ? "Settings"
-                        : "Text"}
-                </small>
-              </button>
-            ))}
-          </nav>
-          {activeValue !== undefined ? (
-            <form
-              className="studio-inspector__form"
-              onSubmit={(event) => void handleSubmit(() => undefined)(event)}
-            >
-              <div className="studio-inspector__selected">
-                <span>Selected element</span>
-                <h2>{labelFor(selectedKey)}</h2>
-              </div>
-              <ValueEditor
-                value={activeValue}
-                label={labelFor(selectedKey)}
-                path={[selectedKey]}
-                onChange={updateValue}
-                uploadEnabled={uploadEnabled}
-              />
-            </form>
-          ) : null}
+          ) : (
+            <div className="studio-inspector__content">
+              <nav className="studio-inspector__elements" aria-label="Editable elements">
+                {Object.entries(currentData).map(([key, value], index) => (
+                  <button
+                    className={selectedRootKey === key ? "is-active" : ""}
+                    type="button"
+                    key={key}
+                    aria-pressed={selectedRootKey === key}
+                    onClick={() => setActivePath([key])}
+                  >
+                    <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
+                    <span>{labelFor(key)}</span>
+                    <small>
+                      {Array.isArray(value)
+                        ? `${value.length} items`
+                        : getMediaConfig(value, [key])
+                          ? "Media"
+                          : isEditorObject(value)
+                            ? "Group"
+                            : "Text"}
+                    </small>
+                  </button>
+                ))}
+              </nav>
+              {activeValue !== undefined ? (
+                <form
+                  className="studio-inspector__form"
+                  onSubmit={(event) => void handleSubmit(() => undefined)(event)}
+                >
+                  <div className="studio-inspector__selected">
+                    <span>Selected from preview</span>
+                    <h2>{pathLabel(selectedPath)}</h2>
+                  </div>
+                  <ValueEditor
+                    value={activeValue}
+                    label={pathLabel(selectedPath)}
+                    path={selectedPath}
+                    onChange={updateValue}
+                    uploadEnabled={uploadEnabled}
+                  />
+                </form>
+              ) : null}
+            </div>
+          )}
           <SaveBar />
         </aside>
       </div>

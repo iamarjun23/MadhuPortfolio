@@ -40,8 +40,8 @@ export function Dropzone({
   const { startUpload, isUploading } = useMediaUpload(endpoint);
 
   const isVideo = endpoint === "heroVideo";
-  const maxBytes = (isVideo ? 32 : 4) * 1024 * 1024;
-  const fileHint = isVideo ? "Video up to 32 MB" : "Image up to 4 MB";
+  const maxBytes = (isVideo ? 48 : 4) * 1024 * 1024;
+  const fileHint = isVideo ? "Video up to 48 MB" : "Image up to 4 MB";
 
   useEffect(
     () => () => {
@@ -57,7 +57,7 @@ export function Dropzone({
       return;
     }
     if (file.size > maxBytes) {
-      setError(`${file.name} is larger than the ${isVideo ? "32" : "4"} MB limit.`);
+      setError(`${file.name} is larger than the ${isVideo ? "48" : "4"} MB limit.`);
       return;
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
