@@ -12,7 +12,7 @@ type EndpointConfig = Readonly<{
 const MB = 1024 * 1024;
 
 export const uploadEndpoints: Record<UploadEndpoint, EndpointConfig> = {
-  heroVideo: { kind: MediaKind.VIDEO, accept: "video/", maxBytes: 48 * MB },
+  heroVideo: { kind: MediaKind.VIDEO, accept: "video/", maxBytes: 64 * MB },
   portrait: { kind: MediaKind.IMAGE, accept: "image/", maxBytes: 4 * MB },
   boothImage: { kind: MediaKind.IMAGE, accept: "image/", maxBytes: 4 * MB },
   logoImage: { kind: MediaKind.IMAGE, accept: "image/", maxBytes: 4 * MB },

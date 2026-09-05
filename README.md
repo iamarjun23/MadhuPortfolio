@@ -69,7 +69,7 @@ For UploadThing v7, create an app in the UploadThing dashboard and add its V7
 token is configured; URL fields continue to work without it. Upload endpoints require an
 authenticated Studio owner.
 
-Hero video uploads are limited to 48 MB. The upload route verifies the limit on both the declared
+Hero video uploads are limited to 64 MB. The upload route verifies the limit on both the declared
 content length and the received payload before storing a file.
 
 ## Source References
