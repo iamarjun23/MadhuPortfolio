@@ -30,6 +30,16 @@ export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
         </div>
         <div className="experience-reel">
           <article className="experience-reel__frame" aria-live="polite">
+            {activeRole.image ? (
+              <div className="experience-reel__image" aria-hidden="true">
+                <PlaceholderImage
+                  src={activeRole.image.url}
+                  alt=""
+                  fill
+                  sizes="(max-width: 720px) 100vw, 1200px"
+                />
+              </div>
+            ) : null}
             <div className="experience-reel__meta">
               <span>
                 {data.sceneLabel} {String(activeIndex + 1).padStart(2, "0")}

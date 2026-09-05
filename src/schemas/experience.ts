@@ -22,6 +22,7 @@ export const ExperienceSchema = z.object({
         id: z.string(),
         company: z.string().max(60),
         role: z.string().max(60),
+        image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
         logo: z.object({ url: MediaUrlSchema }).nullable(),
         logoHint: z.enum(["l-jar", "l-onep", "l-ulc", "l-hb", "custom"]).default("custom"),
         initials: z.string().max(4),

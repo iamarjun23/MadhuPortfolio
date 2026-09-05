@@ -1631,6 +1631,7 @@ button {
     transform 0.35s var(--e-reveal),
     box-shadow 0.35s var(--e-reveal);
 }
+.work__thumb > img,
 .work__thumb video {
   position: absolute;
   inset: 0;
@@ -1648,6 +1649,10 @@ button {
 }
 .work__thumb.bd-4 {
   background: linear-gradient(135deg, var(--ink-500), var(--signal-700));
+}
+
+.work__thumb > img {
+  opacity: 0.76;
 }
 .work__cloud-toolbar {
   position: relative;
@@ -2100,6 +2105,12 @@ button {
   color: var(--on-accent);
   font-family: var(--f-mono);
   font-size: 0.7rem;
+  overflow: hidden;
+}
+.testimonials figcaption > span img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .testimonials b,
 .testimonials small {
@@ -2168,6 +2179,24 @@ button {
   background: repeating-linear-gradient(90deg, var(--bg) 0 1.7rem, transparent 1.7rem 2.35rem);
   opacity: 0.8;
   content: "";
+}
+.experience-reel__image {
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+}
+.experience-reel__image::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--surface) 14%,
+    color-mix(in srgb, var(--surface) 42%, transparent)
+  );
+  content: "";
+}
+.experience-reel__image img {
+  object-fit: cover;
 }
 .experience-reel__frame::before {
   top: 0;
@@ -3333,6 +3362,20 @@ button {
   object-fit: contain;
 }
 
+.studio-dropzone__preview-fallback {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  margin: 0;
+  padding: 1rem;
+  color: var(--red);
+  font-family: var(--f-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .studio-dropzone__delete {
   justify-self: start;
   min-height: 32px;
@@ -3379,10 +3422,12 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
 }
 
 .studio-array h2 {
+  margin-right: auto;
   font-size: 1.05rem;
 }
 
@@ -7354,4 +7399,341 @@ button {
 .theme-toggle:focus-visible .theme-toggle__switch {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(226, 104, 46, 0.18);
+}
+
+/* ==========================================================================
+   Studio field guidance
+   The editor renders raw draft JSON, so every control carries a plain-English
+   name, a sentence about where it lands on the live page, and - for uploads -
+   a Photo/Video badge with the file limits. These styles carry that layer.
+   ========================================================================== */
+
+.studio-field__hint,
+.studio-object__hint,
+.studio-array__hint,
+.studio-array__reorder-hint,
+.studio-media-field__hint {
+  margin: 0;
+  color: var(--d-muted);
+  font-family: var(--f-body);
+  font-size: 0.76rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-transform: none;
+}
+
+.studio-field__hint {
+  margin-top: 0.1rem;
+}
+
+.studio-object__hint {
+  margin: -0.2rem 0 0.2rem;
+}
+
+.studio-switch-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+/* Photo / video badges ---------------------------------------------------- */
+
+.studio-media-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.42rem;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-family: var(--f-mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.studio-media-badge--photo {
+  color: #6fb2d2;
+  background: rgba(111, 178, 210, 0.12);
+}
+
+.studio-media-badge--video {
+  color: var(--accent-text);
+  background: rgba(255, 110, 29, 0.14);
+}
+
+.studio-media-badge--info {
+  color: var(--d-muted);
+  background: transparent;
+}
+
+/* Media field ------------------------------------------------------------- */
+
+.studio-media-field > legend {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.studio-media-field__name {
+  font-family: var(--f-display);
+  font-size: 1.02rem;
+  font-weight: 700;
+}
+
+.studio-media-field__flag {
+  color: var(--d-muted);
+  font-family: var(--f-mono);
+  font-size: 0.58rem;
+  font-style: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.studio-media-field__where {
+  margin: -0.4rem 0 0;
+  color: var(--d-muted);
+  font-family: var(--f-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.studio-media-field__spec {
+  margin: -0.35rem 0 0;
+  color: var(--d-text2);
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.studio-media-field__spec span {
+  color: var(--accent-text);
+}
+
+.studio-media-field--video {
+  border-left: 2px solid rgba(255, 110, 29, 0.45);
+}
+
+.studio-media-field--photo {
+  border-left: 2px solid rgba(111, 178, 210, 0.4);
+}
+
+/* Grouped uploads in the inspector's media tab ---------------------------- */
+
+.studio-media-group {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.studio-media-group h3 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 0.95rem;
+}
+
+.studio-media-group h3 em {
+  flex: 1 1 100%;
+  color: var(--d-muted);
+  font-family: var(--f-body);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+/* Lists ------------------------------------------------------------------- */
+
+.studio-array > header {
+  align-items: flex-start;
+}
+
+.studio-array__title {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+  flex: 1 1 14rem;
+}
+
+.studio-array__count {
+  display: inline-block;
+  margin-left: 0.3rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 110, 29, 0.16);
+  color: var(--accent-text);
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  vertical-align: middle;
+}
+
+.studio-array__reorder-hint {
+  margin: 0;
+}
+
+.studio-array__reorder-hint b {
+  color: var(--d-text2);
+  font-family: var(--f-mono);
+}
+
+/* "How this section works" strip ------------------------------------------ */
+
+.studio-howto {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: var(--r-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.studio-howto li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.55rem;
+  color: var(--d-text2);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.studio-howto li > b {
+  display: grid;
+  place-items: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  background: rgba(255, 110, 29, 0.16);
+  color: var(--accent-text);
+  font-family: var(--f-mono);
+  font-size: 0.68rem;
+}
+
+.studio-howto strong {
+  color: var(--d-text);
+}
+
+.studio-howto em {
+  color: var(--accent-text);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.studio-editor__media-note {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 0.4rem;
+  color: var(--d-muted);
+  font-size: 0.76rem;
+}
+
+.studio-inspector__breadcrumb {
+  margin: 0.25rem 0 0;
+  color: var(--d-muted);
+  font-family: var(--f-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.studio-section-map__media {
+  color: var(--d-muted);
+  font-family: var(--f-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The boolean editor now wraps its switch in .studio-switch-field so the hint can
+   sit under it, so the inspector spacing rules need to reach the wrapper too. */
+.studio-inspector__form > .studio-switch-field {
+  margin: 0 1rem 1rem;
+}
+
+.studio-editor__group > .studio-switch-field {
+  margin: 0;
+}
+
+/* A YouTube-hosted work video is edited as a link rather than an upload, so its
+   card mirrors the upload card: live thumbnail, then the address, then actions. */
+.studio-link-field__preview {
+  display: grid;
+  place-items: center;
+  min-height: 132px;
+  padding: 0.75rem;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+}
+
+.studio-link-field__preview img {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  border-radius: 6px;
+}
+
+.studio-link-field__preview p {
+  margin: 0;
+  max-width: 26rem;
+  color: var(--d-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.studio-link-field__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.studio-link-field__actions a {
+  color: var(--accent-text);
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.studio-link-field__actions em {
+  color: var(--d-muted);
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  font-style: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.studio-link-field__actions button {
+  margin-left: auto;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--d-text2);
+  cursor: pointer;
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.studio-link-field__actions button:hover {
+  border-color: var(--accent);
+  color: var(--d-text);
 }

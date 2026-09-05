@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const uploadedMediaPath =
-  /^\/api\/media\/(?:heroVideo|portrait|boothImage|logoImage|roomImage|ogImage)\/[0-9a-f-]{36}$/i;
+  /^\/api\/media\/(?:heroVideo|portrait|boothImage|logoImage|praiseImage|experienceImage|impactImage|roomImage|ogImage)\/[0-9a-f-]{36}$/i;
 
 // Studio uploads are served from this application's same-origin media route;
 // hand-entered external media must remain a complete URL.

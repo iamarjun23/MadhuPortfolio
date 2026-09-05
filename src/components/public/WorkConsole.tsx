@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PlaceholderImage } from "@/components/public/PlaceholderImage";
+import { getYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 import type { Work } from "@/schemas";
 
 type WorkProject = Work["lanes"][number]["projects"][number];
@@ -37,34 +39,6 @@ function getCloudPosition(index: number, total: number) {
     y: Math.sin(angle) * radius,
     rotate: Math.sin(angle * 1.7) * 2.2,
   };
-}
-
-function playPreview(event: React.MouseEvent<HTMLElement>) {
-  const video = event.currentTarget.querySelector("video");
-  void video?.play().catch(() => {});
-}
-
-function stopPreview(event: React.MouseEvent<HTMLElement>) {
-  const video = event.currentTarget.querySelector("video");
-  if (!video) return;
-  video.pause();
-  video.currentTime = 0;
-}
-
-function getYouTubeId(value: string | null) {
-  if (!value) return null;
-
-  try {
-    const url = new URL(value);
-    const host = url.hostname.replace(/^www\./, "");
-    if (host === "youtu.be") return url.pathname.split("/").filter(Boolean)[0] ?? null;
-    if (host !== "youtube.com" && host !== "m.youtube.com") return null;
-
-    const pathId = url.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1];
-    return url.searchParams.get("v") ?? pathId ?? null;
-  } catch {
-    return null;
-  }
 }
 
 export function WorkConsole({
@@ -236,6 +210,7 @@ export function WorkConsole({
                 const position = getCloudPosition(index, projects.length);
                 const cardId = `${laneLabel}-${project.id}`;
                 const offset = cardOffsets[cardId] ?? { x: 0, y: 0 };
+                const thumbnail = getYouTubeThumbnail(project.href);
                 const cardStyle: CloudCardStyle = {
                   "--cloud-left": `${50 + position.x * 41}%`,
                   "--cloud-top": `${50 + position.y * 38}%`,
@@ -262,15 +237,16 @@ export function WorkConsole({
                     onPointerMove={cardPointerMove}
                     onPointerUp={cardPointerUp}
                     onPointerCancel={cardPointerUp}
-                    onMouseEnter={playPreview}
-                    onMouseLeave={stopPreview}
                     aria-label={`Preview ${project.title}`}
                   >
                     <span className={`work__thumb ${project.thumbHint}`}>
-                      {project.preview ? (
-                        <video muted loop playsInline preload="none">
-                          <source src={project.preview} type="video/mp4" />
-                        </video>
+                      {thumbnail ? (
+                        <PlaceholderImage
+                          src={thumbnail}
+                          alt={`${project.title} on YouTube`}
+                          fill
+                          sizes="(max-width: 720px) 70vw, 280px"
+                        />
                       ) : null}
                     </span>
                     <span className="work__cloud-card-copy">
@@ -312,10 +288,6 @@ export function WorkConsole({
                         referrerPolicy="strict-origin-when-cross-origin"
                         allowFullScreen
                       />
-                    ) : preview.project.preview ? (
-                      <video key={preview.project.id} controls autoPlay muted playsInline>
-                        <source src={preview.project.preview} type="video/mp4" />
-                      </video>
                     ) : (
                       <span>{data.previewUnavailableLabel}</span>
                     )}

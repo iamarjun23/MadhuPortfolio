@@ -26,7 +26,15 @@ import { SaveBar } from "@/components/studio/SaveBar";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
 import type { SectionKey } from "@/lib/sections";
+import {
+  describeField,
+  fieldLabel,
+  mediaSpecs,
+  sectionDocs,
+  type MediaKindLabel,
+} from "@/lib/studio-labels";
 import { studioSectionLabels } from "@/lib/studio-nav";
+import { getYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 import { useStudioStore } from "@/stores/studio-store";
 
 type EditorValue = string | number | boolean | null | EditorObject | EditorValue[];
@@ -70,10 +78,6 @@ function normalizeObject(value: unknown): EditorObject {
   const normalized = normalize(value);
   if (!isEditorObject(normalized)) throw new Error("Studio sections must contain an object.");
   return normalized;
-}
-
-function labelFor(key: string) {
-  return key.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
 }
 
 function updateAtPath(
@@ -183,10 +187,14 @@ function findPreviewPath(
   return matches[0]?.path ?? null;
 }
 
+/* Reads a path as a breadcrumb of human labels, so "lanes.0.projects.2.image"
+   becomes "Categories / Category 1 / Projects / Project 3 / Project cover photo". */
 function pathLabel(path: readonly (string | number)[]) {
-  return path
-    .map((segment) => (typeof segment === "number" ? `Item ${segment + 1}` : labelFor(segment)))
-    .join(" / ");
+  return path.map((_, index) => fieldLabel(path.slice(0, index + 1))).join(" / ");
+}
+
+function parentLabel(path: readonly (string | number)[]) {
+  return path.length > 1 ? pathLabel(path.slice(0, -1)) : "";
 }
 
 function emptyFromTemplate(value: EditorValue): EditorValue {
@@ -219,6 +227,49 @@ function itemTitle(value: EditorValue, fallback: string) {
   return fallback;
 }
 
+function emptyArrayTemplate(path: readonly (string | number)[]): EditorValue | undefined {
+  if (path[0] !== "quotes") return undefined;
+
+  return {
+    id: "",
+    quote: "",
+    name: "",
+    role: "",
+    initials: "",
+    image: null,
+    isSample: false,
+  };
+}
+
+function blankWorkProject(): EditorObject {
+  return {
+    id: crypto.randomUUID(),
+    title: "",
+    subtitle: "",
+    href: null,
+    hrefLabel: null,
+    image: null,
+    thumbHint: "bd-1",
+    preview: null,
+  };
+}
+
+function blankRoomPicture(): EditorObject {
+  return {
+    id: crypto.randomUUID(),
+    type: "polaroid",
+    image: null,
+    tint: "rg1",
+    tag: "",
+    caption: "",
+    subCaption: "",
+    fx: 0.12,
+    fy: 0.12,
+    rot: 0,
+    pinType: "pin",
+  };
+}
+
 function SortableCard({ id, children }: Readonly<{ id: string; children: React.ReactNode }>) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -247,22 +298,38 @@ type ValueEditorProps = Readonly<{
   uploadEnabled: boolean;
 }>;
 
+function FieldHint({ id, hint }: Readonly<{ id: string; hint?: string }>) {
+  if (!hint) return null;
+  return (
+    <small className="studio-field__hint" id={id}>
+      {hint}
+    </small>
+  );
+}
+
 function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
   const key = String(path[path.length - 1] ?? "");
   const options = selectOptions[key];
   const id = `studio-${path.join("-")}`;
+  const hintId = `${id}-hint`;
+  const { hint } = describeField(path);
+  const describedBy = hint ? hintId : undefined;
 
   if (typeof value === "boolean") {
     return (
-      <label className="studio-switch" htmlFor={id}>
-        <span>{label}</span>
-        <input
-          id={id}
-          type="checkbox"
-          checked={value}
-          onChange={(event) => onChange(path, event.target.checked)}
-        />
-      </label>
+      <div className="studio-switch-field">
+        <label className="studio-switch" htmlFor={id}>
+          <span>{label}</span>
+          <input
+            id={id}
+            type="checkbox"
+            checked={value}
+            aria-describedby={describedBy}
+            onChange={(event) => onChange(path, event.target.checked)}
+          />
+        </label>
+        <FieldHint id={hintId} hint={hint} />
+      </div>
     );
   }
 
@@ -274,8 +341,11 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
           id={id}
           type="number"
           value={value}
+          step="any"
+          aria-describedby={describedBy}
           onChange={(event) => onChange(path, Number(event.target.value))}
         />
+        <FieldHint id={hintId} hint={hint} />
       </label>
     );
   }
@@ -288,8 +358,10 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
           id={id}
           value=""
           placeholder="Not set"
+          aria-describedby={describedBy}
           onChange={(event) => onChange(path, event.target.value || null)}
         />
+        <FieldHint id={hintId} hint={hint ?? "Empty. Type a value to set it."} />
       </label>
     );
   }
@@ -303,6 +375,7 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
         <select
           id={id}
           value={value}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(path, event.target.value || null)}
         >
           {options.map((option) => (
@@ -311,6 +384,7 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
             </option>
           ))}
         </select>
+        <FieldHint id={hintId} hint={hint} />
       </label>
     );
   }
@@ -322,18 +396,25 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
     <label className="studio-field" htmlFor={id}>
       <span>
         {label}
-        {key === "sub" || key === "description" ? <b>{value.length}</b> : null}
+        {key === "sub" || key === "description" ? <b>{value.length} characters</b> : null}
       </span>
       {multiline ? (
         <textarea
           id={id}
           value={value}
           rows={Math.min(6, Math.max(3, Math.ceil(value.length / 68)))}
+          aria-describedby={describedBy}
           onChange={(event) => onChange(path, event.target.value)}
         />
       ) : (
-        <input id={id} value={value} onChange={(event) => onChange(path, event.target.value)} />
+        <input
+          id={id}
+          value={value}
+          aria-describedby={describedBy}
+          onChange={(event) => onChange(path, event.target.value)}
+        />
       )}
+      <FieldHint id={hintId} hint={hint} />
     </label>
   );
 }
@@ -343,6 +424,7 @@ type MediaConfig = Readonly<{
   acceptsAlt: boolean;
   isVideo?: boolean;
   isOptional?: boolean;
+  isUrlOnly?: boolean;
 }>;
 
 function getMediaConfig(
@@ -366,12 +448,122 @@ function getMediaConfig(
     return { endpoint: "ogImage", acceptsAlt: false };
   }
   if (key === "image" && (value === null || isEditorObject(value))) {
+    const pathKeys = path.filter((part): part is string => typeof part === "string");
+    const endpoint = pathKeys.includes("quotes")
+      ? "praiseImage"
+      : pathKeys.includes("roles")
+        ? "experienceImage"
+        : pathKeys.includes("slots")
+          ? "boothImage"
+          : pathKeys.includes("worked")
+            ? "impactImage"
+            : "roomImage";
     return {
-      endpoint: path[0] === "slots" ? "boothImage" : "roomImage",
+      endpoint,
       acceptsAlt: true,
     };
   }
   return undefined;
+}
+
+type MediaField = Readonly<{
+  path: readonly (string | number)[];
+  value: EditorValue;
+}>;
+
+function collectMediaFields(
+  value: EditorValue,
+  path: readonly (string | number)[] = [],
+): readonly MediaField[] {
+  if (getMediaConfig(value, path)) return [{ path, value }];
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => collectMediaFields(entry, [...path, index]));
+  }
+
+  if (isEditorObject(value)) {
+    return Object.entries(value).flatMap(([key, entry]) =>
+      collectMediaFields(entry, [...path, key]),
+    );
+  }
+
+  return [];
+}
+
+/* Work projects hold their video as a YouTube address rather than an upload, so the
+   editor treats that link as an asset in its own right: it is collected, previewed
+   and managed alongside the real uploads. */
+function isVideoLinkField(value: EditorValue, path: readonly (string | number)[]) {
+  return (
+    String(path.at(-1) ?? "") === "href" &&
+    path.includes("projects") &&
+    (value === null || typeof value === "string")
+  );
+}
+
+function collectLinkFields(
+  value: EditorValue,
+  path: readonly (string | number)[] = [],
+): readonly MediaField[] {
+  if (isVideoLinkField(value, path)) return [{ path, value }];
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry, index) => collectLinkFields(entry, [...path, index]));
+  }
+
+  if (isEditorObject(value)) {
+    return Object.entries(value).flatMap(([key, entry]) =>
+      collectLinkFields(entry, [...path, key]),
+    );
+  }
+
+  return [];
+}
+
+function hasMedia(value: EditorValue) {
+  if (typeof value === "string") return value.length > 0;
+  return isEditorObject(value) && typeof value.url === "string" && value.url.length > 0;
+}
+
+/* A short "what is set here" line for list rows, so an editor can see at a glance
+   which entries still have no photo or video link without opening each one. */
+function mediaSummary(value: EditorValue, path: readonly (string | number)[]) {
+  const fields = collectMediaFields(value, path);
+  const links = collectLinkFields(value, path);
+  if (fields.length === 0 && links.length === 0) return "Text only";
+
+  const counts: Record<MediaKindLabel, { total: number; filled: number }> = {
+    photo: { total: 0, filled: 0 },
+    video: { total: 0, filled: 0 },
+  };
+
+  for (const field of fields) {
+    const kind: MediaKindLabel = getMediaConfig(field.value, field.path)?.isVideo
+      ? "video"
+      : "photo";
+    counts[kind].total += 1;
+    if (hasMedia(field.value)) counts[kind].filled += 1;
+  }
+
+  const parts = (["photo", "video"] as const)
+    .filter((kind) => counts[kind].total > 0)
+    .map((kind) => {
+      const { filled } = counts[kind];
+      return filled === 0 ? `no ${kind} yet` : `${filled} ${kind}${filled > 1 ? "s" : ""}`;
+    });
+
+  if (links.length > 0) {
+    const filled = links.filter((link) => typeof link.value === "string" && link.value).length;
+    parts.push(
+      filled === 0
+        ? "no video link yet"
+        : filled === 1
+          ? "video link set"
+          : `${filled} video links`,
+    );
+  }
+
+  return parts.join(" · ");
 }
 
 function setOptionalString(object: EditorObject, key: string, value: string): EditorObject {
@@ -381,17 +573,39 @@ function setOptionalString(object: EditorObject, key: string, value: string): Ed
   return next;
 }
 
-function MediaEditor({ value, label, path, onChange, uploadEnabled }: ValueEditorProps) {
+function MediaEditor({
+  value,
+  label,
+  path,
+  onChange,
+  uploadEnabled,
+  showBreadcrumb,
+}: ValueEditorProps & { showBreadcrumb?: boolean }) {
   const config = getMediaConfig(value, path);
   if (!config) return null;
 
+  const kind: MediaKindLabel = config.isVideo ? "video" : "photo";
+  const spec = mediaSpecs[kind];
+  const { hint } = describeField(path);
+  const breadcrumb = showBreadcrumb ? parentLabel(path) : "";
+
   const object = isEditorObject(value) ? value : {};
-  const url = typeof object.url === "string" ? object.url : "";
+  const url = config.isUrlOnly
+    ? typeof value === "string"
+      ? value
+      : ""
+    : typeof object.url === "string"
+      ? object.url
+      : "";
   const alt = typeof object.alt === "string" ? object.alt : "";
   const poster = typeof object.poster === "string" ? object.poster : "";
   const duotone = object.duotone === true;
 
   const setUrl = (nextUrl: string) => {
+    if (config.isUrlOnly) {
+      onChange(path, nextUrl || null);
+      return;
+    }
     if (!nextUrl && (!config.isVideo || config.isOptional)) {
       onChange(path, null);
       return;
@@ -400,66 +614,169 @@ function MediaEditor({ value, label, path, onChange, uploadEnabled }: ValueEdito
   };
 
   return (
-    <fieldset className="studio-object studio-media-field">
-      <legend>{label}</legend>
+    <fieldset className={`studio-object studio-media-field studio-media-field--${kind}`}>
+      <legend>
+        <span className={`studio-media-badge studio-media-badge--${kind}`}>{spec.badge}</span>
+        <span className="studio-media-field__name">{label}</span>
+        {config.isOptional ? <em className="studio-media-field__flag">Optional</em> : null}
+      </legend>
+      {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
+      <p className="studio-media-field__hint">
+        {hint ??
+          (kind === "video"
+            ? "A video that plays in this part of the page."
+            : "An image that appears in this part of the page.")}
+      </p>
+      <p className="studio-media-field__spec">
+        {spec.accepts}
+        {url ? null : <span> · nothing uploaded yet</span>}
+      </p>
       <Dropzone
         endpoint={config.endpoint}
-        label={config.isVideo ? "Upload video" : "Upload image"}
+        label={spec.action}
         value={url || undefined}
         enabled={uploadEnabled}
         onUploaded={(upload) => setUrl(upload.url)}
         onDeleted={() => setUrl("")}
       />
-      <p className="studio-media-field__hint">
-        {config.isVideo
-          ? "Upload a video file for this section, then save the draft to keep it."
-          : "Upload an image for this section, add descriptive alt text, then save the draft."}
-      </p>
       <label className="studio-field" htmlFor={`studio-${path.join("-")}-url`}>
-        <span>Media URL</span>
+        <span>{kind === "video" ? "Video address" : "Photo address"}</span>
         <input
           id={`studio-${path.join("-")}-url`}
           type="url"
           value={url}
           placeholder="https://"
+          aria-describedby={`studio-${path.join("-")}-url-hint`}
           onChange={(event) => setUrl(event.target.value)}
+        />
+        <FieldHint
+          id={`studio-${path.join("-")}-url-hint`}
+          hint={`Filled in for you when you upload above. Clear it to remove this ${kind}.`}
         />
       </label>
       {config.acceptsAlt ? (
         <label className="studio-field" htmlFor={`studio-${path.join("-")}-alt`}>
-          <span>Alt text</span>
+          <span>Alt text (describe the photo)</span>
           <input
             id={`studio-${path.join("-")}-alt`}
             value={alt}
+            placeholder="e.g. Madhu at the edit desk, mid-cut"
+            aria-describedby={`studio-${path.join("-")}-alt-hint`}
             onChange={(event) => onChange(path, { ...object, url, alt: event.target.value })}
+          />
+          <FieldHint
+            id={`studio-${path.join("-")}-alt-hint`}
+            hint="Read aloud by screen readers and shown if the photo fails to load. Say what is in the picture."
           />
         </label>
       ) : null}
-      {config.isVideo ? (
+      {config.isVideo && !config.isUrlOnly ? (
         <>
           <label className="studio-field" htmlFor={`studio-${path.join("-")}-poster`}>
-            <span>Poster URL</span>
+            <span>Poster photo address</span>
             <input
               id={`studio-${path.join("-")}-poster`}
               type="url"
               value={poster}
               placeholder="https://"
+              aria-describedby={`studio-${path.join("-")}-poster-hint`}
               onChange={(event) =>
                 onChange(path, setOptionalString(object, "poster", event.target.value))
               }
             />
-          </label>
-          <label className="studio-switch" htmlFor={`studio-${path.join("-")}-duotone`}>
-            <span>Duotone</span>
-            <input
-              id={`studio-${path.join("-")}-duotone`}
-              type="checkbox"
-              checked={duotone}
-              onChange={(event) => onChange(path, { ...object, duotone: event.target.checked })}
+            <FieldHint
+              id={`studio-${path.join("-")}-poster-hint`}
+              hint="A still image shown while the video loads, or if it cannot play. Optional but recommended."
             />
           </label>
+          <div className="studio-switch-field">
+            <label className="studio-switch" htmlFor={`studio-${path.join("-")}-duotone`}>
+              <span>Duotone tint</span>
+              <input
+                id={`studio-${path.join("-")}-duotone`}
+                type="checkbox"
+                checked={duotone}
+                aria-describedby={`studio-${path.join("-")}-duotone-hint`}
+                onChange={(event) => onChange(path, { ...object, duotone: event.target.checked })}
+              />
+            </label>
+            <FieldHint
+              id={`studio-${path.join("-")}-duotone-hint`}
+              hint="Washes the video in the site's orange-and-black treatment. Turn it off to show the original colours."
+            />
+          </div>
         </>
       ) : null}
+    </fieldset>
+  );
+}
+
+/* The counterpart to MediaEditor for a YouTube-hosted video: same card shape and
+   Video badge, but the address itself is the asset, so it gets a live thumbnail,
+   a way to replace it, and a way to clear it. */
+function LinkEditor({
+  value,
+  label,
+  path,
+  onChange,
+  showBreadcrumb,
+}: ValueEditorProps & { showBreadcrumb?: boolean }) {
+  const url = typeof value === "string" ? value : "";
+  const videoId = getYouTubeId(url);
+  const thumbnail = getYouTubeThumbnail(url);
+  const { hint } = describeField(path);
+  const breadcrumb = showBreadcrumb ? parentLabel(path) : "";
+  const inputId = `studio-${path.join("-")}-link`;
+
+  return (
+    <fieldset className="studio-object studio-media-field studio-media-field--video studio-link-field">
+      <legend>
+        <span className="studio-media-badge studio-media-badge--video">Video</span>
+        <span className="studio-media-field__name">{label}</span>
+      </legend>
+      {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
+      <p className="studio-media-field__hint">{hint}</p>
+      <div className="studio-link-field__preview">
+        {thumbnail ? (
+          /* eslint-disable-next-line @next/next/no-img-element -- a YouTube still keyed
+             off a value the editor is typing, so it cannot be statically optimised. */
+          <img src={thumbnail} alt={`Thumbnail of the linked YouTube video`} />
+        ) : (
+          <p>
+            {url
+              ? "That is not a YouTube address, so there is no thumbnail and no in-page player. The link still opens from the pop-up."
+              : "No link yet. Paste a YouTube address below and its thumbnail appears here."}
+          </p>
+        )}
+      </div>
+      <label className="studio-field" htmlFor={inputId}>
+        <span>{url ? "Change the link" : "Paste the YouTube link"}</span>
+        <input
+          id={inputId}
+          type="url"
+          value={url}
+          placeholder="https://youtu.be/..."
+          aria-describedby={`${inputId}-hint`}
+          onChange={(event) => onChange(path, event.target.value || null)}
+        />
+        <FieldHint
+          id={`${inputId}-hint`}
+          hint="Paste a new address over the old one to swap the video. The card thumbnail and the pop-up player follow it straight away."
+        />
+      </label>
+      <div className="studio-link-field__actions">
+        {url ? (
+          <a href={url} target="_blank" rel="noreferrer">
+            Open the link to check it <span aria-hidden="true">&#8599;</span>
+          </a>
+        ) : null}
+        {videoId ? <em>Video ID {videoId}</em> : null}
+        {url ? (
+          <button type="button" onClick={() => onChange(path, null)}>
+            Clear link
+          </button>
+        ) : null}
+      </div>
     </fieldset>
   );
 }
@@ -480,10 +797,12 @@ function ArrayEditor({
   );
   const isSortable = sortableIds.length === value.length && value.length > 1;
   const [lastTemplate, setLastTemplate] = useState<EditorValue | undefined>(value[0]);
-  const template = value[0] ?? lastTemplate;
+  const template = value[0] ?? lastTemplate ?? emptyArrayTemplate(path);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const activeIndex = Math.min(selectedIndex, Math.max(0, value.length - 1));
   const selectedItem = value[activeIndex];
+  const doc = describeField(path);
+  const itemNoun = doc.itemLabel ?? (label.endsWith("s") ? label.slice(0, -1) : label);
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (!event.over || event.active.id === event.over.id) return;
@@ -491,6 +810,7 @@ function ArrayEditor({
   };
 
   const records = value.map((item, index) => {
+    const summary = mediaSummary(item, [...path, index]);
     const record = (
       <button
         className={`studio-array__record${activeIndex === index ? " is-active" : ""}`}
@@ -499,8 +819,11 @@ function ArrayEditor({
         aria-pressed={activeIndex === index}
       >
         <span>
-          <b>{itemTitle(item, `${label} ${index + 1}`)}</b>
-          <small>{`${label} ${index + 1}`}</small>
+          <b>{itemTitle(item, `${itemNoun} ${index + 1}`)}</b>
+          <small>
+            {`${itemNoun} ${index + 1}`}
+            {summary === "Text only" ? "" : ` · ${summary}`}
+          </small>
         </span>
         <i aria-hidden="true">→</i>
       </button>
@@ -527,6 +850,16 @@ function ArrayEditor({
     setSelectedIndex(value.length);
   };
 
+  const addWorkProject = () => {
+    onChange(path, [...value, blankWorkProject()]);
+    setSelectedIndex(value.length);
+  };
+
+  const addRoomPicture = () => {
+    onChange(path, [...value, blankRoomPicture()]);
+    setSelectedIndex(value.length);
+  };
+
   const removeSelectedItem = () => {
     if (selectedItem === undefined) return;
     setLastTemplate(selectedItem);
@@ -540,10 +873,34 @@ function ArrayEditor({
   return (
     <section className="studio-array" aria-label={label}>
       <header>
-        <h2>{label}</h2>
-        {template !== undefined ? (
+        <div className="studio-array__title">
+          <h2>
+            {label} <span className="studio-array__count">{value.length}</span>
+          </h2>
+          {doc.hint ? <p className="studio-array__hint">{doc.hint}</p> : null}
+          {isSortable ? (
+            <p className="studio-array__reorder-hint">
+              Drag the <b>::</b> handle beside a row to change the order it appears in on the site.
+            </p>
+          ) : null}
+        </div>
+        {/* Projects get a purpose-built blank instead of the generic "copy the shape
+            of the first entry" button, so there is only ever one way to add one. */}
+        {template !== undefined && path.at(-1) !== "projects" ? (
           <button className="studio-add-row" type="button" onClick={addItem}>
-            Add item
+            {path.at(-1) === "cards"
+              ? "Add card (same type as the first)"
+              : `Add ${itemNoun.toLowerCase()}`}
+          </button>
+        ) : null}
+        {path.at(-1) === "projects" ? (
+          <button className="studio-add-row" type="button" onClick={addWorkProject}>
+            Add project
+          </button>
+        ) : null}
+        {path.at(-1) === "cards" ? (
+          <button className="studio-add-row" type="button" onClick={addRoomPicture}>
+            Add polaroid (photo card)
           </button>
         ) : null}
       </header>
@@ -568,13 +925,13 @@ function ArrayEditor({
             <div className="studio-array__detail">
               <header>
                 <div>
-                  <span>Editing item</span>
-                  <strong>{itemTitle(selectedItem, `${label} ${activeIndex + 1}`)}</strong>
+                  <span>{`Editing ${itemNoun.toLowerCase()} ${activeIndex + 1} of ${value.length}`}</span>
+                  <strong>{itemTitle(selectedItem, `${itemNoun} ${activeIndex + 1}`)}</strong>
                 </div>
                 <button
                   className="studio-row-remove"
                   type="button"
-                  aria-label={`Remove ${label} ${activeIndex + 1}`}
+                  aria-label={`Remove ${itemNoun} ${activeIndex + 1}`}
                   onClick={removeSelectedItem}
                 >
                   Remove
@@ -582,7 +939,7 @@ function ArrayEditor({
               </header>
               <ValueEditor
                 value={selectedItem}
-                label={`${label} ${activeIndex + 1}`}
+                label={`${itemNoun} ${activeIndex + 1}`}
                 path={[...path, activeIndex]}
                 onChange={onChange}
                 uploadEnabled={uploadEnabled}
@@ -592,7 +949,8 @@ function ArrayEditor({
         </div>
       ) : (
         <p className="studio-array__empty">
-          No {label.toLowerCase()} yet. Add the first item to begin.
+          No {label.toLowerCase()} yet. Use “Add {itemNoun.toLowerCase()}” above to create the first
+          one.
         </p>
       )}
     </section>
@@ -600,6 +958,18 @@ function ArrayEditor({
 }
 
 function ValueEditor({ value, label, path, onChange, uploadEnabled }: ValueEditorProps) {
+  if (isVideoLinkField(value, path)) {
+    return (
+      <LinkEditor
+        value={value}
+        label={label}
+        path={path}
+        onChange={onChange}
+        uploadEnabled={uploadEnabled}
+      />
+    );
+  }
+
   if (getMediaConfig(value, path)) {
     return (
       <MediaEditor
@@ -624,14 +994,16 @@ function ValueEditor({ value, label, path, onChange, uploadEnabled }: ValueEdito
     );
 
   if (isEditorObject(value)) {
+    const { hint } = describeField(path);
     return (
       <fieldset className="studio-object">
         <legend>{label}</legend>
+        {hint ? <p className="studio-object__hint">{hint}</p> : null}
         {Object.entries(value).map(([key, entry]) => (
           <ValueEditor
             key={key}
             value={entry}
-            label={labelFor(key)}
+            label={fieldLabel([...path, key])}
             path={[...path, key]}
             onChange={onChange}
             uploadEnabled={uploadEnabled}
@@ -740,9 +1112,41 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
         : [];
   const selectedRootKey = typeof selectedPath[0] === "string" ? selectedPath[0] : "";
   const activeValue = valueAtPath(currentData, selectedPath);
-  const directMediaFields = Object.entries(currentData).filter((entry) =>
-    Boolean(getMediaConfig(entry[1], [entry[0]])),
+  const mediaFields = collectMediaFields(currentData);
+  const photoFields = mediaFields.filter(
+    (field) => !getMediaConfig(field.value, field.path)?.isVideo,
   );
+  const videoFields = mediaFields.filter(
+    (field) => getMediaConfig(field.value, field.path)?.isVideo,
+  );
+  const linkFields = collectLinkFields(currentData);
+  const assetCount = mediaFields.length + linkFields.length;
+  const assetGroups = [
+    {
+      key: "photo",
+      kind: "photo" as const,
+      title: "Photos",
+      note: mediaSpecs.photo.accepts,
+      fields: photoFields,
+      isLink: false,
+    },
+    {
+      key: "video",
+      kind: "video" as const,
+      title: "Videos",
+      note: mediaSpecs.video.accepts,
+      fields: videoFields,
+      isLink: false,
+    },
+    {
+      key: "link",
+      kind: "video" as const,
+      title: "Video links",
+      note: "Hosted on YouTube - paste a link, nothing is uploaded",
+      fields: linkFields,
+      isLink: true,
+    },
+  ].filter((group) => group.fields.length > 0);
 
   return (
     <section
@@ -753,7 +1157,11 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
         <div>
           <span className="slate">Visual editor</span>
           <h1 id="studio-section-title">{studioSectionLabels[section]}</h1>
-          <p>Edit the page itself. Select a detail only when you need precise settings.</p>
+          <p>{sectionDocs[section].summary}</p>
+          <p className="studio-editor__media-note">
+            <span className="studio-media-badge studio-media-badge--info">Uploads</span>
+            {sectionDocs[section].media}
+          </p>
         </div>
         <div className="studio-device-switch" aria-label="Preview device">
           <button
@@ -774,6 +1182,30 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
           </button>
         </div>
       </div>
+      <ol className="studio-howto" aria-label="How to edit this section">
+        <li>
+          <b>1</b>
+          <span>
+            <strong>Pick what to change.</strong> Click any text in the preview on the left, or
+            choose a field from the <em>Content</em> list on the right.
+          </span>
+        </li>
+        <li>
+          <b>2</b>
+          <span>
+            <strong>Add photos and videos.</strong> Open the <em>Media</em> tab on the right. Every
+            upload in this section is there, each marked <em>Photo</em> or <em>Video</em> with the
+            file size it accepts.
+          </span>
+        </li>
+        <li>
+          <b>3</b>
+          <span>
+            <strong>Save, then publish.</strong> <em>Save section</em> stores a private draft.
+            Nothing changes on the live site until you press <em>Publish</em> in the top bar.
+          </span>
+        </li>
+      </ol>
       <div className="studio-editor__layout">
         <section
           className={`studio-canvas studio-canvas--${previewDevice}`}
@@ -826,7 +1258,7 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
             >
               Content
             </button>
-            {directMediaFields.length > 0 ? (
+            {assetCount > 0 ? (
               <button
                 type="button"
                 role="tab"
@@ -834,54 +1266,112 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
                 className={inspectorTab === "media" ? "is-active" : ""}
                 onClick={() => setInspectorTab("media")}
               >
-                Media <span>{directMediaFields.length}</span>
+                Photos &amp; video <span>{assetCount}</span>
               </button>
             ) : null}
           </div>
-          {inspectorTab === "media" && directMediaFields.length > 0 ? (
+          {inspectorTab === "media" && assetCount > 0 ? (
             <section className="studio-inspector__media" aria-labelledby="studio-media-title">
               <header>
-                <span>Uploads</span>
-                <h2 id="studio-media-title">Images &amp; video</h2>
-                <p>Upload a replacement, then save this section.</p>
+                <span>Photos &amp; video</span>
+                <h2 id="studio-media-title">
+                  {[
+                    photoFields.length > 0
+                      ? `${photoFields.length} photo${photoFields.length === 1 ? "" : "s"}`
+                      : "",
+                    videoFields.length > 0
+                      ? `${videoFields.length} video${videoFields.length === 1 ? "" : "s"}`
+                      : "",
+                    linkFields.length > 0
+                      ? `${linkFields.length} video link${linkFields.length === 1 ? "" : "s"}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </h2>
+                <p>
+                  Every picture and video this section uses, and where each one lands on the page.
+                  Uploaded files say the size they accept; video links are YouTube addresses you
+                  paste, with nothing stored here. Either way, nothing goes live until you save the
+                  section and publish.
+                </p>
               </header>
               <div>
-                {directMediaFields.map(([key, value]) => (
-                  <MediaEditor
-                    key={key}
-                    value={value}
-                    label={labelFor(key)}
-                    path={[key]}
-                    onChange={updateValue}
-                    uploadEnabled={uploadEnabled}
-                  />
+                {assetGroups.map((group) => (
+                  <section className="studio-media-group" key={group.key}>
+                    <h3>
+                      <span className={`studio-media-badge studio-media-badge--${group.kind}`}>
+                        {mediaSpecs[group.kind].badge}
+                      </span>
+                      {group.title}
+                      <em>{group.note}</em>
+                    </h3>
+                    {group.fields.map(({ path, value }) =>
+                      group.isLink ? (
+                        <LinkEditor
+                          key={path.join("-")}
+                          value={value}
+                          label={fieldLabel(path)}
+                          path={path}
+                          onChange={updateValue}
+                          uploadEnabled={uploadEnabled}
+                          showBreadcrumb
+                        />
+                      ) : (
+                        <MediaEditor
+                          key={path.join("-")}
+                          value={value}
+                          label={fieldLabel(path)}
+                          path={path}
+                          onChange={updateValue}
+                          uploadEnabled={uploadEnabled}
+                          showBreadcrumb
+                        />
+                      ),
+                    )}
+                  </section>
                 ))}
               </div>
             </section>
           ) : (
             <div className="studio-inspector__content">
               <nav className="studio-inspector__elements" aria-label="Editable elements">
-                {Object.entries(currentData).map(([key, value], index) => (
-                  <button
-                    className={selectedRootKey === key ? "is-active" : ""}
-                    type="button"
-                    key={key}
-                    aria-pressed={selectedRootKey === key}
-                    onClick={() => setActivePath([key])}
-                  >
-                    <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
-                    <span>{labelFor(key)}</span>
-                    <small>
-                      {Array.isArray(value)
-                        ? `${value.length} items`
-                        : getMediaConfig(value, [key])
-                          ? "Media"
-                          : isEditorObject(value)
-                            ? "Group"
-                            : "Text"}
-                    </small>
-                  </button>
-                ))}
+                {Object.entries(currentData).map(([key, value], index) => {
+                  const doc = describeField([key]);
+                  const rootConfig = getMediaConfig(value, [key]);
+                  const kindTag = rootConfig
+                    ? rootConfig.isVideo
+                      ? "Video"
+                      : "Photo"
+                    : Array.isArray(value)
+                      ? `${value.length} ${
+                          value.length === 1
+                            ? (doc.itemLabel ?? "item").toLowerCase()
+                            : `${(doc.itemLabel ?? "item").toLowerCase()}s`
+                        }`
+                      : isEditorObject(value)
+                        ? "Group"
+                        : typeof value === "boolean"
+                          ? "On / off"
+                          : typeof value === "number"
+                            ? "Number"
+                            : "Text";
+
+                  return (
+                    <button
+                      className={selectedRootKey === key ? "is-active" : ""}
+                      type="button"
+                      key={key}
+                      title={doc.hint}
+                      aria-pressed={selectedRootKey === key}
+                      onClick={() => setActivePath([key])}
+                    >
+                      <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
+                      <span>{doc.label}</span>
+                      <small>{kindTag}</small>
+                    </button>
+                  );
+                })}
               </nav>
               {activeValue !== undefined ? (
                 <form
@@ -889,12 +1379,15 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
                   onSubmit={(event) => void handleSubmit(() => undefined)(event)}
                 >
                   <div className="studio-inspector__selected">
-                    <span>Selected from preview</span>
-                    <h2>{pathLabel(selectedPath)}</h2>
+                    <span>Now editing</span>
+                    <h2>{fieldLabel(selectedPath)}</h2>
+                    {selectedPath.length > 1 ? (
+                      <p className="studio-inspector__breadcrumb">{pathLabel(selectedPath)}</p>
+                    ) : null}
                   </div>
                   <ValueEditor
                     value={activeValue}
-                    label={pathLabel(selectedPath)}
+                    label={fieldLabel(selectedPath)}
                     path={selectedPath}
                     onChange={updateValue}
                     uploadEnabled={uploadEnabled}

@@ -12,6 +12,8 @@ const nextConfig = {
       { protocol: "https", hostname: "madhu.edit" },
       { protocol: "https", hostname: "placehold.co" },
       { protocol: "https", hostname: "images.pexels.com" },
+      // Work project cards fall back to the thumbnail of the project's YouTube video.
+      { protocol: "https", hostname: "i.ytimg.com" },
     ],
   },
   async headers() {
@@ -24,7 +26,7 @@ const nextConfig = {
       "frame-ancestors 'self'",
       scriptSrc,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://madhu.edit https://placehold.co https://images.pexels.com",
+      "img-src 'self' data: blob: https://madhu.edit https://placehold.co https://images.pexels.com https://i.ytimg.com",
       "media-src 'self' blob: https://videos.pexels.com",
       "frame-src 'self' https://www.youtube-nocookie.com",
       "connect-src 'self'",

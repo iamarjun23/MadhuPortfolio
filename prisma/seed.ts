@@ -140,7 +140,6 @@ export const sectionData = {
             href: "https://youtu.be/PxoYGdcjmt8",
             hrefLabel: "YouTube",
             thumbHint: "bd-1",
-            preview: "https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4",
           },
           {
             id: "ankur-warikoo",
@@ -149,7 +148,6 @@ export const sectionData = {
             href: "https://youtu.be/I3CrnWFsaks",
             hrefLabel: "YouTube",
             thumbHint: "bd-1",
-            preview: "https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4",
           },
           {
             id: "kunal-khattar",
@@ -158,7 +156,6 @@ export const sectionData = {
             href: "https://youtu.be/AfsFyze0c7I",
             hrefLabel: "YouTube",
             thumbHint: "bd-1",
-            preview: "https://videos.pexels.com/video-files/4990247/4990247-hd_1920_1080_30fps.mp4",
           },
           {
             id: "deepak-shenoy",
@@ -167,7 +164,6 @@ export const sectionData = {
             href: "https://youtu.be/PxoYGdcjmt8",
             hrefLabel: "YouTube",
             thumbHint: "bd-1",
-            preview: "https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4",
           },
           {
             id: "ravi-handa",
@@ -176,7 +172,6 @@ export const sectionData = {
             href: "https://youtu.be/I3CrnWFsaks",
             hrefLabel: "YouTube",
             thumbHint: "bd-1",
-            preview: "https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4",
           },
           {
             id: "neil-borate",
@@ -185,7 +180,6 @@ export const sectionData = {
             href: "https://youtu.be/AfsFyze0c7I",
             hrefLabel: "YouTube",
             thumbHint: "bd-1",
-            preview: "https://videos.pexels.com/video-files/4990247/4990247-hd_1920_1080_30fps.mp4",
           },
         ],
       },
@@ -207,7 +201,6 @@ export const sectionData = {
             href: "https://youtu.be/PxoYGdcjmt8",
             hrefLabel: "YouTube",
             thumbHint: "bd-2",
-            preview: "https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4",
           },
           {
             id: "ramesh-arvind",
@@ -216,7 +209,6 @@ export const sectionData = {
             href: "https://youtu.be/I3CrnWFsaks",
             hrefLabel: "YouTube",
             thumbHint: "bd-2",
-            preview: "https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4",
           },
         ],
       },
@@ -238,7 +230,6 @@ export const sectionData = {
             href: "https://www.linkedin.com/posts/jarapp_jarxchange-all-india-permit-edition-1-activity-7388540343006445569-ISxs",
             hrefLabel: "LinkedIn",
             thumbHint: "bd-3",
-            preview: "https://videos.pexels.com/video-files/4990247/4990247-hd_1920_1080_30fps.mp4",
           },
           {
             id: "kannada-rajyotsava",
@@ -247,7 +238,6 @@ export const sectionData = {
             href: "https://www.linkedin.com/posts/jarapp_kannada-rajyotsava-2025-x-jar-activity-7402319420766928896-YQV4",
             hrefLabel: "LinkedIn",
             thumbHint: "bd-3",
-            preview: "https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4",
           },
         ],
       },
@@ -269,7 +259,6 @@ export const sectionData = {
             href: "https://youtu.be/PxoYGdcjmt8",
             hrefLabel: "YouTube",
             thumbHint: "bd-4",
-            preview: "https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4",
           },
           {
             id: "rule-for-2025",
@@ -278,7 +267,6 @@ export const sectionData = {
             href: "https://youtu.be/I3CrnWFsaks",
             hrefLabel: "YouTube",
             thumbHint: "bd-4",
-            preview: "https://videos.pexels.com/video-files/4990247/4990247-hd_1920_1080_30fps.mp4",
           },
           {
             id: "second-airport",
@@ -287,7 +275,6 @@ export const sectionData = {
             href: "https://youtu.be/AfsFyze0c7I",
             hrefLabel: "YouTube",
             thumbHint: "bd-4",
-            preview: "https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4",
           },
           {
             id: "ktm-bankrupt",
@@ -296,7 +283,6 @@ export const sectionData = {
             href: "https://youtu.be/AfsFyze0c7I",
             hrefLabel: "YouTube",
             thumbHint: "bd-4",
-            preview: "https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4",
           },
         ],
       },

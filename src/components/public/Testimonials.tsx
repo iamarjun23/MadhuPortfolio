@@ -1,4 +1,5 @@
 import type { Praise } from "@/schemas";
+import { PlaceholderImage } from "@/components/public/PlaceholderImage";
 export function Testimonials({ data }: Readonly<{ data: Praise }>) {
   if (!data.visible || data.quotes.length === 0) return null;
 
@@ -14,7 +15,19 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
             <figure className={quote.isSample ? "is-sample" : undefined} key={quote.id}>
               <blockquote>{quote.quote}</blockquote>
               <figcaption>
-                <span>{quote.initials}</span>
+                <span>
+                  {quote.image ? (
+                    <PlaceholderImage
+                      src={quote.image.url}
+                      alt={quote.image.alt}
+                      width={36}
+                      height={36}
+                      sizes="36px"
+                    />
+                  ) : (
+                    quote.initials
+                  )}
+                </span>
                 <div>
                   <b>{quote.name}</b>
                   <small>{quote.role}</small>

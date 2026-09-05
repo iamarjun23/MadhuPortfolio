@@ -34,6 +34,7 @@ export function Dropzone({
   const [previewIsVideo, setPreviewIsVideo] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string>();
+  const [failedPreviewUrl, setFailedPreviewUrl] = useState<string>();
   const [uploadedId, setUploadedId] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -63,6 +64,7 @@ export function Dropzone({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
     setPreviewIsVideo(file.type.startsWith("video/"));
+    setFailedPreviewUrl(undefined);
     setProgress(0);
     setError(undefined);
     setUploadedId(undefined);
@@ -94,6 +96,15 @@ export function Dropzone({
 
   const accept = isVideo ? "video/*" : "image/*";
   const displayUrl = previewUrl ?? value;
+  const displayIsVideo = previewUrl ? previewIsVideo : isVideo;
+  const previewFailed = failedPreviewUrl === displayUrl;
+
+  const handlePreviewError = () => {
+    setFailedPreviewUrl(displayUrl);
+    setError(
+      `This ${displayIsVideo ? "video" : "image"} could not be displayed. Choose another file or check the media URL.`,
+    );
+  };
 
   return (
     <div className="studio-dropzone">
@@ -128,10 +139,14 @@ export function Dropzone({
       </label>
       {displayUrl ? (
         <div className="studio-dropzone__preview">
-          {previewIsVideo || endpoint === "heroVideo" ? (
-            <video controls muted src={displayUrl} />
+          {previewFailed ? (
+            <p className="studio-dropzone__preview-fallback" role="status">
+              {displayIsVideo ? "Video preview unavailable" : "Image preview unavailable"}
+            </p>
+          ) : displayIsVideo ? (
+            <video controls muted src={displayUrl} onError={handlePreviewError} />
           ) : (
-            <img src={displayUrl} alt="Selected media preview" />
+            <img src={displayUrl} alt="Selected media preview" onError={handlePreviewError} />
           )}
         </div>
       ) : null}

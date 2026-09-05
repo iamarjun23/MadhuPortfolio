@@ -6,45 +6,71 @@ const sections = [
     href: "/studio/hero",
     number: "01",
     label: "Hero",
-    detail: "First impression, message & calls to action",
+    detail: "Headline, buttons and film-frame labels",
+    media: "1 background video",
   },
   {
     href: "/studio/about",
     number: "02",
     label: "About",
-    detail: "Portrait, story, status & tools",
+    detail: "Your story, current status and tools",
+    media: "1 portrait photo + optional video",
   },
-  { href: "/studio/impact", number: "03", label: "Impact", detail: "Metrics and collaborators" },
+  {
+    href: "/studio/impact",
+    number: "03",
+    label: "Impact",
+    detail: "Numbers strip, collaborators and campaigns",
+    media: "1 photo per collaborator",
+  },
   {
     href: "/studio/work",
     number: "04",
     label: "Work",
-    detail: "Video projects and category filters",
+    detail: "Project cards grouped into filter categories",
+    media: "YouTube link per project · no uploads at all",
   },
   {
     href: "/studio/booth",
     number: "05",
     label: "Photobooth",
-    detail: "On-set images and lightbox copy",
+    detail: "On-set photo wall and lightbox captions",
+    media: "1 photo per slot",
   },
-  { href: "/studio/praise", number: "06", label: "Praise", detail: "Testimonials and attribution" },
+  {
+    href: "/studio/praise",
+    number: "06",
+    label: "Praise",
+    detail: "Testimonials and who said them",
+    media: "Optional photo per person",
+  },
   {
     href: "/studio/experience",
     number: "07",
     label: "Experience",
-    detail: "Career reel and scenes",
+    detail: "One scene per role, with dates and location",
+    media: "Scene photo + company logo per role",
   },
   {
     href: "/studio/room",
     number: "08",
     label: "Drawing Room",
-    detail: "Invitation and mood board",
+    detail: "Pinboard of polaroids, notes and quotes",
+    media: "1 photo per polaroid card",
   },
   {
     href: "/studio/contact",
     number: "09",
     label: "Contact",
-    detail: "Project invitation and contact details",
+    detail: "Invitation, contact details and social links",
+    media: "No uploads",
+  },
+  {
+    href: "/studio/settings",
+    number: "10",
+    label: "Site & Navigation",
+    detail: "Brand wordmark, menu, footer, SEO and theme",
+    media: "1 social share photo",
   },
 ] as const;
 
@@ -182,6 +208,7 @@ export default async function StudioPage() {
               <span>
                 <strong>{section.label}</strong>
                 <small>{section.detail}</small>
+                <small className="studio-section-map__media">{section.media}</small>
               </span>
               <b aria-hidden="true">→</b>
             </Link>
