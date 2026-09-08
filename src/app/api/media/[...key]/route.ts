@@ -96,9 +96,25 @@ export async function GET(request: Request, { params }: RouteParams) {
   );
   headers.set("accept-ranges", "bytes");
 
-  if (object.range && "offset" in object.range) {
-    const start = object.range.offset ?? 0;
-    const length = object.range.length ?? object.size - start;
+  // R2 reports `object.range` on every read, a full one included, so the partial-content
+  // branch has to key off what the client actually asked for. Answering an unconditional
+  // GET with a 206 is what left photos blank: next/image refuses a partial upstream
+  // response ("upstream response is invalid") while <video> happily accepts one, so video
+  // played and every still image broke.
+  if (parsedRange) {
+    // R2 resolves whatever was asked for and reports it back, so read the answer off the
+    // object rather than re-deriving it from the header.
+    const resolved = object.range;
+    const suffix = resolved && "suffix" in resolved ? resolved.suffix : undefined;
+    const offset =
+      resolved && "offset" in resolved && resolved.offset !== undefined ? resolved.offset : 0;
+    const start = suffix === undefined ? offset : Math.max(0, object.size - suffix);
+    const length =
+      suffix !== undefined
+        ? Math.min(suffix, object.size)
+        : resolved && "length" in resolved && resolved.length !== undefined
+          ? resolved.length
+          : object.size - start;
     headers.set("content-range", `bytes ${start}-${start + length - 1}/${object.size}`);
     headers.set("content-length", String(length));
     return new Response(object.body, { status: 206, headers });
