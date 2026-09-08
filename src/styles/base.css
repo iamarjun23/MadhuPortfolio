@@ -7257,6 +7257,42 @@ button {
   margin: -0.2rem 0 0.2rem;
 }
 
+.studio-hint-more > summary {
+  display: inline-block;
+  margin-top: 0.3rem;
+  color: var(--accent-text);
+  cursor: pointer;
+  font-family: var(--f-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  list-style: none;
+  text-transform: uppercase;
+}
+
+.studio-hint-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.studio-hint-more > summary::after {
+  content: " +";
+}
+
+.studio-hint-more[open] > summary::after {
+  content: " \2212";
+}
+
+.studio-hint-more > summary:hover,
+.studio-hint-more > summary:focus-visible {
+  text-decoration: underline;
+}
+
+.studio-hint-more > span {
+  display: block;
+  margin-top: 0.35rem;
+  padding-left: 0.6rem;
+  border-left: 1px solid rgba(255, 110, 29, 0.3);
+}
+
 .studio-switch-field {
   display: grid;
   gap: 0.35rem;

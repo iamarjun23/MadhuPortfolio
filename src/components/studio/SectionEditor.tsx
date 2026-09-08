@@ -433,12 +433,37 @@ type ValueEditorProps = Readonly<{
   uploadEnabled: boolean;
 }>;
 
-function FieldHint({ id, hint }: Readonly<{ id: string; hint?: string }>) {
+/* Field guidance is written long so nothing is ambiguous, but a wall of it under
+   every input buries the inputs themselves. Only the opening sentence stays on
+   screen; the rest waits behind a toggle. The scan skips a full stop inside an
+   ellipsis so addresses like "youtu.be/..." do not split a sentence in half. */
+function splitHint(hint: string): Readonly<{ lead: string; rest: string }> {
+  for (let i = 20; i < hint.length - 1; i += 1) {
+    if (hint[i] !== "." || hint[i - 1] === "." || !/\s/.test(hint[i + 1] ?? "")) continue;
+    const rest = hint.slice(i + 1).trim();
+    if (rest.length < 24) break;
+    return { lead: hint.slice(0, i + 1), rest };
+  }
+  return { lead: hint, rest: "" };
+}
+
+function FieldHint({
+  id,
+  hint,
+  className = "studio-field__hint",
+}: Readonly<{ id: string; hint?: string; className?: string }>) {
   if (!hint) return null;
+  const { lead, rest } = splitHint(hint);
   return (
-    <small className="studio-field__hint" id={id}>
-      {hint}
-    </small>
+    <div className={className} id={id}>
+      {lead}
+      {rest ? (
+        <details className="studio-hint-more">
+          <summary>More detail</summary>
+          <span>{rest}</span>
+        </details>
+      ) : null}
+    </div>
   );
 }
 
@@ -770,12 +795,16 @@ function MediaEditor({
         {config.isOptional ? <em className="studio-media-field__flag">Optional</em> : null}
       </legend>
       {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
-      <p className="studio-media-field__hint">
-        {hint ??
+      <FieldHint
+        id={`studio-${path.join("-")}-field-hint`}
+        className="studio-media-field__hint"
+        hint={
+          hint ??
           (kind === "video"
             ? "A video that plays in this part of the page."
-            : "An image that appears in this part of the page.")}
-      </p>
+            : "An image that appears in this part of the page.")
+        }
+      />
       <p className="studio-media-field__spec">
         {spec.accepts}
         {url ? null : <span> · nothing uploaded yet</span>}
@@ -889,7 +918,11 @@ function LinkEditor({
         <span className="studio-media-field__name">{label}</span>
       </legend>
       {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
-      <p className="studio-media-field__hint">{hint}</p>
+      <FieldHint
+        id={`${inputId}-field-hint`}
+        className="studio-media-field__hint"
+        hint={hint}
+      />
       <div className="studio-link-field__preview">
         {reel.playable ? (
           <MediaPreview
