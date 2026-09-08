@@ -21,6 +21,17 @@ type PlaceholderImageProps = Readonly<{
   unoptimized?: boolean;
 }>;
 
+// next/image's optimizer cannot read an uploaded photo. On Workers, OpenNext resolves a
+// same-origin `url=` through the ASSETS binding, which only serves the build's static
+// files - our media lives in R2 behind the `/api/media/[...key]` route, so the lookup
+// misses and `/_next/image` answers 404 ("upstream response is invalid"), leaving every
+// uploaded photo broken while the bundled placeholders kept working. The route already
+// serves the stored file with an immutable year-long cache lifetime, so going direct
+// costs nothing but the optimizer's resizing.
+function isUploadedMediaSrc(url: string) {
+  return url.startsWith("/api/media/");
+}
+
 export function PlaceholderImage({
   src,
   alt,
@@ -33,7 +44,7 @@ export function PlaceholderImage({
 }: PlaceholderImageProps) {
   const displaySrc = displayImageSrc(src);
 
-  if (unoptimized || isPlaceholderImageSrc(displaySrc)) {
+  if (unoptimized || isUploadedMediaSrc(displaySrc) || isPlaceholderImageSrc(displaySrc)) {
     return fill ? (
       <Image src={displaySrc} alt={alt} fill sizes={sizes} unoptimized onError={onError} />
     ) : (
