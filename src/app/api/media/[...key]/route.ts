@@ -2,6 +2,22 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 type RouteParams = Readonly<{ params: Promise<{ key: string[] }> }>;
 
+// Cloning the response to populate the cache tees the R2 stream, and whichever half is
+// read slower buffers in the Worker's memory. Only small objects are worth that risk
+// against the 128MB limit; browsers request video with a Range header anyway, which
+// takes the 206 path below and never reaches the cache at all.
+const EDGE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
+
+// `caches.default` is a Workers-only member that the ambient DOM `CacheStorage` type
+// (pulled in by tsconfig's "dom" lib) doesn't declare, and it is not reachable from every
+// bundle this route ends up in — reading media 500'd on every non-Range request because
+// the previous unchecked cast assumed it was always there. The edge cache is an
+// optimisation, so treat it as absent unless it is genuinely usable.
+function getEdgeCache(): Cache | undefined {
+  const store = (caches as unknown as { default?: Cache }).default;
+  return typeof store?.match === "function" && typeof store.put === "function" ? store : undefined;
+}
+
 function parseByteRange(value: string | null) {
   if (!value) return undefined;
 
@@ -34,13 +50,20 @@ export async function GET(request: Request, { params }: RouteParams) {
   // straight from cache instead of re-streaming the object out of R2 through the Worker
   // each time, which is what made large videos feel slow to (re)load.
   const { env, ctx } = getCloudflareContext();
-  // `caches.default` is a Workers-only member the ambient DOM `CacheStorage` type (pulled in
-  // by tsconfig's "dom" lib) doesn't declare.
-  const edgeCache = (caches as unknown as { default: Cache }).default;
+  const edgeCache = getEdgeCache();
   const range = request.headers.get("range");
-  if (!range) {
-    const cached = await edgeCache.match(request);
-    if (cached) return cached;
+  // Key on the URL alone. The request Next hands a route handler is rebuilt from the
+  // incoming one and carries cookies and auth headers that have nothing to do with which
+  // object is being served.
+  const cacheKey = new Request(request.url, { method: "GET" });
+
+  if (edgeCache && !range) {
+    try {
+      const cached = await edgeCache.match(cacheKey);
+      if (cached) return cached;
+    } catch (error) {
+      console.error(`Reading the edge cache for ${key} failed`, error);
+    }
   }
 
   if (!env.MEDIA_BUCKET) {
@@ -86,7 +109,15 @@ export async function GET(request: Request, { params }: RouteParams) {
 
   // Populate the edge cache in the background so this response isn't held up by it, and
   // so the *next* request for this key (from this viewer or another) is served from cache.
-  ctx.waitUntil(edgeCache.put(request, response.clone()));
+  if (edgeCache && object.size <= EDGE_CACHE_MAX_BYTES) {
+    ctx.waitUntil(
+      edgeCache
+        .put(cacheKey, response.clone())
+        .catch((error: unknown) =>
+          console.error(`Populating the edge cache for ${key} failed`, error),
+        ),
+    );
+  }
 
   return response;
 }
