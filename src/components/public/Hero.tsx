@@ -9,6 +9,9 @@ type HeroProps = Readonly<{ data: HeroData }>;
 
 export function Hero({ data }: HeroProps) {
   const [wordIndex, setWordIndex] = useState(0);
+  /* Deleting cut words in the studio can leave the rotation past the end of the
+     shortened list, which rendered the headline with a hole in it. */
+  const cutWord = data.cutWords[wordIndex % Math.max(1, data.cutWords.length)] ?? "";
   const backgroundRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const timecodeRef = useTimecode();
@@ -106,7 +109,7 @@ export function Hero({ data }: HeroProps) {
         <h1>
           <span>{data.line1}</span>
           <span>
-            {data.line2} <em key={data.cutWords[wordIndex]}>{data.cutWords[wordIndex]}</em>.
+            {data.line2} <em key={cutWord}>{cutWord}</em>.
           </span>
         </h1>
         <p>{data.sub}</p>

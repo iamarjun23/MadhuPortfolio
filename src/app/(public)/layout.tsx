@@ -15,8 +15,18 @@ function getTheme(value: string | undefined, defaultTheme: "suite" | "sheet" | "
   return defaultTheme === "sheet" ? "light" : "dark";
 }
 
+// Keep the public portfolio on its 1280px artboard across phones and tablets.
+// Browsers auto-fit that artboard to the device while desktop browsers continue
+// to use their real viewport, preserving the responsive laptop layout.
 export const viewport: Viewport = {
   themeColor: "#050505",
+  width: 1280,
+  viewportFit: "cover",
+  userScalable: true,
+  maximumScale: 5,
+  // Override Next.js's implicit scale so mobile browsers can calculate the
+  // correct fit for the fixed-width artboard.
+  initialScale: undefined,
 };
 
 export async function generateMetadata(): Promise<Metadata> {

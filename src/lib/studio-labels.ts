@@ -51,7 +51,7 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
     summary:
       "Your selected work board. Cards are grouped into categories, and visitors drag them around and click to play the video.",
     media:
-      "Nothing is uploaded here. Paste each project's YouTube link and it supplies the card thumbnail and the pop-up player on its own.",
+      "Usually nothing is uploaded here. Paste each project's YouTube, Instagram or LinkedIn link and it supplies the card thumbnail and the pop-up player on its own. For a reel that is not on any of those, upload the video file to the project instead.",
   },
   booth: {
     summary:
@@ -70,8 +70,9 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
   },
   room: {
     summary:
-      "The Drawing Room pinboard - polaroids, sticky notes, quotes and an Instagram card scattered on a wall.",
-    media: "Polaroid cards hold photos. Notes, quotes and tag cards are text only.",
+      "The Drawing Room pinboard - polaroids, reels, sticky notes, quotes and an Instagram card scattered on a wall.",
+    media:
+      "Polaroid cards hold photos. Video cards hold a YouTube or LinkedIn link and play in a pop-up. Notes, quotes and tag cards are text only.",
   },
   contact: {
     summary: "The closing invitation plus your real contact details, social links and footer line.",
@@ -374,6 +375,14 @@ const fieldRules: readonly FieldRule[] = [
   },
   { key: "name", within: ["campaigns"], doc: { label: "Campaign name" } },
   { key: "context", within: ["campaigns"], doc: { label: "Campaign detail" } },
+  {
+    key: "href",
+    within: ["campaigns"],
+    doc: {
+      label: "Watch link",
+      hint: "Where this campaign's row links out to - a full https:// address. Leave it as None to keep the row as plain text.",
+    },
+  },
   { key: "collaboratorsLabel", doc: { label: "Collaborators caption" } },
   { key: "detailLabel", doc: { label: "Selected collaboration caption" } },
   { key: "campaignsHeading", doc: { label: "Campaigns heading" } },
@@ -411,8 +420,8 @@ const fieldRules: readonly FieldRule[] = [
     key: "href",
     within: ["projects"],
     doc: {
-      label: "YouTube link",
-      hint: "The whole project in one field - no cover photo needed. Paste the video's YouTube address (youtu.be/... or youtube.com/watch?v=... both work) and it becomes the card thumbnail, the player inside the pop-up, and the link out. Paste a different address over it any time to swap the video. A non-YouTube link (a LinkedIn post, say) still opens from the pop-up, but gets no thumbnail and no in-page player.",
+      label: "Reel link",
+      hint: "The whole project in one field - no cover photo needed. Paste a YouTube address (youtu.be/... or youtube.com/watch?v=...), an Instagram reel (instagram.com/reel/...) or a LinkedIn post (linkedin.com/posts/... or linkedin.com/feed/update/...). Whichever it is becomes the card thumbnail, the player inside the pop-up, and the link out. Instagram and LinkedIn stills are fetched rather than computed - if one cannot be reached the card falls back to its gradient and a badge saying where the reel lives. Paste a different address over it any time to swap the project, or upload a file below to play that instead. Any other link still opens from the pop-up, with no in-page player.",
     },
   },
   {
@@ -420,14 +429,14 @@ const fieldRules: readonly FieldRule[] = [
     within: ["projects"],
     doc: {
       label: "Watch link label",
-      hint: 'Text on the link out of the pop-up, e.g. "YouTube". Leave it as None to hide the label.',
+      hint: 'Text on the link out of the pop-up, e.g. "YouTube" or "LinkedIn". Leave it as None to hide the label.',
     },
   },
   {
     key: "thumbHint",
     doc: {
       label: "Card gradient",
-      hint: "The colour wash behind the card. It shows on its own until the project has a YouTube link. bd-1 to bd-4 are the four presets.",
+      hint: "The colour wash behind the card. It shows on its own until the project has a YouTube link or a LinkedIn post whose preview image could be fetched. bd-1 to bd-4 are the four presets.",
     },
   },
   { key: "allProjectsLabel", doc: { label: '"All projects" caption' } },
@@ -452,7 +461,7 @@ const fieldRules: readonly FieldRule[] = [
     key: "previewUnavailableLabel",
     doc: {
       label: "No-preview message",
-      hint: "Shown inside the pop-up when a project has no YouTube link yet.",
+      hint: "Shown inside the pop-up when a project has no YouTube video or LinkedIn post to play yet.",
     },
   },
 
@@ -578,7 +587,7 @@ const fieldRules: readonly FieldRule[] = [
     within: ["cards"],
     doc: {
       label: "Card type",
-      hint: "polaroid = a photo, note = sticky note, quote = a quotation, ig = Instagram card, tags = word cluster. Changing this changes the fields below.",
+      hint: "polaroid = a photo, video = a reel that plays in a pop-up, note = sticky note, quote = a quotation, ig = Instagram card, tags = word cluster. Changing this changes the fields below.",
     },
   },
   {
@@ -638,6 +647,37 @@ const fieldRules: readonly FieldRule[] = [
   },
   { key: "ctaLabel", doc: { label: "Button text" } },
   { key: "ctaHref", doc: { label: "Button link", hint: "Full https:// address." } },
+  {
+    key: "href",
+    within: ["cards"],
+    doc: {
+      label: "Reel link",
+      hint: "A YouTube, Instagram or LinkedIn address. Its own still becomes the face of the card, and clicking the card opens the reel in a pop-up - nothing is uploaded. To play a file of your own instead, upload it below.",
+    },
+  },
+  {
+    key: "image",
+    within: ["projects"],
+    doc: {
+      label: "Cover photo",
+      hint: "The still shown on the card. A YouTube link fills this in on its own, so leave it empty there. An Instagram reel publishes no still anyone can look up and a LinkedIn post's has to be fetched, so upload a frame from the reel here and the card always looks right. A cover set here beats whatever the link supplies.",
+    },
+  },
+  {
+    key: "image",
+    within: ["cards"],
+    doc: {
+      label: "Cover photo",
+      hint: "The still shown on this card. A YouTube link fills it in on its own; for an Instagram reel upload a frame here so the card never falls back to a bare gradient.",
+    },
+  },
+  {
+    key: "video",
+    doc: {
+      label: "Upload a reel instead",
+      hint: "For a reel that is not on YouTube, Instagram or LinkedIn. An uploaded file takes precedence over the link above, and plays straight from this site.",
+    },
+  },
   {
     key: "tags",
     doc: { label: "Word cluster", itemLabel: "Tag", hint: "Short words scattered on the card." },

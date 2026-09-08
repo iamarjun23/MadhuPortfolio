@@ -10,10 +10,12 @@ function ToastMessage({
 }: Readonly<{ id: number; message: string; tone: "success" | "info" | "error" }>) {
   const dismissToast = useStudioStore((state) => state.dismissToast);
 
+  /* An error names the fields that need attention, so it stays up long enough to
+     read and act on; a "Draft saved" only has to be noticed. */
   useEffect(() => {
-    const timeout = window.setTimeout(() => dismissToast(id), 2600);
+    const timeout = window.setTimeout(() => dismissToast(id), tone === "error" ? 12_000 : 2600);
     return () => window.clearTimeout(timeout);
-  }, [dismissToast, id]);
+  }, [dismissToast, id, tone]);
 
   return (
     <li className={`studio-toast studio-toast--${tone}`} role="status">

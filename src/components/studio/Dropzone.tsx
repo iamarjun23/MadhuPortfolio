@@ -1,10 +1,8 @@
 "use client";
 
-/* Dynamic object URLs and uploaded media URLs cannot use Next's static image optimization. */
-/* eslint-disable @next/next/no-img-element */
-
 import { useEffect, useId, useState } from "react";
 import { deleteMedia } from "@/actions/media";
+import { MediaPreview } from "@/components/studio/MediaPreview";
 import { useMediaUpload } from "@/lib/media-upload-client";
 import type { UploadEndpoint } from "@/lib/media-upload";
 
@@ -143,10 +141,16 @@ export function Dropzone({
             <p className="studio-dropzone__preview-fallback" role="status">
               {displayIsVideo ? "Video preview unavailable" : "Image preview unavailable"}
             </p>
-          ) : displayIsVideo ? (
-            <video controls muted src={displayUrl} onError={handlePreviewError} />
           ) : (
-            <img src={displayUrl} alt="Selected media preview" onError={handlePreviewError} />
+            <MediaPreview
+              label={label}
+              source={
+                displayIsVideo
+                  ? { kind: "video", src: displayUrl }
+                  : { kind: "image", src: displayUrl, alt: "Selected media preview" }
+              }
+              onError={handlePreviewError}
+            />
           )}
         </div>
       ) : null}

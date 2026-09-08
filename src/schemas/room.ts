@@ -18,6 +18,23 @@ const PolaroidSchema = CardBase.extend({
   subCaption: z.string().max(40),
 });
 
+/* A reel on the pinboard. The video itself lives on YouTube or LinkedIn, never in
+   our own storage - the same arrangement the work board uses - so the card holds
+   a link, borrows that link's still for its face, and plays in a pop-up. */
+const VideoCardSchema = CardBase.extend({
+  type: z.literal("video"),
+  href: z.string().nullable().default(null),
+  video: z
+    .object({ url: MediaUrlSchema, poster: MediaUrlSchema.optional() })
+    .nullable()
+    .default(null),
+  image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
+  tint: z.enum(["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"]).default("rg1"),
+  tag: z.string().max(20).default("Reel"),
+  caption: z.string().max(60),
+  subCaption: z.string().max(40),
+});
+
 const StickyNoteSchema = CardBase.extend({
   type: z.literal("note"),
   color: z.enum(["ember", "signal"]),
@@ -92,6 +109,7 @@ export const RoomSchema = z.object({
     .array(
       z.discriminatedUnion("type", [
         PolaroidSchema,
+        VideoCardSchema,
         StickyNoteSchema,
         QuoteSchema,
         InstagramCardSchema,

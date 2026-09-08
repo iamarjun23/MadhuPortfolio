@@ -19,7 +19,7 @@ export function ContactBlock({ contact }: Readonly<{ contact: Contact }>) {
             >
               <span>{contact.projectCtaLabel}</span>
               <b>{contact.email}</b>
-              <i aria-hidden="true">↗</i>
+              <i aria-hidden="true">→</i>
             </a>
             <a
               className="contact__callback"

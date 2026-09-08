@@ -5,14 +5,18 @@ import { PlaceholderImage } from "@/components/public/PlaceholderImage";
 import type { Experience as ExperienceData } from "@/schemas";
 
 export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const roles = data.roles;
+  /* Deleting roles in the studio can leave the selection past the end of the
+     list. Clamping keeps the reel on its last scene instead of blanking the
+     whole section out from under the editor. */
+  const activeIndex = roles.length === 0 ? 0 : Math.min(selectedIndex, roles.length - 1);
   const activeRole = roles[activeIndex];
 
   if (!activeRole) return null;
 
   function moveChapter(direction: -1 | 1) {
-    setActiveIndex((current) => (current + direction + roles.length) % roles.length);
+    setSelectedIndex((activeIndex + direction + roles.length) % roles.length);
   }
 
   return (
@@ -98,7 +102,7 @@ export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
                   type="button"
                   className={activeIndex === index ? "is-active" : undefined}
                   aria-current={activeIndex === index ? "step" : undefined}
-                  onClick={() => setActiveIndex(index)}
+                  onClick={() => setSelectedIndex(index)}
                 >
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <b>{role.company}</b>

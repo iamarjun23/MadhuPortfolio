@@ -45,10 +45,16 @@ export const useStudioStore = create<StudioStore>((set) => ({
   setHasUnpublishedChanges: (hasUnpublishedChanges) => set({ hasUnpublishedChanges }),
   registerDraftHandlers: (section, handlers) => {
     set((state) => ({ handlers: { ...state.handlers, [section]: handlers } }));
+    /* The editor that owned these edits has gone, and its unsaved draft went with
+       it. Letting `dirtySection` outlive it left the save bar offering to save a
+       section that was no longer on screen, and pressing Save did nothing at all. */
     return () =>
       set((state) => {
         const { [section]: _removed, ...handlersWithoutSection } = state.handlers;
-        return { handlers: handlersWithoutSection };
+        return {
+          handlers: handlersWithoutSection,
+          dirtySection: state.dirtySection === section ? null : state.dirtySection,
+        };
       });
   },
   discard: () => {

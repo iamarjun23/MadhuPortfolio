@@ -43,13 +43,17 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
   return (
     <section className="section" id="about" ref={sectionRef}>
       <div className="wrap about">
+        {/* The portrait photo is the subject of this section, so it fills the
+            frame whenever there is one. A portrait video no longer replaces it:
+            with both set the video plays as a clip inset into the corner, and it
+            only fills the frame itself when there is no photo to show. */}
         <div className={`portrait${isVisible ? " portrait--in" : ""}`}>
-          {portraitImage && !portraitVideo ? (
+          {portraitImage ? (
             <PlaceholderImage
               src={portraitImage.url}
               alt={portraitImage.alt}
               fill
-              sizes="(max-width: 720px) 100vw, 48vw"
+              sizes="(max-width: 900px) min(100vw, 420px), 40vw"
             />
           ) : (
             <video
@@ -58,14 +62,29 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
               loop
               playsInline
               preload="none"
-              poster={portraitVideo?.poster ?? portraitImage?.url ?? STAND_IN_VIDEO_POSTER}
-              aria-label={portraitImage?.alt ?? "Madhu editing"}
+              poster={portraitVideo?.poster ?? STAND_IN_VIDEO_POSTER}
+              aria-label="Madhu editing"
             >
               <source src={portraitVideo?.url ?? STAND_IN_VIDEO_URL} type="video/mp4" />
             </video>
           )}
+          {portraitImage && portraitVideo ? (
+            <div className="portrait__clip">
+              <video
+                ref={videoRef}
+                muted
+                loop
+                playsInline
+                preload="none"
+                poster={portraitVideo.poster}
+                aria-label="Madhu at the edit desk"
+              >
+                <source src={portraitVideo.url} type="video/mp4" />
+              </video>
+            </div>
+          ) : null}
         </div>
-        <div>
+        <div className="about__text">
           <span className="slate">
             <b className="slate__index">01</b>
             {data.eyebrow}
@@ -90,7 +109,9 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
                     <b>{group.label}</b>
                     <div className="tags">
                       {group.items.map((skill) => (
-                        <span key={skill}>{skill}</span>
+                        <span className="about__skill" key={skill}>
+                          {skill}
+                        </span>
                       ))}
                     </div>
                   </div>

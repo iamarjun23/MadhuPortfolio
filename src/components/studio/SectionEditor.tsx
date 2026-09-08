@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { saveDraft } from "@/actions/save-draft";
 import { Dropzone, type UploadEndpoint } from "@/components/studio/Dropzone";
+import { MediaPreview } from "@/components/studio/MediaPreview";
 import { SaveBar } from "@/components/studio/SaveBar";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
@@ -34,11 +35,13 @@ import {
   type MediaKindLabel,
 } from "@/lib/studio-labels";
 import { studioSectionLabels } from "@/lib/studio-nav";
-import { getYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
+import { reelSourceLabel, resolveReel } from "@/lib/reel";
 import { useStudioStore } from "@/stores/studio-store";
 
 type EditorValue = string | number | boolean | null | EditorObject | EditorValue[];
 type EditorObject = { [key: string]: EditorValue };
+
+const roomTints = ["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"] as const;
 
 const selectOptions: Record<string, readonly string[]> = {
   defaultTheme: ["suite", "sheet", "system"],
@@ -47,10 +50,85 @@ const selectOptions: Record<string, readonly string[]> = {
   pinType: ["pin", "pin-signal", "tape", "none"],
   thumbHint: ["bd-1", "bd-2", "bd-3", "bd-4"],
   tile: ["a", "b", "c", "d", "e", "f", "g", "h"],
-  tint: ["default", "ember", "signal", "rg1", "rg2", "rg3", "rg4", "rg5", "rg6"],
-  type: ["polaroid", "note", "quote", "ig", "tags"],
+  tint: roomTints,
+  type: ["polaroid", "video", "note", "quote", "ig", "tags"],
   color: ["ember", "signal"],
 };
+
+/* `tint` means two different things on a drawing-room card - the wash behind a
+   polaroid, and the colour of one word in a tag cluster - and offering the wrong
+   set writes a value the schema rejects at save time. The board's six tiles are
+   the same six washes, but they sit in a list, so their key is an index. */
+function optionsForPath(path: readonly (string | number)[]): readonly string[] | undefined {
+  const key = String(path.at(-1) ?? "");
+  if (key === "tint") {
+    return path.includes("tags") ? ["default", "ember", "signal"] : roomTints;
+  }
+  if (typeof path.at(-1) === "number" && path.at(-2) === "tiles") return roomTints;
+  return selectOptions[key];
+}
+
+/* Every field a drawing-room card of a given type must carry. Switching the type
+   in the picker swaps the card onto this shape: without it the card keeps the
+   old type's fields, the preview cannot parse it, and the save is refused. */
+function roomCardShape(type: string): EditorObject {
+  switch (type) {
+    case "video":
+      return {
+        href: null,
+        video: null,
+        image: null,
+        tint: "rg1",
+        tag: "Reel",
+        caption: "",
+        subCaption: "",
+      };
+    case "note":
+      return { color: "ember", kicker: "", text: "" };
+    case "quote":
+      return { text: "", attribution: "" };
+    case "ig":
+      return {
+        handle: "",
+        tiles: [...roomTints],
+        ctaLabel: "Follow along",
+        ctaHref: "https://instagram.com/",
+      };
+    case "tags":
+      return { kicker: "", tags: [] };
+    default:
+      return { image: null, tint: "rg1", tag: "", caption: "", subCaption: "" };
+  }
+}
+
+function isRoomCardTypePath(path: readonly (string | number)[]) {
+  return path.at(-1) === "type" && path.at(-3) === "cards" && typeof path.at(-2) === "number";
+}
+
+/* Keeps the card's identity and its place on the board, keeps any words whose
+   field survives the change, and fills the rest of the new shape with blanks. */
+function retypeRoomCard(card: EditorValue, nextType: string): EditorObject {
+  const previous = isEditorObject(card) ? card : {};
+  const shape = roomCardShape(nextType);
+  const next: EditorObject = {
+    id: typeof previous.id === "string" ? previous.id : crypto.randomUUID(),
+    type: nextType,
+    fx: typeof previous.fx === "number" ? previous.fx : 0.12,
+    fy: typeof previous.fy === "number" ? previous.fy : 0.12,
+    rot: typeof previous.rot === "number" ? previous.rot : 0,
+    pinType: typeof previous.pinType === "string" ? previous.pinType : "pin",
+  };
+
+  for (const [key, blank] of Object.entries(shape)) {
+    const carried = previous[key];
+    next[key] =
+      carried !== undefined && typeof carried === typeof blank && !Array.isArray(blank)
+        ? carried
+        : blank;
+  }
+
+  return next;
+}
 
 function isEditorObject(value: EditorValue): value is EditorObject {
   return !Array.isArray(value) && value !== null && typeof value === "object";
@@ -197,15 +275,34 @@ function parentLabel(path: readonly (string | number)[]) {
   return path.length > 1 ? pathLabel(path.slice(0, -1)) : "";
 }
 
-function emptyFromTemplate(value: EditorValue): EditorValue {
-  if (typeof value === "string") return "";
+function emptyFromTemplate(
+  value: EditorValue,
+  path: readonly (string | number)[] = [],
+): EditorValue {
+  if (typeof value === "string") {
+    // A field with a fixed option list (logoHint, pinType, tint, ...) has no
+    // blank value the schema accepts - "" isn't one of the enum's options -
+    // so a new item keeps the template's own valid choice instead of losing it.
+    return optionsForPath(path) ? value : "";
+  }
   if (typeof value === "number") return 0;
   if (typeof value === "boolean") return false;
   if (value === null) return null;
   if (Array.isArray(value)) return [];
+  // A media field (image/video/logo/...) is nullable in the schema, and "empty"
+  // for it means null - not an object with blank strings, which fails upload
+  // URL validation and permanently breaks the preview until a file is chosen.
+  if (getMediaConfig(value, path)) return null;
   const result: EditorObject = {};
   for (const [key, entry] of Object.entries(value)) {
-    result[key] = key === "id" ? crypto.randomUUID() : emptyFromTemplate(entry);
+    // A link field (e.g. a campaign's watch link) is a nullable URL in the
+    // schema - "" isn't a valid URL, so blanking it must mean null, not "".
+    result[key] =
+      key === "id"
+        ? crypto.randomUUID()
+        : key === "href" && typeof entry === "string"
+          ? null
+          : emptyFromTemplate(entry, [...path, key]);
   }
   return result;
 }
@@ -227,11 +324,23 @@ function itemTitle(value: EditorValue, fallback: string) {
   return fallback;
 }
 
-function emptyArrayTemplate(path: readonly (string | number)[]): EditorValue | undefined {
-  if (path[0] !== "quotes") return undefined;
+/* A fresh copy of an entry: same shape and words, but its own identity, so
+   duplicating a project cannot make two cards fight over one id. */
+function withFreshIds(value: EditorValue): EditorValue {
+  if (Array.isArray(value)) return value.map(withFreshIds);
+  if (isEditorObject(value)) {
+    const result: EditorObject = {};
+    for (const [key, entry] of Object.entries(value)) {
+      result[key] = key === "id" ? crypto.randomUUID() : withFreshIds(entry);
+    }
+    return result;
+  }
+  return value;
+}
 
+function blankTestimonial(): EditorObject {
   return {
-    id: "",
+    id: crypto.randomUUID(),
     quote: "",
     name: "",
     role: "",
@@ -248,6 +357,7 @@ function blankWorkProject(): EditorObject {
     subtitle: "",
     href: null,
     hrefLabel: null,
+    video: null,
     image: null,
     thumbHint: "bd-1",
     preview: null,
@@ -270,23 +380,48 @@ function blankRoomPicture(): EditorObject {
   };
 }
 
-function SortableCard({ id, children }: Readonly<{ id: string; children: React.ReactNode }>) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+/* A new entry for a list. Entries with a fixed shape get a purpose-built blank;
+   anything else copies the shape - never the words - of an entry that already
+   exists, falling back to the last saved draft when the list was emptied. */
+function blankItem(
+  path: readonly (string | number)[],
+  template: EditorValue | undefined,
+): EditorValue | undefined {
+  switch (String(path.at(-1) ?? "")) {
+    case "projects":
+      return blankWorkProject();
+    case "cards":
+      return blankRoomPicture();
+    case "quotes":
+      return blankTestimonial();
+    default:
+      return template === undefined ? undefined : emptyFromTemplate(template, path);
+  }
+}
+
+function SortableRow({ id, children }: Readonly<{ id: string; children: React.ReactNode }>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
-    <div className="studio-editor-card" ref={setNodeRef} style={style}>
+    <li
+      className={`studio-ins-item${isDragging ? " is-dragging" : ""}`}
+      ref={setNodeRef}
+      style={style}
+    >
       <button
-        className="studio-drag-handle"
+        className="studio-ins-item__grip"
         type="button"
         aria-label="Drag to reorder"
         {...attributes}
         {...listeners}
       >
-        ::
+        <span aria-hidden="true">::</span>
       </button>
       {children}
-    </div>
+    </li>
   );
 }
 
@@ -309,7 +444,7 @@ function FieldHint({ id, hint }: Readonly<{ id: string; hint?: string }>) {
 
 function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
   const key = String(path[path.length - 1] ?? "");
-  const options = selectOptions[key];
+  const options = optionsForPath(path);
   const id = `studio-${path.join("-")}`;
   const hintId = `${id}-hint`;
   const { hint } = describeField(path);
@@ -438,6 +573,15 @@ function getMediaConfig(
   if (key === "portraitVideo" && (value === null || isEditorObject(value))) {
     return { endpoint: "heroVideo", acceptsAlt: false, isVideo: true, isOptional: true };
   }
+  /* A reel that lives nowhere public can be uploaded to a work project or a
+     pinboard card instead of linked. Same field on both boards. */
+  if (
+    key === "video" &&
+    (path.includes("projects") || path.includes("cards")) &&
+    (value === null || isEditorObject(value))
+  ) {
+    return { endpoint: "reelVideo", acceptsAlt: false, isVideo: true, isOptional: true };
+  }
   if (key === "portrait" && (value === null || isEditorObject(value))) {
     return { endpoint: "portrait", acceptsAlt: true };
   }
@@ -457,10 +601,15 @@ function getMediaConfig(
           ? "boothImage"
           : pathKeys.includes("worked")
             ? "impactImage"
-            : "roomImage";
+            : pathKeys.includes("projects")
+              ? "reelCover"
+              : "roomImage";
     return {
       endpoint,
       acceptsAlt: true,
+      // A YouTube link brings its own still, so a cover here is a deliberate
+      // override rather than something every project has to fill in.
+      isOptional: pathKeys.includes("projects"),
     };
   }
   return undefined;
@@ -496,7 +645,7 @@ function collectMediaFields(
 function isVideoLinkField(value: EditorValue, path: readonly (string | number)[]) {
   return (
     String(path.at(-1) ?? "") === "href" &&
-    path.includes("projects") &&
+    (path.includes("projects") || path.includes("cards")) &&
     (value === null || typeof value === "string")
   );
 }
@@ -711,9 +860,10 @@ function MediaEditor({
   );
 }
 
-/* The counterpart to MediaEditor for a YouTube-hosted video: same card shape and
-   Video badge, but the address itself is the asset, so it gets a live thumbnail,
-   a way to replace it, and a way to clear it. */
+/* The counterpart to MediaEditor for a project that lives on someone else's
+   site - a YouTube video or a LinkedIn post: same card shape and Video badge,
+   but the address itself is the asset, so it gets a live thumbnail where one
+   exists, a way to replace it, and a way to clear it. */
 function LinkEditor({
   value,
   label,
@@ -722,8 +872,12 @@ function LinkEditor({
   showBreadcrumb,
 }: ValueEditorProps & { showBreadcrumb?: boolean }) {
   const url = typeof value === "string" ? value : "";
-  const videoId = getYouTubeId(url);
-  const thumbnail = getYouTubeThumbnail(url);
+  const reel = resolveReel({ href: url || null });
+  // A fetched thumbnail can fail where a computed YouTube one never does.
+  // Tracked against the url it failed for, so pasting a new address over a
+  // broken one gets a fresh attempt.
+  const [failedThumbUrl, setFailedThumbUrl] = useState<string | null>(null);
+  const thumbnail = reel.thumbnailCanFail && failedThumbUrl === url ? null : reel.thumbnail;
   const { hint } = describeField(path);
   const breadcrumb = showBreadcrumb ? parentLabel(path) : "";
   const inputId = `studio-${path.join("-")}-link`;
@@ -737,20 +891,28 @@ function LinkEditor({
       {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
       <p className="studio-media-field__hint">{hint}</p>
       <div className="studio-link-field__preview">
-        {thumbnail ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- a YouTube still keyed
-             off a value the editor is typing, so it cannot be statically optimised. */
-          <img src={thumbnail} alt={`Thumbnail of the linked YouTube video`} />
+        {reel.playable ? (
+          <MediaPreview
+            label={label}
+            source={{
+              kind: "embed",
+              thumbnail,
+              embed: reel.embed,
+              href: url,
+              alt: `Preview of the linked ${reelSourceLabel(reel.kind).toLocaleLowerCase()}`,
+            }}
+            onError={reel.thumbnailCanFail ? () => setFailedThumbUrl(url) : undefined}
+          />
         ) : (
           <p>
             {url
-              ? "That is not a YouTube address, so there is no thumbnail and no in-page player. The link still opens from the pop-up."
-              : "No link yet. Paste a YouTube address below and its thumbnail appears here."}
+              ? "That is not a YouTube, Instagram or LinkedIn address, so there is no thumbnail and no in-page player. The link still opens from the pop-up."
+              : "No link yet. Paste a YouTube, Instagram or LinkedIn address below and its preview appears here."}
           </p>
         )}
       </div>
       <label className="studio-field" htmlFor={inputId}>
-        <span>{url ? "Change the link" : "Paste the YouTube link"}</span>
+        <span>{url ? "Change the link" : "Paste the YouTube, Instagram or LinkedIn link"}</span>
         <input
           id={inputId}
           type="url"
@@ -761,16 +923,23 @@ function LinkEditor({
         />
         <FieldHint
           id={`${inputId}-hint`}
-          hint="Paste a new address over the old one to swap the video. The card thumbnail and the pop-up player follow it straight away."
+          hint="Paste a new address over the old one to swap the reel. A YouTube video, an Instagram reel and a LinkedIn post all bring their own thumbnail; the card and the pop-up follow it straight away."
         />
       </label>
+      {reel.thumbnailCanFail ? (
+        <p className="studio-media-field__spec">
+          {reelSourceLabel(reel.kind)}s publish no still at an address we can look up, so this one
+          is fetched and may not arrive. Upload a <b>Cover photo</b> below and the card uses that
+          instead - the way a YouTube link supplies its own.
+        </p>
+      ) : null}
       <div className="studio-link-field__actions">
         {url ? (
           <a href={url} target="_blank" rel="noreferrer">
             Open the link to check it <span aria-hidden="true">&#8599;</span>
           </a>
         ) : null}
-        {videoId ? <em>Video ID {videoId}</em> : null}
+        {reel.kind === "none" ? null : <em>{reelSourceLabel(reel.kind)}</em>}
         {url ? (
           <button type="button" onClick={() => onChange(path, null)}>
             Clear link
@@ -781,246 +950,488 @@ function LinkEditor({
   );
 }
 
-function ArrayEditor({
+/* ---------------------------------------------------------------------------
+   The panel on the right shows one level at a time: a list of plain-language
+   rows, and a trail back to where you came from. Lists of entries - projects,
+   polaroids, testimonials - are managed as rows you can add to, copy and delete,
+   and you step into an entry to edit its own fields.
+--------------------------------------------------------------------------- */
+
+type InspectorViewProps = Readonly<{
+  path: readonly (string | number)[];
+  onChange: (path: readonly (string | number)[], value: EditorValue) => void;
+  onNavigate: (path: readonly (string | number)[]) => void;
+  templateFor: (path: readonly (string | number)[]) => EditorValue | undefined;
+  uploadEnabled: boolean;
+  focusKey: string | null;
+}>;
+
+function itemNounFor(path: readonly (string | number)[]) {
+  const doc = describeField(path);
+  return doc.itemLabel ?? (doc.label.endsWith("s") ? doc.label.slice(0, -1) : doc.label);
+}
+
+/* "4 projects" / "3 fields": what a row leads to, before you open it. */
+function contentsLabel(value: EditorValue, path: readonly (string | number)[]) {
+  if (Array.isArray(value)) {
+    const noun = itemNounFor(path).toLowerCase();
+    return `${value.length} ${value.length === 1 ? noun : `${noun}s`}`;
+  }
+  if (isEditorObject(value)) {
+    const count = Object.keys(value).length;
+    return `${count} ${count === 1 ? "field" : "fields"}`;
+  }
+  return "";
+}
+
+function GroupView({
   value,
-  label,
   path,
   onChange,
+  onNavigate,
   uploadEnabled,
-}: ValueEditorProps & { value: EditorValue[] }) {
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
-  const sortableIds = value.flatMap((item) =>
-    isEditorObject(item) && typeof item.id === "string" ? [item.id] : [],
-  );
-  const isSortable = sortableIds.length === value.length && value.length > 1;
-  const [lastTemplate, setLastTemplate] = useState<EditorValue | undefined>(value[0]);
-  const template = value[0] ?? lastTemplate ?? emptyArrayTemplate(path);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const activeIndex = Math.min(selectedIndex, Math.max(0, value.length - 1));
-  const selectedItem = value[activeIndex];
-  const doc = describeField(path);
-  const itemNoun = doc.itemLabel ?? (label.endsWith("s") ? label.slice(0, -1) : label);
+  focusKey,
+}: InspectorViewProps & { value: EditorObject }) {
+  const focusRef = useRef<HTMLDivElement | null>(null);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    if (!event.over || event.active.id === event.over.id) return;
-    onChange(path, reorder(value, String(event.active.id), String(event.over.id)));
-  };
-
-  const records = value.map((item, index) => {
-    const summary = mediaSummary(item, [...path, index]);
-    const record = (
-      <button
-        className={`studio-array__record${activeIndex === index ? " is-active" : ""}`}
-        type="button"
-        onClick={() => setSelectedIndex(index)}
-        aria-pressed={activeIndex === index}
-      >
-        <span>
-          <b>{itemTitle(item, `${itemNoun} ${index + 1}`)}</b>
-          <small>
-            {`${itemNoun} ${index + 1}`}
-            {summary === "Text only" ? "" : ` · ${summary}`}
-          </small>
-        </span>
-        <i aria-hidden="true">→</i>
-      </button>
-    );
-
-    if (!isSortable || !isEditorObject(item) || typeof item.id !== "string") {
-      return (
-        <div className="studio-array__record-wrap" key={`${label}-${index}`}>
-          {record}
-        </div>
-      );
-    }
-
-    return (
-      <SortableCard key={item.id} id={item.id}>
-        {record}
-      </SortableCard>
-    );
-  });
-
-  const addItem = () => {
-    if (template === undefined) return;
-    onChange(path, [...value, emptyFromTemplate(template)]);
-    setSelectedIndex(value.length);
-  };
-
-  const addWorkProject = () => {
-    onChange(path, [...value, blankWorkProject()]);
-    setSelectedIndex(value.length);
-  };
-
-  const addRoomPicture = () => {
-    onChange(path, [...value, blankRoomPicture()]);
-    setSelectedIndex(value.length);
-  };
-
-  const removeSelectedItem = () => {
-    if (selectedItem === undefined) return;
-    setLastTemplate(selectedItem);
-    onChange(
-      path,
-      value.filter((_, index) => index !== activeIndex),
-    );
-    setSelectedIndex(Math.max(0, activeIndex - 1));
-  };
+  useEffect(() => {
+    focusRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focusKey]);
 
   return (
-    <section className="studio-array" aria-label={label}>
-      <header>
-        <div className="studio-array__title">
-          <h2>
-            {label} <span className="studio-array__count">{value.length}</span>
-          </h2>
-          {doc.hint ? <p className="studio-array__hint">{doc.hint}</p> : null}
-          {isSortable ? (
-            <p className="studio-array__reorder-hint">
-              Drag the <b>::</b> handle beside a row to change the order it appears in on the site.
-            </p>
-          ) : null}
-        </div>
-        {/* Projects get a purpose-built blank instead of the generic "copy the shape
-            of the first entry" button, so there is only ever one way to add one. */}
-        {template !== undefined && path.at(-1) !== "projects" ? (
-          <button className="studio-add-row" type="button" onClick={addItem}>
-            {path.at(-1) === "cards"
-              ? "Add card (same type as the first)"
-              : `Add ${itemNoun.toLowerCase()}`}
-          </button>
-        ) : null}
-        {path.at(-1) === "projects" ? (
-          <button className="studio-add-row" type="button" onClick={addWorkProject}>
-            Add project
-          </button>
-        ) : null}
-        {path.at(-1) === "cards" ? (
-          <button className="studio-add-row" type="button" onClick={addRoomPicture}>
-            Add polaroid (photo card)
-          </button>
-        ) : null}
-      </header>
-      {value.length > 0 ? (
-        <div className="studio-array__workspace">
-          <div className="studio-array__records" aria-label={`${label} list`}>
-            {isSortable ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
+    <div className="studio-ins-fields">
+      {Object.entries(value)
+        .filter(([key]) => key !== "id")
+        .map(([key, entry]) => {
+          const childPath = [...path, key];
+          const label = fieldLabel(childPath);
+          const isFocused = focusKey === key;
+          const isLink = isVideoLinkField(entry, childPath);
+          const isMedia = getMediaConfig(entry, childPath) !== undefined;
+
+          if (isLink || isMedia) {
+            return (
+              <div
+                className={`studio-ins-field${isFocused ? " is-focused" : ""}`}
+                key={key}
+                ref={isFocused ? focusRef : undefined}
               >
-                <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-                  {records}
-                </SortableContext>
-              </DndContext>
-            ) : (
-              records
-            )}
-          </div>
-          {selectedItem !== undefined ? (
-            <div className="studio-array__detail">
-              <header>
-                <div>
-                  <span>{`Editing ${itemNoun.toLowerCase()} ${activeIndex + 1} of ${value.length}`}</span>
-                  <strong>{itemTitle(selectedItem, `${itemNoun} ${activeIndex + 1}`)}</strong>
-                </div>
-                <button
-                  className="studio-row-remove"
-                  type="button"
-                  aria-label={`Remove ${itemNoun} ${activeIndex + 1}`}
-                  onClick={removeSelectedItem}
-                >
-                  Remove
-                </button>
-              </header>
-              <ValueEditor
-                value={selectedItem}
-                label={`${itemNoun} ${activeIndex + 1}`}
-                path={[...path, activeIndex]}
+                {isLink ? (
+                  <LinkEditor
+                    value={entry}
+                    label={label}
+                    path={childPath}
+                    onChange={onChange}
+                    uploadEnabled={uploadEnabled}
+                  />
+                ) : (
+                  <MediaEditor
+                    value={entry}
+                    label={label}
+                    path={childPath}
+                    onChange={onChange}
+                    uploadEnabled={uploadEnabled}
+                  />
+                )}
+              </div>
+            );
+          }
+
+          if (Array.isArray(entry) || isEditorObject(entry)) {
+            const { hint } = describeField(childPath);
+            return (
+              <button
+                className="studio-ins-nav"
+                type="button"
+                key={key}
+                onClick={() => onNavigate(childPath)}
+              >
+                <span className="studio-ins-nav__text">
+                  <b>{label}</b>
+                  <small>{hint ?? "Open this to edit what is inside."}</small>
+                </span>
+                <span className="studio-ins-nav__count">{contentsLabel(entry, childPath)}</span>
+                <i aria-hidden="true">&#8250;</i>
+              </button>
+            );
+          }
+
+          return (
+            <div
+              className={`studio-ins-field${isFocused ? " is-focused" : ""}`}
+              key={key}
+              ref={isFocused ? focusRef : undefined}
+            >
+              <ScalarEditor
+                value={entry}
+                label={label}
+                path={childPath}
                 onChange={onChange}
                 uploadEnabled={uploadEnabled}
               />
             </div>
-          ) : null}
-        </div>
-      ) : (
-        <p className="studio-array__empty">
-          No {label.toLowerCase()} yet. Use “Add {itemNoun.toLowerCase()}” above to create the first
-          one.
-        </p>
-      )}
-    </section>
+          );
+        })}
+    </div>
   );
 }
 
-function ValueEditor({ value, label, path, onChange, uploadEnabled }: ValueEditorProps) {
-  if (isVideoLinkField(value, path)) {
-    return (
-      <LinkEditor
-        value={value}
-        label={label}
-        path={path}
-        onChange={onChange}
-        uploadEnabled={uploadEnabled}
-      />
-    );
-  }
+function ListView({
+  value,
+  path,
+  onChange,
+  onNavigate,
+  templateFor,
+  focusKey,
+}: InspectorViewProps & { value: EditorValue[] }) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
+  const doc = describeField(path);
+  const itemNoun = itemNounFor(path);
+  const noun = itemNoun.toLowerCase();
+  const template = templateFor(path);
+  const nextItem = blankItem(path, template);
+  const isTextList =
+    value.every((item) => typeof item === "string") &&
+    (value.length > 0 || typeof template === "string");
+  const itemOptions = optionsForPath([...path, 0]);
+  /* The six tiles on an Instagram card are a fixed set the schema counts, so the
+     panel lets you recolour them but not add a seventh or drop one. */
+  const isFixedLength = path.at(-1) === "tiles";
+  const sortableIds = value.flatMap((item) =>
+    isEditorObject(item) && typeof item.id === "string" ? [item.id] : [],
+  );
+  const isSortable = !isTextList && sortableIds.length === value.length && value.length > 1;
 
-  if (getMediaConfig(value, path)) {
-    return (
-      <MediaEditor
-        value={value}
-        label={label}
-        path={path}
-        onChange={onChange}
-        uploadEnabled={uploadEnabled}
-      />
-    );
-  }
+  const addItem = () => {
+    if (nextItem === undefined) return;
+    onChange(path, [...value, nextItem]);
+    if (!isTextList) onNavigate([...path, value.length]);
+  };
 
-  if (Array.isArray(value))
-    return (
-      <ArrayEditor
-        value={value}
-        label={label}
-        path={path}
-        onChange={onChange}
-        uploadEnabled={uploadEnabled}
-      />
-    );
+  const copyItem = (index: number) => {
+    const item = value[index];
+    if (item === undefined) return;
+    onChange(path, [...value.slice(0, index + 1), withFreshIds(item), ...value.slice(index + 1)]);
+  };
 
-  if (isEditorObject(value)) {
-    const { hint } = describeField(path);
-    return (
-      <fieldset className="studio-object">
-        <legend>{label}</legend>
-        {hint ? <p className="studio-object__hint">{hint}</p> : null}
-        {Object.entries(value).map(([key, entry]) => (
-          <ValueEditor
-            key={key}
-            value={entry}
-            label={fieldLabel([...path, key])}
-            path={[...path, key]}
-            onChange={onChange}
-            uploadEnabled={uploadEnabled}
-          />
-        ))}
-      </fieldset>
+  const deleteItem = (index: number) => {
+    setConfirmIndex(null);
+    onChange(
+      path,
+      value.filter((_, position) => position !== index),
     );
-  }
+  };
+
+  const rows = value.map((item, index) => {
+    const title = itemTitle(item, `${itemNoun} ${index + 1}`);
+    const summary = mediaSummary(item, [...path, index]);
+    const key = isEditorObject(item) && typeof item.id === "string" ? item.id : `${noun}-${index}`;
+
+    const body =
+      confirmIndex === index ? (
+        <div className="studio-ins-confirm">
+          <p>
+            Delete <b>{typeof item === "string" ? item || `${itemNoun} ${index + 1}` : title}</b>?
+          </p>
+          <div>
+            <button
+              className="studio-ins-btn studio-ins-btn--danger"
+              type="button"
+              onClick={() => deleteItem(index)}
+            >
+              Yes, delete
+            </button>
+            <button className="studio-ins-btn" type="button" onClick={() => setConfirmIndex(null)}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      ) : isTextList ? (
+        <>
+          {itemOptions ? (
+            <select
+              className="studio-ins-item__input"
+              value={String(item)}
+              aria-label={`${itemNoun} ${index + 1}`}
+              onChange={(event) => onChange([...path, index], event.target.value)}
+            >
+              {itemOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="studio-ins-item__input"
+              value={String(item)}
+              aria-label={`${itemNoun} ${index + 1}`}
+              onChange={(event) => onChange([...path, index], event.target.value)}
+            />
+          )}
+          {isFixedLength ? null : (
+            <button
+              className="studio-ins-tool studio-ins-tool--danger"
+              type="button"
+              aria-label={`Delete ${noun} ${index + 1}`}
+              onClick={() => setConfirmIndex(index)}
+            >
+              Delete
+            </button>
+          )}
+        </>
+      ) : (
+        <>
+          <button
+            className="studio-ins-item__open"
+            type="button"
+            onClick={() => onNavigate([...path, index])}
+          >
+            <span className="studio-ins-item__text">
+              <b>{title}</b>
+              <small>
+                {`${itemNoun} ${index + 1}`}
+                {summary === "Text only" ? "" : ` · ${summary}`}
+              </small>
+            </span>
+            <i aria-hidden="true">&#8250;</i>
+          </button>
+          <div className="studio-ins-item__tools">
+            <button
+              className="studio-ins-tool"
+              type="button"
+              aria-label={`Duplicate ${noun} ${index + 1}`}
+              onClick={() => copyItem(index)}
+            >
+              Duplicate
+            </button>
+            <button
+              className="studio-ins-tool studio-ins-tool--danger"
+              type="button"
+              aria-label={`Delete ${noun} ${index + 1}`}
+              onClick={() => setConfirmIndex(index)}
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      );
+
+    if (isSortable && isEditorObject(item) && typeof item.id === "string") {
+      return (
+        <SortableRow key={key} id={item.id}>
+          {body}
+        </SortableRow>
+      );
+    }
+
+    return (
+      <li
+        className={`studio-ins-item${isTextList ? " studio-ins-item--text" : ""}${
+          focusKey === String(index) ? " is-focused" : ""
+        }`}
+        key={key}
+      >
+        {body}
+      </li>
+    );
+  });
 
   return (
-    <ScalarEditor
-      value={value}
-      label={label}
-      path={path}
-      onChange={onChange}
-      uploadEnabled={uploadEnabled}
-    />
+    <div className="studio-ins-collection">
+      {doc.hint ? <p className="studio-ins-note">{doc.hint}</p> : null}
+      {isSortable ? (
+        <p className="studio-ins-note studio-ins-note--quiet">
+          Drag the <b>::</b> handle to change the order these appear in on the page.
+        </p>
+      ) : null}
+      {value.length > 0 ? (
+        <ol className="studio-ins-list">
+          {isSortable ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event: DragEndEvent) => {
+                if (!event.over || event.active.id === event.over.id) return;
+                onChange(path, reorder(value, String(event.active.id), String(event.over.id)));
+              }}
+            >
+              <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                {rows}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            rows
+          )}
+        </ol>
+      ) : (
+        <p className="studio-ins-empty">
+          Nothing here yet. Add the first {noun} and it appears in the preview on the left.
+        </p>
+      )}
+      {isFixedLength ? (
+        <p className="studio-ins-note studio-ins-note--quiet">
+          This grid always holds {value.length} tiles. Change their colours above; they cannot be
+          added to or removed.
+        </p>
+      ) : nextItem === undefined ? (
+        <p className="studio-ins-note studio-ins-note--quiet">
+          New entries here copy the shape of an existing one, and there is none left to copy.
+        </p>
+      ) : (
+        <button className="studio-ins-add" type="button" onClick={addItem}>
+          <span aria-hidden="true">+</span> Add {noun}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* Duplicate and delete for the entry you are currently inside, so you never have
+   to step back out to the list to get rid of it. */
+function ItemActions({
+  data,
+  path,
+  onChange,
+  onNavigate,
+}: Readonly<{
+  data: EditorObject;
+  path: readonly (string | number)[];
+  onChange: (path: readonly (string | number)[], value: EditorValue) => void;
+  onNavigate: (path: readonly (string | number)[]) => void;
+}>) {
+  const [confirming, setConfirming] = useState(false);
+  const index = path.at(-1);
+  const parentPath = path.slice(0, -1);
+  const parent = valueAtPath(data, parentPath);
+
+  if (typeof index !== "number" || !Array.isArray(parent)) return null;
+
+  const noun = itemNounFor(parentPath).toLowerCase();
+  const item = parent[index];
+
+  if (confirming)
+    return (
+      <div className="studio-ins-item-actions">
+        <div className="studio-ins-confirm">
+          <p>Delete this {noun}? It leaves the live page the next time you publish.</p>
+          <div>
+            <button
+              className="studio-ins-btn studio-ins-btn--danger"
+              type="button"
+              onClick={() => {
+                onChange(
+                  parentPath,
+                  parent.filter((_, position) => position !== index),
+                );
+                onNavigate(parentPath);
+              }}
+            >
+              Yes, delete
+            </button>
+            <button className="studio-ins-btn" type="button" onClick={() => setConfirming(false)}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="studio-ins-item-actions">
+      <button
+        className="studio-ins-btn"
+        type="button"
+        onClick={() => {
+          if (item === undefined) return;
+          onChange(parentPath, [
+            ...parent.slice(0, index + 1),
+            withFreshIds(item),
+            ...parent.slice(index + 1),
+          ]);
+          onNavigate([...parentPath, index + 1]);
+        }}
+      >
+        Duplicate this {noun}
+      </button>
+      <button
+        className="studio-ins-btn studio-ins-btn--danger"
+        type="button"
+        onClick={() => setConfirming(true)}
+      >
+        Delete this {noun}
+      </button>
+    </div>
+  );
+}
+
+function InspectorBody({
+  data,
+  path,
+  onChange,
+  onNavigate,
+  templateFor,
+  uploadEnabled,
+  focusKey,
+}: InspectorViewProps & { data: EditorObject }) {
+  const value = path.length === 0 ? data : valueAtPath(data, path);
+  if (value === undefined) return null;
+
+  const label = fieldLabel(path);
+  const shared = { path, onChange, onNavigate, templateFor, uploadEnabled, focusKey };
+
+  if (Array.isArray(value)) return <ListView value={value} {...shared} />;
+
+  if (isVideoLinkField(value, path))
+    return (
+      <div className="studio-ins-fields">
+        <LinkEditor
+          value={value}
+          label={label}
+          path={path}
+          onChange={onChange}
+          uploadEnabled={uploadEnabled}
+        />
+      </div>
+    );
+
+  if (getMediaConfig(value, path))
+    return (
+      <div className="studio-ins-fields">
+        <MediaEditor
+          value={value}
+          label={label}
+          path={path}
+          onChange={onChange}
+          uploadEnabled={uploadEnabled}
+        />
+      </div>
+    );
+
+  if (isEditorObject(value))
+    return (
+      <>
+        <GroupView value={value} {...shared} />
+        <ItemActions data={data} path={path} onChange={onChange} onNavigate={onNavigate} />
+      </>
+    );
+
+  return (
+    <div className="studio-ins-fields">
+      <div className="studio-ins-field">
+        <ScalarEditor
+          value={value}
+          label={label}
+          path={path}
+          onChange={onChange}
+          uploadEnabled={uploadEnabled}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -1036,10 +1447,8 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
   const [savedData, setSavedData] = useState(() => normalizeObject(data));
   const [currentData, setCurrentData] = useState(() => normalizeObject(data));
   const currentDataRef = useRef(currentData);
-  const [activePath, setActivePath] = useState<readonly (string | number)[]>(() => {
-    const firstKey = Object.keys(savedData)[0];
-    return firstKey ? [firstKey] : [];
-  });
+  const [activePath, setActivePath] = useState<readonly (string | number)[]>([]);
+  const [focusKey, setFocusKey] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [inspectorTab, setInspectorTab] = useState<"content" | "media">("content");
   const { formState, handleSubmit, reset, setValue } = useForm<{ data: unknown }>({
@@ -1053,7 +1462,16 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
 
   const updateValue = useCallback(
     (path: readonly (string | number)[], value: EditorValue) => {
-      const nextData = updateAtPath(currentDataRef.current, path, value);
+      /* Changing a drawing-room card's type rewrites the whole card rather than
+         one field, so the card never sits half in one shape and half in another. */
+      const nextData =
+        isRoomCardTypePath(path) && typeof value === "string"
+          ? updateAtPath(
+              currentDataRef.current,
+              path.slice(0, -1),
+              retypeRoomCard(valueAtPath(currentDataRef.current, path.slice(0, -1)) ?? null, value),
+            )
+          : updateAtPath(currentDataRef.current, path, value);
       currentDataRef.current = nextData;
       setCurrentData(nextData);
       setValue("data", nextData, {
@@ -1061,6 +1479,24 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
       });
     },
     [setValue],
+  );
+
+  const openPath = useCallback((path: readonly (string | number)[]) => {
+    setActivePath(path);
+    setFocusKey(null);
+  }, []);
+
+  /* A new list entry copies the shape of one that already exists. When the list
+     has been emptied, the last saved draft still remembers that shape. */
+  const templateFor = useCallback(
+    (path: readonly (string | number)[]) => {
+      const current = valueAtPath(currentData, path);
+      if (Array.isArray(current) && current[0] !== undefined) return current[0];
+      const saved = valueAtPath(savedData, path);
+      if (Array.isArray(saved) && saved[0] !== undefined) return saved[0];
+      return undefined;
+    },
+    [currentData, savedData],
   );
 
   const handleSave = useCallback(async () => {
@@ -1103,15 +1539,19 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
     if (formState.isDirty) markDirty(section);
   }, [formState.isDirty, markDirty, section]);
 
-  const fallbackKey = Object.keys(currentData)[0];
+  /* A draft lives in this component until it is saved, so closing the tab or
+     hitting reload throws it away. The browser's own guard is the only one that
+     can catch that. */
+  useEffect(() => {
+    if (!formState.isDirty) return;
+
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [formState.isDirty]);
+
   const selectedPath =
-    activePath.length > 0 && valueAtPath(currentData, activePath) !== undefined
-      ? activePath
-      : fallbackKey
-        ? [fallbackKey]
-        : [];
-  const selectedRootKey = typeof selectedPath[0] === "string" ? selectedPath[0] : "";
-  const activeValue = valueAtPath(currentData, selectedPath);
+    activePath.length === 0 || valueAtPath(currentData, activePath) !== undefined ? activePath : [];
   const mediaFields = collectMediaFields(currentData);
   const photoFields = mediaFields.filter(
     (field) => !getMediaConfig(field.value, field.path)?.isVideo,
@@ -1186,16 +1626,17 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
         <li>
           <b>1</b>
           <span>
-            <strong>Pick what to change.</strong> Click any text in the preview on the left, or
-            choose a field from the <em>Content</em> list on the right.
+            <strong>Pick what to change.</strong> Click any text in the preview on the left and the
+            panel opens it, or work down the <em>Content</em> list on the right.
           </span>
         </li>
         <li>
           <b>2</b>
           <span>
-            <strong>Add photos and videos.</strong> Open the <em>Media</em> tab on the right. Every
-            upload in this section is there, each marked <em>Photo</em> or <em>Video</em> with the
-            file size it accepts.
+            <strong>Add, copy or delete entries.</strong> Rows with an arrow open a list. Use
+            <em>Add</em> for a new one, <em>Duplicate</em> to copy an existing one, and
+            <em>Delete</em> to remove it. Every upload sits together under{" "}
+            <em>Photos &amp; video</em>.
           </span>
         </li>
         <li>
@@ -1233,168 +1674,149 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
               if (!path) return;
               event.preventDefault();
               event.stopPropagation();
-              setActivePath(path);
+              setActivePath(path.slice(0, -1));
+              setFocusKey(String(path.at(-1)));
               setInspectorTab("content");
             }}
           >
             <StudioLandingPreview section={section} data={previewData} contactData={contactData} />
           </div>
         </section>
-        <aside className="studio-inspector" aria-label="Element inspector">
-          <header className="studio-inspector__heading">
+        <aside className="studio-ins" aria-label="Editing panel">
+          <header className="studio-ins__head">
             <div>
-              <span>Inspector</span>
+              <span>Editing</span>
               <h2>{studioSectionLabels[section]}</h2>
             </div>
-            <small>{Object.keys(currentData).length} fields</small>
-          </header>
-          <div className="studio-inspector__tabs" role="tablist" aria-label="Inspector mode">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={inspectorTab === "content"}
-              className={inspectorTab === "content" ? "is-active" : ""}
-              onClick={() => setInspectorTab("content")}
-            >
-              Content
-            </button>
-            {assetCount > 0 ? (
+            <div className="studio-ins__tabs" role="tablist" aria-label="Panel view">
               <button
                 type="button"
                 role="tab"
-                aria-selected={inspectorTab === "media"}
-                className={inspectorTab === "media" ? "is-active" : ""}
-                onClick={() => setInspectorTab("media")}
+                aria-selected={inspectorTab === "content"}
+                className={inspectorTab === "content" ? "is-active" : ""}
+                onClick={() => setInspectorTab("content")}
               >
-                Photos &amp; video <span>{assetCount}</span>
+                Content
               </button>
-            ) : null}
-          </div>
-          {inspectorTab === "media" && assetCount > 0 ? (
-            <section className="studio-inspector__media" aria-labelledby="studio-media-title">
-              <header>
-                <span>Photos &amp; video</span>
-                <h2 id="studio-media-title">
-                  {[
-                    photoFields.length > 0
-                      ? `${photoFields.length} photo${photoFields.length === 1 ? "" : "s"}`
-                      : "",
-                    videoFields.length > 0
-                      ? `${videoFields.length} video${videoFields.length === 1 ? "" : "s"}`
-                      : "",
-                    linkFields.length > 0
-                      ? `${linkFields.length} video link${linkFields.length === 1 ? "" : "s"}`
-                      : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </h2>
-                <p>
-                  Every picture and video this section uses, and where each one lands on the page.
-                  Uploaded files say the size they accept; video links are YouTube addresses you
-                  paste, with nothing stored here. Either way, nothing goes live until you save the
-                  section and publish.
-                </p>
-              </header>
-              <div>
-                {assetGroups.map((group) => (
-                  <section className="studio-media-group" key={group.key}>
-                    <h3>
-                      <span className={`studio-media-badge studio-media-badge--${group.kind}`}>
-                        {mediaSpecs[group.kind].badge}
-                      </span>
-                      {group.title}
-                      <em>{group.note}</em>
-                    </h3>
-                    {group.fields.map(({ path, value }) =>
-                      group.isLink ? (
-                        <LinkEditor
-                          key={path.join("-")}
-                          value={value}
-                          label={fieldLabel(path)}
-                          path={path}
-                          onChange={updateValue}
-                          uploadEnabled={uploadEnabled}
-                          showBreadcrumb
-                        />
-                      ) : (
-                        <MediaEditor
-                          key={path.join("-")}
-                          value={value}
-                          label={fieldLabel(path)}
-                          path={path}
-                          onChange={updateValue}
-                          uploadEnabled={uploadEnabled}
-                          showBreadcrumb
-                        />
-                      ),
-                    )}
-                  </section>
-                ))}
-              </div>
-            </section>
-          ) : (
-            <div className="studio-inspector__content">
-              <nav className="studio-inspector__elements" aria-label="Editable elements">
-                {Object.entries(currentData).map(([key, value], index) => {
-                  const doc = describeField([key]);
-                  const rootConfig = getMediaConfig(value, [key]);
-                  const kindTag = rootConfig
-                    ? rootConfig.isVideo
-                      ? "Video"
-                      : "Photo"
-                    : Array.isArray(value)
-                      ? `${value.length} ${
-                          value.length === 1
-                            ? (doc.itemLabel ?? "item").toLowerCase()
-                            : `${(doc.itemLabel ?? "item").toLowerCase()}s`
-                        }`
-                      : isEditorObject(value)
-                        ? "Group"
-                        : typeof value === "boolean"
-                          ? "On / off"
-                          : typeof value === "number"
-                            ? "Number"
-                            : "Text";
-
-                  return (
-                    <button
-                      className={selectedRootKey === key ? "is-active" : ""}
-                      type="button"
-                      key={key}
-                      title={doc.hint}
-                      aria-pressed={selectedRootKey === key}
-                      onClick={() => setActivePath([key])}
-                    >
-                      <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
-                      <span>{doc.label}</span>
-                      <small>{kindTag}</small>
-                    </button>
-                  );
-                })}
-              </nav>
-              {activeValue !== undefined ? (
-                <form
-                  className="studio-inspector__form"
-                  onSubmit={(event) => void handleSubmit(() => undefined)(event)}
+              {assetCount > 0 ? (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={inspectorTab === "media"}
+                  className={inspectorTab === "media" ? "is-active" : ""}
+                  onClick={() => setInspectorTab("media")}
                 >
-                  <div className="studio-inspector__selected">
-                    <span>Now editing</span>
-                    <h2>{fieldLabel(selectedPath)}</h2>
-                    {selectedPath.length > 1 ? (
-                      <p className="studio-inspector__breadcrumb">{pathLabel(selectedPath)}</p>
-                    ) : null}
-                  </div>
-                  <ValueEditor
-                    value={activeValue}
-                    label={fieldLabel(selectedPath)}
-                    path={selectedPath}
-                    onChange={updateValue}
-                    uploadEnabled={uploadEnabled}
-                  />
-                </form>
+                  Photos &amp; video <span>{assetCount}</span>
+                </button>
               ) : null}
             </div>
+          </header>
+          {inspectorTab === "media" && assetCount > 0 ? (
+            <div className="studio-ins__body studio-ins-media">
+              <p className="studio-ins-note">
+                Every photo and video this section uses, in one place. Uploads say the file size
+                they accept; video links are YouTube addresses you paste. Nothing reaches the live
+                site until you save and publish.
+              </p>
+              {assetGroups.map((group) => (
+                <section className="studio-media-group" key={group.key}>
+                  <h3>
+                    <span className={`studio-media-badge studio-media-badge--${group.kind}`}>
+                      {mediaSpecs[group.kind].badge}
+                    </span>
+                    {group.title}
+                    <em>{group.note}</em>
+                  </h3>
+                  {group.fields.map(({ path, value }) =>
+                    group.isLink ? (
+                      <LinkEditor
+                        key={path.join("-")}
+                        value={value}
+                        label={fieldLabel(path)}
+                        path={path}
+                        onChange={updateValue}
+                        uploadEnabled={uploadEnabled}
+                        showBreadcrumb
+                      />
+                    ) : (
+                      <MediaEditor
+                        key={path.join("-")}
+                        value={value}
+                        label={fieldLabel(path)}
+                        path={path}
+                        onChange={updateValue}
+                        uploadEnabled={uploadEnabled}
+                        showBreadcrumb
+                      />
+                    ),
+                  )}
+                </section>
+              ))}
+            </div>
+          ) : (
+            <>
+              <nav className="studio-ins__trail" aria-label="Where you are">
+                <button
+                  className="studio-ins__back"
+                  type="button"
+                  disabled={selectedPath.length === 0}
+                  onClick={() => openPath(selectedPath.slice(0, -1))}
+                >
+                  <span aria-hidden="true">&#8249;</span> Back
+                </button>
+                <ol>
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => openPath([])}
+                      disabled={selectedPath.length === 0}
+                    >
+                      All fields
+                    </button>
+                  </li>
+                  {selectedPath.map((_, index) => {
+                    const crumbPath = selectedPath.slice(0, index + 1);
+                    const isCurrent = index === selectedPath.length - 1;
+                    return (
+                      <li key={crumbPath.join("-")}>
+                        <button
+                          type="button"
+                          onClick={() => openPath(crumbPath)}
+                          disabled={isCurrent}
+                          aria-current={isCurrent ? "step" : undefined}
+                        >
+                          {fieldLabel(crumbPath)}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </nav>
+              <div className="studio-ins__body">
+                <div className="studio-ins__title">
+                  <h3>
+                    {selectedPath.length === 0
+                      ? "Everything in this section"
+                      : fieldLabel(selectedPath)}
+                  </h3>
+                  <p>
+                    {selectedPath.length === 0
+                      ? "Type in any box to change the words. A row with an arrow opens a list you can add to, reorder or delete from."
+                      : (describeField(selectedPath).hint ??
+                        "The preview on the left updates as you type.")}
+                  </p>
+                </div>
+                <InspectorBody
+                  data={currentData}
+                  path={selectedPath}
+                  onChange={updateValue}
+                  onNavigate={openPath}
+                  templateFor={templateFor}
+                  uploadEnabled={uploadEnabled}
+                  focusKey={focusKey}
+                />
+              </div>
+            </>
           )}
           <SaveBar />
         </aside>

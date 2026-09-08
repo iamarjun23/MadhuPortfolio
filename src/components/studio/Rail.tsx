@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { studioNavGroups, type StudioBadgeCounts } from "@/lib/studio-nav";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
+import { studioNavGroups, studioSectionLabels, type StudioBadgeCounts } from "@/lib/studio-nav";
+import { useStudioStore } from "@/stores/studio-store";
 
 type RailProps = Readonly<{
   badges: StudioBadgeCounts;
@@ -16,11 +18,45 @@ function isCurrentPath(pathname: string, href: string) {
 
 export function Rail({ badges, open, onClose }: RailProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const dirtySection = useStudioStore((state) => state.dirtySection);
+  const saveDraft = useStudioStore((state) => state.saveDraft);
+  const isSaving = useStudioStore((state) => state.isSaving);
+  /* An unsaved draft only exists inside the editor that holds it, so leaving the
+     page throws it away. Rather than let that happen quietly, the move is held
+     here until the edits are either saved or deliberately abandoned. */
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const dirtyLabel = dirtySection
+    ? (studioSectionLabels[dirtySection as keyof typeof studioSectionLabels] ?? dirtySection)
+    : "";
+
+  const leave = (href: string) => {
+    setPendingHref(null);
+    onClose();
+    router.push(href);
+  };
+
+  const saveThenLeave = async (href: string) => {
+    await saveDraft();
+    if (useStudioStore.getState().dirtySection) return;
+    leave(href);
+  };
 
   return (
     <aside className={`studio-rail ${open ? "is-open" : ""}`} aria-label="Studio navigation">
       <div className="studio-rail__brand">
-        <Link className="studio-rail__home" href="/studio" onClick={onClose}>
+        <Link
+          className="studio-rail__home"
+          href="/studio"
+          onClick={(event) => {
+            if (dirtySection) {
+              event.preventDefault();
+              setPendingHref("/studio");
+              return;
+            }
+            onClose();
+          }}
+        >
           <span>madhu.edit</span>
           <small>Content studio</small>
         </Link>
@@ -50,7 +86,14 @@ export function Rail({ badges, open, onClose }: RailProps) {
                     <Link
                       href={item.href}
                       aria-current={current ? "page" : undefined}
-                      onClick={onClose}
+                      onClick={(event) => {
+                        if (dirtySection && !current) {
+                          event.preventDefault();
+                          setPendingHref(item.href);
+                          return;
+                        }
+                        onClose();
+                      }}
                     >
                       <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
                       <span>
@@ -66,6 +109,39 @@ export function Rail({ badges, open, onClose }: RailProps) {
           </section>
         ))}
       </nav>
+      {pendingHref ? (
+        <div className="studio-rail__guard" role="alertdialog" aria-label="Unsaved changes">
+          <p>
+            <b>{dirtyLabel}</b> has changes you have not saved. Leaving now loses them.
+          </p>
+          <div>
+            <button
+              className="studio-ins-btn"
+              type="button"
+              disabled={isSaving}
+              onClick={() => void saveThenLeave(pendingHref)}
+            >
+              {isSaving ? "Saving..." : "Save, then go"}
+            </button>
+            <button
+              className="studio-ins-btn studio-ins-btn--danger"
+              type="button"
+              disabled={isSaving}
+              onClick={() => leave(pendingHref)}
+            >
+              Discard and go
+            </button>
+            <button
+              className="studio-ins-btn"
+              type="button"
+              disabled={isSaving}
+              onClick={() => setPendingHref(null)}
+            >
+              Stay here
+            </button>
+          </div>
+        </div>
+      ) : null}
     </aside>
   );
 }

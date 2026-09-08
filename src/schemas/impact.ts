@@ -32,6 +32,7 @@ export const ImpactSchema = z.object({
       z.object({
         name: z.string().max(60),
         context: z.string().max(100),
+        href: z.url().nullable().default(null),
       }),
     )
     .max(12)

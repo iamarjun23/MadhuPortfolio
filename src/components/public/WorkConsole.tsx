@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { PlaceholderImage } from "@/components/public/PlaceholderImage";
-import { getYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
+import { reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
 import type { Work } from "@/schemas";
 
 type WorkProject = Work["lanes"][number]["projects"][number];
@@ -17,27 +17,128 @@ type CardOffset = {
   y: number;
 };
 
-type CloudCardStyle = React.CSSProperties & {
-  "--cloud-left": string;
-  "--cloud-top": string;
-  "--cloud-rotate": string;
-  "--card-offset-x": string;
-  "--card-offset-y": string;
-  "--cloud-float-delay": string;
+type BoardCardStyle = React.CSSProperties & {
+  "--card-ox": string;
+  "--card-oy": string;
+  "--card-x": string;
+  "--card-y": string;
+  "--card-tilt": string;
+  "--card-delay": string;
 };
 
-function getCloudPosition(index: number, total: number) {
-  const outerCount = Math.min(total, 10);
-  const isOuter = index < outerCount;
-  const ringIndex = isOuter ? index : index - outerCount;
-  const ringCount = isOuter ? outerCount : Math.max(total - outerCount, 1);
-  const angle = -Math.PI / 2 + (Math.PI * 2 * ringIndex) / ringCount;
-  const radius = isOuter ? 1 : 0.48;
+type DragState = {
+  active: boolean;
+  moved: boolean;
+  id: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  baseX: number;
+  baseY: number;
+  x: number;
+  y: number;
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+};
+
+/* A card only counts as dragged once the pointer has travelled far enough that
+   the gesture can no longer be read as a click, so a plain click still opens
+   the video instead of nudging the card a pixel and swallowing the press. */
+const DRAG_THRESHOLD = 5;
+/* How far past the board's edge a card may be parked. */
+const BOARD_SLACK = 16;
+/* Keyboard equivalent of a drag, so the board is not pointer-only. */
+const NUDGE_STEP = 18;
+
+/* Cards ride concentric rings rather than a grid, so the board opens as a
+   circle of stills with the middle left clear. Each ring fills before the next
+   one starts; a board large enough to outrun the last ring simply packs it
+   tighter, and every card can be dragged off its ring anyway. */
+const RINGS: readonly (readonly [capacity: number, radius: number])[] = [
+  [10, 1],
+  [7, 0.6],
+  [5, 0.28],
+];
+/* A handful of cards on the full-width ring reads as a scatter rather than a
+   circle, so a short board draws its one ring in tighter. */
+const SMALL_RING = 5;
+const SMALL_RING_RADIUS = 0.66;
+
+const NUDGE_KEYS: Readonly<Record<string, CardOffset>> = {
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+};
+
+function getRingCounts(total: number) {
+  const counts: number[] = [];
+  let remaining = total;
+
+  for (let ring = 0; ring < RINGS.length && remaining > 0; ring += 1) {
+    const capacity = RINGS[ring]![0];
+    const take = ring === RINGS.length - 1 ? remaining : Math.min(remaining, capacity);
+    counts.push(take);
+    remaining -= take;
+  }
+
+  return counts;
+}
+
+/* Where every card sits before anyone touches it, as a pair of offsets from
+   the middle of the board between -1 and 1. How far that actually is stays in
+   CSS, so a narrow screen can pull the whole ring in without this having to
+   know the board's width. Each ring is turned half a step against the one
+   outside it, so the cards interleave rather than line up into spokes, and the
+   numbers are rounded because `Math.sin` can differ in its last digit between
+   the server's runtime and the browser's, which is enough on its own to fail
+   hydration. */
+function getBoardLayout(total: number) {
+  const placements: { ox: string; oy: string; tilt: string; delay: string }[] = [];
+  let index = 0;
+
+  getRingCounts(total).forEach((count, ring) => {
+    const base = RINGS[ring]![1];
+    const radius = ring === 0 && count < SMALL_RING ? SMALL_RING_RADIUS : base;
+    const turn = ring % 2 ? Math.PI / count : 0;
+
+    for (let slot = 0; slot < count; slot += 1) {
+      const angle = -Math.PI / 2 + turn + (Math.PI * 2 * slot) / count;
+      placements.push({
+        ox: (Math.cos(angle) * radius).toFixed(4),
+        oy: (Math.sin(angle) * radius).toFixed(4),
+        tilt: `${(Math.sin(index * 12.9898) * 3.2).toFixed(2)}deg`,
+        delay: `${(-((index * 0.61) % 4.2)).toFixed(2)}s`,
+      });
+      index += 1;
+    }
+  });
+
+  return placements;
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (min > max) return (min + max) / 2;
+  return Math.min(Math.max(value, min), max);
+}
+
+/* Bounds are measured from where the card is actually sitting rather than from
+   its slot on the ring, so they hold whether the card is untouched, dragged, or
+   nudged with the arrow keys. */
+function getBoardBounds(card: HTMLElement, rendered: CardOffset) {
+  const board = card.closest<HTMLElement>(".work__board");
+  if (!board) return null;
+
+  const boardRect = board.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
 
   return {
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
-    rotate: Math.sin(angle * 1.7) * 2.2,
+    minX: rendered.x + (boardRect.left - BOARD_SLACK) - cardRect.left,
+    maxX: rendered.x + (boardRect.right + BOARD_SLACK) - cardRect.right,
+    minY: rendered.y + (boardRect.top - BOARD_SLACK) - cardRect.top,
+    maxY: rendered.y + (boardRect.bottom + BOARD_SLACK) - cardRect.bottom,
   };
 }
 
@@ -48,94 +149,156 @@ export function WorkConsole({
   const [activeLane, setActiveLane] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
   const [cardOffsets, setCardOffsets] = useState<Record<string, CardOffset>>({});
-  const cardDrag = useRef({
-    active: false,
-    moved: false,
-    id: "",
-    x: 0,
-    y: 0,
-    offsetX: 0,
-    offsetY: 0,
-    currentX: 0,
-    currentY: 0,
-    minX: Number.NEGATIVE_INFINITY,
-    maxX: Number.POSITIVE_INFINITY,
-    minY: Number.NEGATIVE_INFINITY,
-    maxY: Number.POSITIVE_INFINITY,
-  });
+  const [cardStack, setCardStack] = useState<Record<string, number>>({});
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  // A LinkedIn thumbnail is fetched, not computed, so it can fail where a
+  // YouTube one never does. Cards that fail here fall back to their gradient.
+  const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
+  const boardRef = useRef<HTMLDivElement>(null);
+  const stackTop = useRef(0);
+  const drag = useRef<DragState | null>(null);
+  const boardHintId = useId();
+
   const allProjects = data.lanes.flatMap((lane) =>
     lane.projects.map((project) => ({ project, laneLabel: lane.label })),
   );
-  const projects = activeLane
-    ? allProjects.filter(({ laneLabel }) => laneLabel === activeLane)
+  /* Renaming a category in the studio would otherwise leave the filter pointing
+     at a label that no longer exists, and the board would read as empty. */
+  const selectedLane =
+    activeLane && data.lanes.some((lane) => lane.label === activeLane) ? activeLane : null;
+  const projects = selectedLane
+    ? allProjects.filter(({ laneLabel }) => laneLabel === selectedLane)
     : allProjects;
+  const hasMoved = Object.keys(cardOffsets).length > 0;
+  const layout = getBoardLayout(projects.length);
+
+  function resetBoard() {
+    setCardOffsets({});
+    setCardStack({});
+    stackTop.current = 0;
+  }
+
+  /* Offsets are measured against a card's place on the ring, and filtering
+     redraws the rings, so every filter starts from a tidy circle. */
   function filterProjects(laneLabel: string | null) {
     setActiveLane(laneLabel);
     setPreview(null);
+    resetBoard();
   }
 
-  function cardPointerDown(event: React.PointerEvent<HTMLButtonElement>, id: string) {
-    event.stopPropagation();
-    const offset = cardOffsets[id] ?? { x: 0, y: 0 };
-    const canvasBounds = event.currentTarget
-      .closest(".work__cloud-canvas")
-      ?.getBoundingClientRect();
-    const cardBounds = event.currentTarget.getBoundingClientRect();
-    cardDrag.current = {
+  function liftCard(id: string) {
+    stackTop.current += 1;
+    const top = stackTop.current;
+    setCardStack((current) => ({ ...current, [id]: top }));
+  }
+
+  function startDrag(card: HTMLButtonElement, id: string, event: React.PointerEvent) {
+    const base = cardOffsets[id] ?? { x: 0, y: 0 };
+    const bounds = getBoardBounds(card, base);
+
+    drag.current = {
       active: true,
       moved: false,
       id,
-      x: event.clientX,
-      y: event.clientY,
-      offsetX: offset.x,
-      offsetY: offset.y,
-      currentX: offset.x,
-      currentY: offset.y,
-      minX: canvasBounds
-        ? offset.x + canvasBounds.left - cardBounds.left
-        : Number.NEGATIVE_INFINITY,
-      maxX: canvasBounds
-        ? offset.x + canvasBounds.right - cardBounds.right
-        : Number.POSITIVE_INFINITY,
-      minY: canvasBounds ? offset.y + canvasBounds.top - cardBounds.top : Number.NEGATIVE_INFINITY,
-      maxY: canvasBounds
-        ? offset.y + canvasBounds.bottom - cardBounds.bottom
-        : Number.POSITIVE_INFINITY,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: base.x,
+      baseY: base.y,
+      x: base.x,
+      y: base.y,
+      minX: bounds?.minX ?? Number.NEGATIVE_INFINITY,
+      maxX: bounds?.maxX ?? Number.POSITIVE_INFINITY,
+      minY: bounds?.minY ?? Number.NEGATIVE_INFINITY,
+      maxY: bounds?.maxY ?? Number.POSITIVE_INFINITY,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    card.setPointerCapture(event.pointerId);
+    setDraggingId(id);
+    liftCard(id);
   }
 
-  // The card is driven straight through its custom properties while the pointer
-  // is down; committing to state on every move re-rendered every card in the
-  // cloud, each of which carries a video and a blurred backdrop.
-  function cardPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = cardDrag.current;
-    if (!drag.active) return;
-    const deltaX = event.clientX - drag.x;
-    const deltaY = event.clientY - drag.y;
-    if (Math.abs(deltaX) + Math.abs(deltaY) > 5) drag.moved = true;
+  /* Touch starts a drag from the grip only: anywhere else on the card the
+     browser keeps the gesture, so the page still scrolls under a finger. */
+  function cardPointerDown(event: React.PointerEvent<HTMLButtonElement>, id: string) {
+    if (event.pointerType === "touch" || event.button !== 0) return;
+    startDrag(event.currentTarget, id, event);
+  }
 
-    drag.currentX = Math.min(Math.max(drag.offsetX + deltaX, drag.minX), drag.maxX);
-    drag.currentY = Math.min(Math.max(drag.offsetY + deltaY, drag.minY), drag.maxY);
-    const card = event.currentTarget;
-    card.style.setProperty("--card-offset-x", `${drag.currentX}px`);
-    card.style.setProperty("--card-offset-y", `${drag.currentY}px`);
+  function gripPointerDown(event: React.PointerEvent<HTMLSpanElement>, id: string) {
+    const card = event.currentTarget.closest<HTMLButtonElement>(".work__card");
+    if (!card || event.button !== 0) return;
+    event.stopPropagation();
+    startDrag(card, id, event);
+  }
+
+  /* The card is driven straight through its custom properties while the pointer
+     is down: committing every move to state would re-render every card on the
+     board, each of which carries a remote thumbnail. */
+  function cardPointerMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const state = drag.current;
+    if (!state?.active || state.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.startX;
+    const deltaY = event.clientY - state.startY;
+    if (!state.moved && Math.abs(deltaX) + Math.abs(deltaY) > DRAG_THRESHOLD) state.moved = true;
+    if (!state.moved) return;
+
+    state.x = clamp(state.baseX + deltaX, state.minX, state.maxX);
+    state.y = clamp(state.baseY + deltaY, state.minY, state.maxY);
+    event.currentTarget.style.setProperty("--card-x", `${state.x}px`);
+    event.currentTarget.style.setProperty("--card-y", `${state.y}px`);
   }
 
   function cardPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = cardDrag.current;
-    if (drag.active) {
-      const { id, currentX, currentY } = drag;
-      setCardOffsets((current) => ({ ...current, [id]: { x: currentX, y: currentY } }));
-    }
-    drag.active = false;
+    const state = drag.current;
+    if (!state?.active || state.pointerId !== event.pointerId) return;
+
+    state.active = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    setDraggingId(null);
+    if (state.moved) {
+      setCardOffsets((current) => ({ ...current, [state.id]: { x: state.x, y: state.y } }));
+    }
+  }
+
+  function cardClick(project: WorkProject, laneLabel: string) {
+    const state = drag.current;
+    if (state?.moved) {
+      state.moved = false;
+      return;
+    }
+    setPreview({ project, laneLabel });
+  }
+
+  function cardKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, id: string) {
+    const direction = NUDGE_KEYS[event.key];
+    if (!direction) return;
+    event.preventDefault();
+
+    const step = NUDGE_STEP * (event.shiftKey ? 3 : 1);
+    const base = cardOffsets[id] ?? { x: 0, y: 0 };
+    const bounds = getBoardBounds(event.currentTarget, base);
+    const nextX = base.x + direction.x * step;
+    const nextY = base.y + direction.y * step;
+
+    setCardOffsets((current) => ({
+      ...current,
+      [id]: {
+        x: bounds ? clamp(nextX, bounds.minX, bounds.maxX) : nextX,
+        y: bounds ? clamp(nextY, bounds.minY, bounds.maxY) : nextY,
+      },
+    }));
+    liftCard(id);
   }
 
   useEffect(() => {
     if (!preview) return;
+
+    window.requestAnimationFrame(() => {
+      boardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
 
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
@@ -155,7 +318,7 @@ export function WorkConsole({
   }, [preview]);
 
   const brief = `mailto:${contactEmail}?subject=${encodeURIComponent("Brief: Selected work")}`;
-  const previewYouTubeId = getYouTubeId(preview?.project.href ?? null);
+  const previewReel = preview ? resolveReel(preview.project) : null;
 
   return (
     <section className="work section" id="work">
@@ -168,7 +331,7 @@ export function WorkConsole({
         <article className="work__panel work__panel--all">
           <div className="work__panel-head">
             <div className="work__panel-meta">
-              <span>{activeLane ?? data.allProjectsLabel}</span>
+              <span>{selectedLane ?? data.allProjectsLabel}</span>
               <span>
                 {projects.length} {data.videoCountLabel}
               </span>
@@ -177,7 +340,7 @@ export function WorkConsole({
               <button
                 type="button"
                 role="tab"
-                aria-selected={activeLane === null}
+                aria-selected={selectedLane === null}
                 onClick={() => filterProjects(null)}
               >
                 {data.allFilterLabel}
@@ -186,7 +349,7 @@ export function WorkConsole({
                 <button
                   type="button"
                   role="tab"
-                  aria-selected={activeLane === lane.label}
+                  aria-selected={selectedLane === lane.label}
                   onClick={() => filterProjects(lane.label)}
                   key={lane.id}
                 >
@@ -201,112 +364,192 @@ export function WorkConsole({
               </strong>
             </a>
           </div>
-          <div className="work__cloud-toolbar">
-            <span>{data.canvasHint}</span>
+          <div className="work__board-bar">
+            <span className="work__board-hint">{data.canvasHint}</span>
+            <button
+              type="button"
+              className="work__board-reset"
+              onClick={resetBoard}
+              disabled={!hasMoved}
+            >
+              Reset layout
+            </button>
           </div>
-          <div className="work__cloud" role="group" aria-label="Floating cloud of video projects">
-            <div className="work__cloud-canvas">
-              {projects.map(({ project, laneLabel }, index) => {
-                const position = getCloudPosition(index, projects.length);
+          <p className="sr-only" id={boardHintId}>
+            Press Enter on a card to preview the video. Use the arrow keys to move a card around the
+            board, or drag it with the pointer.
+          </p>
+          <div
+            className="work__board"
+            ref={boardRef}
+            role="group"
+            aria-label="Board of video projects"
+            aria-describedby={boardHintId}
+          >
+            {projects.length === 0 ? (
+              <p className="work__board-empty">Nothing pinned to this category yet.</p>
+            ) : (
+              projects.map(({ project, laneLabel }, index) => {
                 const cardId = `${laneLabel}-${project.id}`;
-                const offset = cardOffsets[cardId] ?? { x: 0, y: 0 };
-                const thumbnail = getYouTubeThumbnail(project.href);
-                const cardStyle: CloudCardStyle = {
-                  "--cloud-left": `${50 + position.x * 41}%`,
-                  "--cloud-top": `${50 + position.y * 38}%`,
-                  "--cloud-rotate": `${position.rotate}deg`,
-                  "--card-offset-x": `${offset.x}px`,
-                  "--card-offset-y": `${offset.y}px`,
-                  "--cloud-float-delay": `-${(index * 0.77) % 5.8}s`,
+                const reel = resolveReel(project);
+                const thumbnail = reelThumbnail(reel, failedThumbs.has(cardId));
+                const badge = reelBadge(reel.kind);
+                const place = layout[index]!;
+                const offset = cardOffsets[cardId];
+                const lifted = cardStack[cardId];
+                const cardStyle: BoardCardStyle = {
+                  "--card-ox": place.ox,
+                  "--card-oy": place.oy,
+                  "--card-x": `${offset?.x ?? 0}px`,
+                  "--card-y": `${offset?.y ?? 0}px`,
+                  "--card-tilt": place.tilt,
+                  "--card-delay": place.delay,
+                  ...(lifted ? { zIndex: lifted } : {}),
                 };
+                const className = [
+                  "work__card",
+                  offset ? "is-moved" : "",
+                  draggingId === cardId ? "is-dragging" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
 
                 return (
                   <button
-                    className="work__cloud-card"
+                    className={className}
                     style={cardStyle}
                     type="button"
                     key={cardId}
-                    onClick={() => {
-                      if (cardDrag.current.moved) {
-                        cardDrag.current.moved = false;
-                        return;
-                      }
-                      setPreview({ project, laneLabel });
-                    }}
                     onPointerDown={(event) => cardPointerDown(event, cardId)}
                     onPointerMove={cardPointerMove}
                     onPointerUp={cardPointerUp}
                     onPointerCancel={cardPointerUp}
+                    /* Pressing on the thumbnail would otherwise start the
+                       browser's own image drag, which cancels the pointer
+                       stream and leaves the card stuck where it was. */
+                    onDragStart={(event) => event.preventDefault()}
+                    onKeyDown={(event) => cardKeyDown(event, cardId)}
+                    onClick={() => cardClick(project, laneLabel)}
                     aria-label={`Preview ${project.title}`}
                   >
-                    <span className={`work__thumb ${project.thumbHint}`}>
-                      {thumbnail ? (
-                        <PlaceholderImage
-                          src={thumbnail}
-                          alt={`${project.title} on YouTube`}
-                          fill
-                          sizes="(max-width: 720px) 70vw, 280px"
-                        />
-                      ) : null}
+                    <span className="work__card-frame">
+                      <span className={`work__card-media ${project.thumbHint}`}>
+                        {thumbnail ? (
+                          <PlaceholderImage
+                            src={thumbnail}
+                            alt={`${project.title} still`}
+                            fill
+                            sizes="(max-width: 560px) 45vw, 190px"
+                            unoptimized={reel.kind !== "youtube"}
+                            onError={
+                              reel.thumbnailCanFail
+                                ? () =>
+                                    setFailedThumbs((current) =>
+                                      current.has(cardId) ? current : new Set(current).add(cardId),
+                                    )
+                                : undefined
+                            }
+                          />
+                        ) : null}
+                        <span className="work__card-scrim" aria-hidden="true" />
+                        {/* With no fetched still to show, the badge grows into
+                            naming where the reel lives instead - the same spot a
+                            YouTube card uses for ▶. */}
+                        <span
+                          className={`work__card-play${badge.length > 1 && !thumbnail ? " work__card-play--post" : ""}`}
+                          aria-hidden="true"
+                        >
+                          {badge}
+                        </span>
+                      </span>
+                      <span className="work__card-body">
+                        <small>{laneLabel}</small>
+                        <b>{project.title}</b>
+                        <em>{project.subtitle}</em>
+                      </span>
                     </span>
-                    <span className="work__cloud-card-copy">
-                      <small>{laneLabel}</small>
-                      <b>{project.title}</b>
-                      <em>{project.subtitle}</em>
-                    </span>
+                    <span
+                      className="work__card-grip"
+                      title="Drag to move this card"
+                      aria-hidden="true"
+                      onPointerDown={(event) => gripPointerDown(event, cardId)}
+                      onClick={(event) => event.stopPropagation()}
+                    />
                   </button>
                 );
-              })}
-            </div>
-            {preview ? (
-              <>
-                <div
-                  className="work__preview-scrim"
-                  aria-hidden="true"
-                  onClick={() => setPreview(null)}
-                />
-                <div
-                  className="work__preview"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label={`${preview.project.title} preview`}
-                >
-                  <button
-                    type="button"
-                    className="work__preview-close"
-                    onClick={() => setPreview(null)}
-                    aria-label="Close video preview"
-                  >
-                    &times;
-                  </button>
-                  <div className="work__preview-media">
-                    {previewYouTubeId ? (
-                      <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${previewYouTubeId}?rel=0`}
-                        title={`${preview.project.title} video`}
-                        allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        referrerPolicy="strict-origin-when-cross-origin"
-                        allowFullScreen
-                      />
-                    ) : (
-                      <span>{data.previewUnavailableLabel}</span>
-                    )}
-                  </div>
-                  <div className="work__preview-copy">
-                    <small>{preview.laneLabel}</small>
-                    <h3>{preview.project.title}</h3>
-                    <p>{preview.project.subtitle}</p>
-                    {preview.project.href ? (
-                      <a href={preview.project.href} target="_blank" rel="noreferrer">
-                        {preview.project.hrefLabel ?? "Watch full video"}{" "}
-                        <span aria-hidden="true">&rarr;</span>
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
-              </>
-            ) : null}
+              })
+            )}
           </div>
+          {preview ? (
+            <>
+              <div
+                className="work__preview-scrim"
+                aria-hidden="true"
+                onClick={() => setPreview(null)}
+              />
+              <div
+                className="work__preview"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${preview.project.title} preview`}
+              >
+                <button
+                  type="button"
+                  className="work__preview-close"
+                  onClick={() => setPreview(null)}
+                  aria-label="Close video preview"
+                >
+                  &times;
+                </button>
+                <div
+                  className={`work__preview-media work__preview-media--${previewReel?.kind ?? "none"}${
+                    previewReel?.kind === "linkedin" || previewReel?.kind === "instagram"
+                      ? " work__preview-media--post"
+                      : ""
+                  }`}
+                >
+                  {previewReel?.file ? (
+                    <video
+                      src={previewReel.file}
+                      poster={previewReel.poster ?? undefined}
+                      controls
+                      autoPlay
+                      playsInline
+                    />
+                  ) : previewReel?.embed ? (
+                    <iframe
+                      src={previewReel.embed}
+                      title={`${preview.project.title} video`}
+                      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="work__preview-unavailable">
+                      <span>{data.previewUnavailableLabel}</span>
+                      {preview.project.href ? (
+                        <a href={preview.project.href} target="_blank" rel="noreferrer">
+                          Open {preview.project.hrefLabel ?? "project"}{" "}
+                          <span aria-hidden="true">↗</span>
+                        </a>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+                <div className="work__preview-copy">
+                  <small>{preview.laneLabel}</small>
+                  <h3>{preview.project.title}</h3>
+                  <p>{preview.project.subtitle}</p>
+                  {preview.project.href ? (
+                    <a href={preview.project.href} target="_blank" rel="noreferrer">
+                      {preview.project.hrefLabel ?? "Watch full video"}{" "}
+                      <span aria-hidden="true">&rarr;</span>
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          ) : null}
         </article>
       </div>
     </section>

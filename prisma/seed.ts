@@ -110,9 +110,21 @@ export const sectionData = {
     campaignsHeading: "Sponsorship campaigns",
     campaignsDescription: "Performance films cut for Jar's sponsorship of each show.",
     campaigns: [
-      { name: "Mahanati", context: "Jar sponsorship performance film" },
-      { name: "Bigg Boss Kannada", context: "Jar sponsorship performance film" },
-      { name: "Sa Re Ga Ma Pa", context: "Jar sponsorship performance film" },
+      {
+        name: "Mahanati",
+        context: "Jar sponsorship performance film",
+        href: "https://www.youtube.com/watch?v=placeholder-mahanati",
+      },
+      {
+        name: "Bigg Boss Kannada",
+        context: "Jar sponsorship performance film",
+        href: "https://www.youtube.com/watch?v=placeholder-bigg-boss-kannada",
+      },
+      {
+        name: "Sa Re Ga Ma Pa",
+        context: "Jar sponsorship performance film",
+        href: "https://www.youtube.com/watch?v=placeholder-sa-re-ga-ma-pa",
+      },
     ],
   }),
   work: WorkSchema.parse({
@@ -377,8 +389,36 @@ export const sectionData = {
     ],
   }),
   praise: PraiseSchema.parse({
-    visible: false,
-    quotes: [],
+    visible: true,
+    quotes: [
+      {
+        id: "sample-1",
+        quote:
+          "Madhu turns a pile of raw footage into a story with rhythm. Every cut lands exactly where it should.",
+        name: "Creative Director",
+        role: "Production House",
+        initials: "CD",
+        isSample: true,
+      },
+      {
+        id: "sample-2",
+        quote:
+          "Fast, precise, and always finds the emotional beat in a scene. Our campaign turnaround time got so much better.",
+        name: "Brand Manager",
+        role: "Marketing Agency",
+        initials: "BM",
+        isSample: true,
+      },
+      {
+        id: "sample-3",
+        quote:
+          "Handles everything from documentary pacing to punchy short-form without missing a beat. A rare range.",
+        name: "Podcast Producer",
+        role: "Media Company",
+        initials: "PP",
+        isSample: true,
+      },
+    ],
   }),
   experience: ExperienceSchema.parse({
     eyebrow: "Experience",

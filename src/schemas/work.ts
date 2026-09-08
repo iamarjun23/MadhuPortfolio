@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MediaUrlSchema } from "./media";
 
 export const WorkSchema = z.object({
   eyebrow: z.string().max(40).default("Selected work"),
@@ -12,10 +13,7 @@ export const WorkSchema = z.object({
   allFilterLabel: z.string().max(30).default("All work"),
   briefPrompt: z.string().max(50).default("Have a story?"),
   briefCta: z.string().max(40).default("Hire me"),
-  canvasHint: z
-    .string()
-    .max(120)
-    .default("Freeform canvas · drag any card anywhere · click to preview"),
+  canvasHint: z.string().max(120).default("Drag any card to rearrange · click to preview"),
   previewUnavailableLabel: z.string().max(60).default("Preview coming soon"),
   lanes: z
     .array(
@@ -28,12 +26,22 @@ export const WorkSchema = z.object({
               id: z.string(),
               title: z.string().max(80),
               subtitle: z.string().max(60),
-              // A project's video lives on YouTube, never in our own storage: this one
-              // link supplies the card thumbnail, the in-page player, and the link out.
-              // There is no cover-photo upload - the thumbHint gradient covers the gap
-              // when a project has no YouTube link yet.
+              // A project's video usually lives somewhere else - YouTube, LinkedIn or
+              // Instagram - and that one link supplies the card thumbnail, the in-page
+              // player and the link out. A reel that lives nowhere public can be
+              // uploaded instead, and then plays from our own storage. With neither,
+              // the thumbHint gradient covers the gap.
               href: z.url().nullable(),
               hrefLabel: z.string().max(16).nullable(),
+              video: z
+                .object({ url: MediaUrlSchema, poster: MediaUrlSchema.optional() })
+                .nullable()
+                .default(null),
+              // YouTube hands over a still from the link alone. Instagram does not
+              // publish one at any address, and LinkedIn's has to be fetched, so a
+              // cover uploaded here is what keeps those cards from falling back to
+              // a bare gradient. Set, it outranks whatever was worked out.
+              image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
               thumbHint: z.enum(["bd-1", "bd-2", "bd-3", "bd-4"]),
             }),
           )

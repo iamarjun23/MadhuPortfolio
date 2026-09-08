@@ -19,12 +19,21 @@ export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
               {teaser.ctaLabel} <span aria-hidden="true">↗</span>
             </Link>
           </div>
-          <div className="drawing-teaser__archive" aria-hidden="true">
+          <Link
+            className="drawing-teaser__archive"
+            href="/room"
+            aria-label="Open the Drawing Room"
+          >
+            <div className="drawing-teaser__graphic" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
             <span className="drawing-teaser__stamp">{teaser.stamp}</span>
             <span className="drawing-teaser__note">{teaser.note}</span>
             <b>{teaser.invitation}</b>
             <i>{teaser.invitationNote}</i>
-          </div>
+          </Link>
         </div>
       </div>
     </section>
