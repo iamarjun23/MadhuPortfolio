@@ -16,7 +16,11 @@
   top: 5.85rem;
   display: flex;
   overflow: hidden;
-  max-height: calc(100vh - 7rem);
+  /* A fixed height rather than a cap: the preview beside it is page-length, so a panel
+     sized to its own content left a ragged edge with dead column under it whenever the
+     open tab was short - the media tab for a section with one or two photos, say. The
+     body scrolls inside this, so a tall tab behaves exactly as it did before. */
+  height: calc(100vh - 7rem);
   flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 18px;
@@ -643,7 +647,7 @@
 
   .studio-ins {
     position: static;
-    max-height: none;
+    height: auto;
   }
 
   .studio-ins__body {

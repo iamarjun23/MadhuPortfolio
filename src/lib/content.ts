@@ -3,7 +3,7 @@ import { cache } from "react";
 import { Status } from "@/generated/prisma/client";
 import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { contentTag } from "@/lib/revalidate";
-import type { SectionKey } from "@/lib/sections";
+import { sectionKeys, type SectionKey } from "@/lib/sections";
 import {
   AboutSchema,
   BoothSchema,
@@ -18,35 +18,52 @@ import {
 } from "@/schemas";
 import type { z } from "zod";
 
+// A landing render asks for nine sections at once. Reading them one `findUnique` at a
+// time meant nine queries in parallel, and because the adapter retires a connection
+// after a single use (see db.ts) that opened nine Postgres connections per uncached
+// render - nine TLS handshakes billed to the Worker's CPU budget, which is what tripped
+// "Worker exceeded CPU time limit" on `/`. One `findMany` reads every section over a
+// single connection instead.
+//
+// The batch carries every section's tag, so publishing any one section still refreshes
+// it. That is coarser than a tag per entry, but a publish rewrites the whole draft
+// anyway, and the reread it forces is now a single query rather than nine.
+const readSections = (status: Status) =>
+  unstable_cache(
+    async () => {
+      const sections = await getDb().section.findMany({
+        where: { status },
+        select: { key: true, data: true },
+      });
+
+      return Object.fromEntries(sections.map((section) => [section.key, section.data])) as Partial<
+        Record<SectionKey, unknown>
+      >;
+    },
+    ["sections", status],
+    { tags: sectionKeys.map(contentTag) },
+  )();
+
 async function getSection<TSchema extends z.ZodType>(
   key: SectionKey,
   status: Status,
   schema: TSchema,
 ): Promise<z.output<TSchema>> {
-  const read = unstable_cache(
-    async () => {
-      if (!isDatabaseConfigured()) {
-        // Imported on demand: the seed module parses every section's defaults at
-        // module scope, so keeping it off the configured path saves that work.
-        const { sectionData } = await import("../../prisma/seed");
-        return schema.parse(sectionData[key]);
-      }
+  if (!isDatabaseConfigured()) {
+    // Imported on demand: the seed module parses every section's defaults at
+    // module scope, so keeping it off the configured path saves that work.
+    const { sectionData } = await import("../../prisma/seed");
+    return schema.parse(sectionData[key]);
+  }
 
-      const section = await getDb().section.findUnique({
-        where: { key_status: { key, status } },
-      });
+  const sections = await readSections(status);
+  const data = sections[key];
 
-      if (!section) {
-        throw new Error(`Missing ${status.toLowerCase()} content for the ${key} section.`);
-      }
+  if (data === undefined) {
+    throw new Error(`Missing ${status.toLowerCase()} content for the ${key} section.`);
+  }
 
-      return schema.parse(section.data);
-    },
-    ["section", key, status],
-    { tags: [contentTag(key)] },
-  );
-
-  return read();
+  return schema.parse(data);
 }
 
 // Memoised per request: a landing render asks for the settings section from
