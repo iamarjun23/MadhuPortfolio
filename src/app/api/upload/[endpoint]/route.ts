@@ -45,40 +45,25 @@ export async function POST(request: Request, { params }: RouteParams) {
   // Stream the request body straight through to R2 instead of buffering the whole file
   // in the Worker's heap first. Buffering a full-size video (up to 64MB) alongside the
   // rest of the request/render work risked exceeding the Worker's 128MB memory limit.
-  // A counting TransformStream still enforces the real byte cap and reports the actual
-  // size, without ever holding the complete file in memory at once.
-  let bytesRead = 0;
-  let sizeExceeded = false;
-  const limiter = new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      bytesRead += chunk.byteLength;
-      if (bytesRead > config.maxBytes) {
-        sizeExceeded = true;
-        controller.error(new Error("File too large"));
-        return;
-      }
-      controller.enqueue(chunk);
-    },
+  // Piping the incoming request body through a hand-rolled TransformStream broke on
+  // Cloudflare (opaque 500s even for small files), so the byte cap is enforced by
+  // checking R2's own reported size after the write instead of counting chunks in transit.
+  const key = `${endpoint}/${randomUUID()}`;
+  const object = await env.MEDIA_BUCKET.put(key, request.body, {
+    httpMetadata: { contentType },
   });
 
-  const key = `${endpoint}/${randomUUID()}`;
-  try {
-    await env.MEDIA_BUCKET.put(key, request.body.pipeThrough(limiter), {
-      httpMetadata: { contentType },
-    });
-  } catch (error) {
-    if (sizeExceeded) {
-      return NextResponse.json(
-        { error: `File must be under ${Math.round(config.maxBytes / (1024 * 1024))}MB.` },
-        { status: 413 },
-      );
-    }
-    throw error;
-  }
-
+  const bytesRead = object?.size ?? 0;
   if (!bytesRead) {
     await env.MEDIA_BUCKET.delete(key);
     return NextResponse.json({ error: "Missing file body." }, { status: 400 });
+  }
+  if (bytesRead > config.maxBytes) {
+    await env.MEDIA_BUCKET.delete(key);
+    return NextResponse.json(
+      { error: `File must be under ${Math.round(config.maxBytes / (1024 * 1024))}MB.` },
+      { status: 413 },
+    );
   }
 
   const media = await getDb().media.create({
