@@ -16,7 +16,7 @@
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "52e310b1815c41c1b0e817916036c5f0",
+      "id": "aefeb571688b49a1953c680b39570b57",
       // Never actually connected to — opennextjs-cloudflare's `deploy` command starts a local
       // Miniflare proxy just to collect env vars/bindings before the real remote deploy, and that
       // proxy setup fails without *some* Postgres-shaped connection string here. Any dummy value works.

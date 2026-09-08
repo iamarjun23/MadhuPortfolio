@@ -42,28 +42,51 @@ export async function POST(request: Request, { params }: RouteParams) {
     return NextResponse.json({ error: "Missing file body." }, { status: 400 });
   }
 
-  // R2 requires the length of a streamed upload. Buffering here also verifies
-  // the actual payload size rather than relying on a client-supplied header.
-  const file = await request.arrayBuffer();
-  if (!file.byteLength) {
-    return NextResponse.json({ error: "Missing file body." }, { status: 400 });
-  }
-  if (file.byteLength > config.maxBytes) {
-    return NextResponse.json(
-      { error: `File must be under ${Math.round(config.maxBytes / (1024 * 1024))}MB.` },
-      { status: 413 },
-    );
-  }
+  // Stream the request body straight through to R2 instead of buffering the whole file
+  // in the Worker's heap first. Buffering a full-size video (up to 64MB) alongside the
+  // rest of the request/render work risked exceeding the Worker's 128MB memory limit.
+  // A counting TransformStream still enforces the real byte cap and reports the actual
+  // size, without ever holding the complete file in memory at once.
+  let bytesRead = 0;
+  let sizeExceeded = false;
+  const limiter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      bytesRead += chunk.byteLength;
+      if (bytesRead > config.maxBytes) {
+        sizeExceeded = true;
+        controller.error(new Error("File too large"));
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  });
 
   const key = `${endpoint}/${randomUUID()}`;
-  await env.MEDIA_BUCKET.put(key, file, { httpMetadata: { contentType } });
+  try {
+    await env.MEDIA_BUCKET.put(key, request.body.pipeThrough(limiter), {
+      httpMetadata: { contentType },
+    });
+  } catch (error) {
+    if (sizeExceeded) {
+      return NextResponse.json(
+        { error: `File must be under ${Math.round(config.maxBytes / (1024 * 1024))}MB.` },
+        { status: 413 },
+      );
+    }
+    throw error;
+  }
+
+  if (!bytesRead) {
+    await env.MEDIA_BUCKET.delete(key);
+    return NextResponse.json({ error: "Missing file body." }, { status: 400 });
+  }
 
   const media = await getDb().media.create({
     data: {
       key,
       url: `/api/media/${key}`,
       kind: config.kind,
-      bytes: file.byteLength,
+      bytes: bytesRead,
       mime: contentType,
     },
   });

@@ -29,13 +29,26 @@ export async function GET(request: Request, { params }: RouteParams) {
   const { key: keyParts } = await params;
   const key = keyParts.join("/");
 
-  const { env } = getCloudflareContext();
+  // Media keys are random UUIDs and never reused for different content, so full-response
+  // caching at Cloudflare's edge is safe: a repeat view (or a second viewer) is served
+  // straight from cache instead of re-streaming the object out of R2 through the Worker
+  // each time, which is what made large videos feel slow to (re)load.
+  const { env, ctx } = getCloudflareContext();
+  // `caches.default` is a Workers-only member the ambient DOM `CacheStorage` type (pulled in
+  // by tsconfig's "dom" lib) doesn't declare.
+  const edgeCache = (caches as unknown as { default: Cache }).default;
+  const range = request.headers.get("range");
+  if (!range) {
+    const cached = await edgeCache.match(request);
+    if (cached) return cached;
+  }
+
   if (!env.MEDIA_BUCKET) {
     return new Response("Uploads are not configured.", { status: 503 });
   }
 
-  const range = parseByteRange(request.headers.get("range"));
-  const object = await env.MEDIA_BUCKET.get(key, range ? { range } : undefined);
+  const parsedRange = parseByteRange(range);
+  const object = await env.MEDIA_BUCKET.get(key, parsedRange ? { range: parsedRange } : undefined);
 
   if (!object) {
     return new Response("Not found.", { status: 404 });
@@ -69,5 +82,11 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 
   headers.set("content-length", String(object.size));
-  return new Response(object.body, { status: 200, headers });
+  const response = new Response(object.body, { status: 200, headers });
+
+  // Populate the edge cache in the background so this response isn't held up by it, and
+  // so the *next* request for this key (from this viewer or another) is served from cache.
+  ctx.waitUntil(edgeCache.put(request, response.clone()));
+
+  return response;
 }
