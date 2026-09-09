@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { deleteMedia } from "@/actions/media";
 import { MediaPreview } from "@/components/studio/MediaPreview";
 import { useMediaUpload } from "@/lib/media-upload-client";
+import { acceptAttribute, endpointLimits, isAllowedMimeType } from "@/lib/upload-endpoints";
 import { isPlaceholderImageSrc } from "@/lib/placeholders";
 import type { UploadEndpoint } from "@/lib/media-upload";
 
@@ -37,11 +38,17 @@ export function Dropzone({
   const [uploadedId, setUploadedId] = useState<string>();
   const [isDragging, setIsDragging] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { startUpload, isUploading } = useMediaUpload(endpoint);
+  const { startUpload, cancelUpload, isUploading, isBlockedByOtherUpload, blockingUploadLabel } =
+    useMediaUpload(endpoint, label);
+  const busy = isUploading || isBlockedByOtherUpload;
 
-  const isVideo = endpoint === "heroVideo";
-  const maxBytes = (isVideo ? 64 : 4) * 1024 * 1024;
-  const fileHint = isVideo ? "Video up to 64 MB" : "Image up to 4 MB";
+  /* Read from the shared table rather than re-derived here. Checking for one
+     endpoint by name missed `reelVideo`, so a work project's or pinboard card's
+     video field behaved as an image field throughout. */
+  const { accept: acceptKind, maxBytes } = endpointLimits[endpoint];
+  const isVideo = acceptKind === "video/";
+  const maxLabel = `${Math.round(maxBytes / (1024 * 1024))} MB`;
+  const fileHint = isVideo ? `Video up to ${maxLabel}` : `Image up to ${maxLabel}`;
 
   useEffect(
     () => () => {
@@ -52,12 +59,27 @@ export function Dropzone({
 
   const chooseFile = async (file: File | undefined) => {
     if (!file || !enabled || isUploading) return;
-    if (!file.type.startsWith(isVideo ? "video/" : "image/")) {
-      setError(`Choose an ${isVideo ? "video" : "image"} file.`);
+    /* A drop lands here even while another field is uploading, so the refusal has
+       to be explained rather than silently ignored - the file simply vanishing
+       looked like the dropzone was broken. */
+    if (isBlockedByOtherUpload) {
+      setError(
+        blockingUploadLabel
+          ? `${blockingUploadLabel} is still uploading. Wait for it to finish, then add this one.`
+          : "Another upload is still running. Wait for it to finish, then add this one.",
+      );
+      return;
+    }
+    if (!isAllowedMimeType(file.type, acceptKind)) {
+      setError(
+        isVideo
+          ? "Choose an MP4, WebM or MOV video."
+          : "Choose a JPEG, PNG, WebP, AVIF or GIF image.",
+      );
       return;
     }
     if (file.size > maxBytes) {
-      setError(`${file.name} is larger than the ${isVideo ? "64" : "4"} MB limit.`);
+      setError(`${file.name} is larger than the ${maxLabel} limit.`);
       return;
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -79,7 +101,7 @@ export function Dropzone({
   };
 
   const removeUpload = async () => {
-    if (!uploadedId || isDeleting) return;
+    if (!uploadedId || isDeleting || busy) return;
     setIsDeleting(true);
     const result = await deleteMedia(uploadedId);
     if (!result.ok) {
@@ -93,7 +115,7 @@ export function Dropzone({
     setIsDeleting(false);
   };
 
-  const accept = isVideo ? "video/*" : "image/*";
+  const accept = acceptAttribute[acceptKind];
   // Records seeded before the placeholder artwork was retired still carry its
   // address. The page treats that as no picture at all, so the field here shows
   // its empty state rather than previewing a file the visitor never sees.
@@ -113,7 +135,7 @@ export function Dropzone({
     <div className="studio-dropzone">
       <label
         className={`studio-dropzone__target${isDragging ? " is-dragging" : ""}${
-          !enabled ? " is-disabled" : ""
+          !enabled || busy ? " is-disabled" : ""
         }`}
         htmlFor={inputId}
         onDragEnter={() => setIsDragging(true)}
@@ -129,7 +151,7 @@ export function Dropzone({
           id={inputId}
           type="file"
           accept={accept}
-          disabled={!enabled || isUploading}
+          disabled={!enabled || busy}
           onChange={(event) => {
             void chooseFile(event.target.files?.[0]);
             event.target.value = "";
@@ -137,7 +159,13 @@ export function Dropzone({
         />
         <span>{label}</span>
         <small>
-          {enabled ? `${fileHint} · Drop a file or choose one` : "Uploads are not configured"}
+          {!enabled
+            ? "Uploads are not configured"
+            : isUploading
+              ? "Uploading - this file has to finish first"
+              : isBlockedByOtherUpload
+                ? `Waiting for ${blockingUploadLabel ?? "another upload"} to finish`
+                : `${fileHint} · Drop a file or choose one`}
         </small>
       </label>
       {displayUrl ? (
@@ -162,6 +190,9 @@ export function Dropzone({
       {isUploading ? (
         <p className="studio-dropzone__status" role="status" aria-live="polite">
           Uploading {progress}%
+          <button className="studio-dropzone__cancel" type="button" onClick={cancelUpload}>
+            Cancel
+          </button>
         </p>
       ) : null}
       {uploadedId ? (
@@ -169,7 +200,7 @@ export function Dropzone({
           className="studio-dropzone__delete"
           type="button"
           onClick={() => void removeUpload()}
-          disabled={isDeleting}
+          disabled={isDeleting || busy}
         >
           {isDeleting ? "Deleting..." : "Delete uploaded file"}
         </button>

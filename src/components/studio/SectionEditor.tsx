@@ -592,6 +592,9 @@ function getMediaConfig(
   path: readonly (string | number)[],
 ): MediaConfig | undefined {
   const key = String(path[path.length - 1] ?? "");
+  // Every media field here sits directly on an object inside an array, so the array's own
+  // key - not any ancestor segment - is what tells one field's array apart from another's.
+  const arrayKey = path[path.length - 3];
   if (key === "bgVideo" && isEditorObject(value)) {
     return { endpoint: "heroVideo", acceptsAlt: false, isVideo: true };
   }
@@ -602,7 +605,7 @@ function getMediaConfig(
      pinboard card instead of linked. Same field on both boards. */
   if (
     key === "video" &&
-    (path.includes("projects") || path.includes("cards")) &&
+    (arrayKey === "projects" || arrayKey === "cards") &&
     (value === null || isEditorObject(value))
   ) {
     return { endpoint: "reelVideo", acceptsAlt: false, isVideo: true, isOptional: true };
@@ -617,20 +620,24 @@ function getMediaConfig(
     return { endpoint: "fallbackImage", acceptsAlt: false, isOptional: true };
   }
   if (key === "image" && (value === null || isEditorObject(value))) {
-    const pathKeys = path.filter((part): part is string => typeof part === "string");
-    const endpoint = pathKeys.includes("roles")
-      ? "experienceImage"
-      : pathKeys.includes("slots")
-        ? "boothImage"
-        : pathKeys.includes("projects")
-          ? "reelCover"
-          : "roomImage";
+    const endpoint =
+      arrayKey === "roles"
+        ? "experienceImage"
+        : arrayKey === "slots"
+          ? "boothImage"
+          : arrayKey === "projects"
+            ? "reelCover"
+            : arrayKey === "worked"
+              ? "collaboratorImage"
+              : "roomImage";
     return {
       endpoint,
       acceptsAlt: true,
       // A YouTube link brings its own still, so a cover here is a deliberate
-      // override rather than something every project has to fill in.
-      isOptional: pathKeys.includes("projects"),
+      // override rather than something every project has to fill in. A
+      // collaborator portrait is the same kind of optional: the credit
+      // stands on its own until a real photo is uploaded.
+      isOptional: arrayKey === "projects" || arrayKey === "worked",
     };
   }
   return undefined;
@@ -1463,6 +1470,7 @@ function InspectorBody({
 type SectionEditorProps = Readonly<{
   section: SectionKey;
   data: unknown;
+  version: string | null;
   uploadEnabled: boolean;
   contactData: unknown;
   settingsData: unknown;
@@ -1471,6 +1479,7 @@ type SectionEditorProps = Readonly<{
 export function SectionEditor({
   section,
   data,
+  version,
   uploadEnabled,
   contactData,
   settingsData,
@@ -1479,6 +1488,11 @@ export function SectionEditor({
   const [savedData, setSavedData] = useState(() => normalizeObject(data));
   const [currentData, setCurrentData] = useState(() => normalizeObject(data));
   const currentDataRef = useRef(currentData);
+  /* The draft version this editor is working from. Held in a ref because a save
+     has to send the version as it stands at that moment, and because the refresh
+     that follows a save re-renders this component without remounting it - the
+     `version` prop would still be the one the page first loaded. */
+  const versionRef = useRef(version);
   const [activePath, setActivePath] = useState<readonly (string | number)[]>([]);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
@@ -1535,11 +1549,12 @@ export function SectionEditor({
     let saved = false;
     await handleSubmit(
       async (values) => {
-        const result = await saveDraft(section, values.data);
+        const result = await saveDraft(section, values.data, versionRef.current);
         if (!result.ok) {
           pushToast(result.error, "error");
           return;
         }
+        versionRef.current = result.version;
         const nextData = normalizeObject(result.data);
         setSavedData(nextData);
         currentDataRef.current = nextData;

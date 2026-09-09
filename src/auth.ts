@@ -1,8 +1,8 @@
-import { compare } from "bcryptjs";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "@/auth.config";
 import { getDb } from "@/lib/db";
+import { verifyPassword } from "@/lib/password";
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -15,7 +15,11 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         const password = typeof credentials.password === "string" ? credentials.password : "";
         if (!email || !password) return null;
         const user = await getDb().user.findUnique({ where: { email } });
-        if (!user?.password || user.role !== "OWNER" || !(await compare(password, user.password)))
+        if (
+          !user?.password ||
+          user.role !== "OWNER" ||
+          !(await verifyPassword(password, user.password))
+        )
           return null;
         return { id: user.id, email: user.email, name: user.name };
       },

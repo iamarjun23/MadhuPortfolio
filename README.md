@@ -47,7 +47,8 @@ pnpm build
 `PUBLISHED` rows for all 10 sections. It requires a reachable `DATABASE_URL`.
 
 Create the single Studio owner with `pnpm admin:create` after setting `DATABASE_URL`,
-`ADMIN_EMAIL`, and `ADMIN_PASSWORD_HASH` in `.env.local`.
+`ADMIN_EMAIL`, and `ADMIN_PASSWORD` (the plaintext password) in `.env`. The script hashes it
+with PBKDF2 and upserts the owner, so re-running it also resets an existing password.
 
 The Studio is protected at `/studio`. Every section has a schema-validated draft editor,
 sortable repeated rows, SaveBar integration, live previews that render the matching public

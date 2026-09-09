@@ -22,6 +22,7 @@ import {
   getPraise,
   getProcess,
   getRoom,
+  getSectionVersion,
   getSettings,
   getWork,
 } from "@/lib/content";
@@ -40,6 +41,13 @@ export const sectionSchemas = {
   contact: ContactSchema,
   settings: SettingsSchema,
 };
+
+/* The draft row's `updatedAt` as the editor is about to load it. Sent back with
+   the save so a write can be refused when the row moved in between; null means
+   the section has no draft row yet. */
+export async function getStudioDraftVersion(section: SectionKey): Promise<string | null> {
+  return getSectionVersion(section, Status.DRAFT);
+}
 
 export async function getStudioDraft(section: SectionKey): Promise<unknown> {
   switch (section) {

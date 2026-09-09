@@ -34,12 +34,21 @@ const readSections = (status: Status) =>
     async () => {
       const sections = await getDb().section.findMany({
         where: { status },
-        select: { key: true, data: true },
+        select: { key: true, data: true, updatedAt: true },
       });
 
-      return Object.fromEntries(sections.map((section) => [section.key, section.data])) as Partial<
-        Record<SectionKey, unknown>
-      >;
+      /* `updatedAt` rides along with the data rather than being read separately,
+         so the studio editor's optimistic-locking version comes from the same
+         snapshot as the content it is editing. Read apart, the cached data could
+         be older than a freshly-read version, and a save carrying that pairing
+         would pass the version check and quietly overwrite the newer write it
+         never saw. Same snapshot means a stale pair fails closed instead. */
+      return Object.fromEntries(
+        sections.map((section) => [
+          section.key,
+          { data: section.data, version: section.updatedAt.toISOString() },
+        ]),
+      ) as Partial<Record<SectionKey, { data: unknown; version: string }>>;
     },
     ["sections", status],
     { tags: sectionKeys.map(contentTag) },
@@ -62,16 +71,24 @@ async function getSection<TSchema extends z.ZodType>(
   }
 
   const sections = await readSections(status);
-  const data = sections[key];
+  const entry = sections[key];
 
   // A section added after the database was seeded has no row of its own yet, and
   // a page is better served its shipped defaults than a 500. The row appears the
   // first time the section is saved or the site is published.
-  if (data === undefined) {
+  if (entry === undefined) {
     return schema.parse(await sectionDefaults(key));
   }
 
-  return schema.parse(data);
+  return schema.parse(entry.data);
+}
+
+/* The draft row's version, taken from the same cached read the draft content
+   comes from - see the note in `readSections`. Null when the section has no
+   draft row yet. */
+export async function getSectionVersion(key: SectionKey, status: Status) {
+  if (!isDatabaseConfigured()) return null;
+  return (await readSections(status))[key]?.version ?? null;
 }
 
 // Memoised per request: a landing render asks for the settings section from

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { studioNavGroups, studioSectionLabels, type StudioBadgeCounts } from "@/lib/studio-nav";
-import { useStudioStore } from "@/stores/studio-store";
+import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type RailProps = Readonly<{
   badges: StudioBadgeCounts;
@@ -22,6 +22,11 @@ export function Rail({ badges, open, onClose }: RailProps) {
   const dirtySection = useStudioStore((state) => state.dirtySection);
   const saveDraft = useStudioStore((state) => state.saveDraft);
   const isSaving = useStudioStore((state) => state.isSaving);
+  /* Leaving mid-upload aborts the request, so the move is refused outright rather
+     than offered as a choice - there is nothing to save first and nothing worth
+     discarding. */
+  const { blocked: uploadBlocked, label: uploadLabel } = useUploadBlock();
+  const pushToast = useStudioStore((state) => state.pushToast);
   /* An unsaved draft only exists inside the editor that holds it, so leaving the
      page throws it away. Rather than let that happen quietly, the move is held
      here until the edits are either saved or deliberately abandoned. */
@@ -30,6 +35,12 @@ export function Rail({ badges, open, onClose }: RailProps) {
     ? (studioSectionLabels[dirtySection as keyof typeof studioSectionLabels] ?? dirtySection)
     : "";
 
+  const blockedByUpload = () => {
+    if (!uploadBlocked) return false;
+    pushToast(`${uploadLabel} is still uploading. Wait for it to finish.`, "info");
+    return true;
+  };
+
   const leave = (href: string) => {
     setPendingHref(null);
     onClose();
@@ -37,6 +48,7 @@ export function Rail({ badges, open, onClose }: RailProps) {
   };
 
   const saveThenLeave = async (href: string) => {
+    if (blockedByUpload()) return;
     await saveDraft();
     if (useStudioStore.getState().dirtySection) return;
     leave(href);
@@ -49,6 +61,11 @@ export function Rail({ badges, open, onClose }: RailProps) {
           className="studio-rail__home"
           href="/studio"
           onClick={(event) => {
+            if (uploadBlocked) {
+              event.preventDefault();
+              blockedByUpload();
+              return;
+            }
             if (dirtySection) {
               event.preventDefault();
               setPendingHref("/studio");
@@ -87,6 +104,11 @@ export function Rail({ badges, open, onClose }: RailProps) {
                       href={item.href}
                       aria-current={current ? "page" : undefined}
                       onClick={(event) => {
+                        if (uploadBlocked && !current) {
+                          event.preventDefault();
+                          blockedByUpload();
+                          return;
+                        }
                         if (dirtySection && !current) {
                           event.preventDefault();
                           setPendingHref(item.href);

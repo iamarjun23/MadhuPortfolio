@@ -444,6 +444,15 @@ const fieldRules: readonly FieldRule[] = [
     },
   },
   {
+    key: "image",
+    within: ["worked"],
+    doc: {
+      label: "Collaborator photo",
+      media: "photo",
+      hint: "Shown when this name is clicked. Leave empty to keep the credit text-only.",
+    },
+  },
+  {
     key: "campaigns",
     doc: {
       label: "Campaigns",

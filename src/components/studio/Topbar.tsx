@@ -6,7 +6,7 @@ import { useEffect, useState, useTransition } from "react";
 import { publishAll } from "@/actions/publish";
 import { ThemeToggle, type ThemeName } from "@/components/public/ThemeToggle";
 import { studioSectionLabels } from "@/lib/studio-nav";
-import { useStudioStore } from "@/stores/studio-store";
+import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type TopbarProps = Readonly<{
   initialTheme: ThemeName;
@@ -26,6 +26,7 @@ export function Topbar({ initialTheme, onMenu }: TopbarProps) {
   const pushToast = useStudioStore((state) => state.pushToast);
   const dirtySection = useStudioStore((state) => state.dirtySection);
   const hasUnpublishedChanges = useStudioStore((state) => state.hasUnpublishedChanges);
+  const { blocked: uploadBlocked, label: uploadLabel } = useUploadBlock();
   const setHasUnpublishedChanges = useStudioStore((state) => state.setHasUnpublishedChanges);
   const [isPublishing, startTransition] = useTransition();
   const [networkAvailable, setNetworkAvailable] = useState(true);
@@ -113,10 +114,11 @@ export function Topbar({ initialTheme, onMenu }: TopbarProps) {
         <button
           className="button button--primary studio-publish"
           type="button"
-          disabled={!hasUnpublishedChanges || Boolean(dirtySection) || isPublishing}
+          disabled={!hasUnpublishedChanges || Boolean(dirtySection) || isPublishing || uploadBlocked}
+          title={uploadBlocked ? `${uploadLabel} is still uploading.` : undefined}
           onClick={publish}
         >
-          {isPublishing ? "Publishing..." : "Publish updates"}
+          {isPublishing ? "Publishing..." : uploadBlocked ? "Uploading..." : "Publish updates"}
         </button>
       </div>
     </header>

@@ -73,7 +73,11 @@ export function StudioLandingPreview({
     }
     case "impact": {
       const parsed = ImpactSchema.safeParse(data);
-      return parsed.success ? <ImpactStrip data={parsed.data} /> : <PreviewUnavailable />;
+      return parsed.success ? (
+        <ImpactStrip data={parsed.data} />
+      ) : (
+        <PreviewUnavailable />
+      );
     }
     case "work": {
       const parsed = WorkSchema.safeParse(data);

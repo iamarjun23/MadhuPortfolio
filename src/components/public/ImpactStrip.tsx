@@ -1,8 +1,22 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { MediaImage } from "@/components/public/MediaImage";
+import { realImage } from "@/lib/placeholders";
 import type { Impact } from "@/schemas";
 
 const SPONSORSHIP_SHOWS = new Set(["Mahanati", "Bigg Boss Kannada", "Sa Re Ga Ma Pa"]);
+
+/* The stand-in on a collaborator tile that has no photo yet: the first letter of
+   the first two words, so the grid keeps one shape whether or not a picture has
+   been uploaded. */
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() ?? "")
+    .join("");
+}
 
 function CountUp({ value }: Readonly<{ value: string }>) {
   const match = value.match(/^(\d[\d,.]*)(.*)$/);
@@ -42,9 +56,11 @@ function CountUp({ value }: Readonly<{ value: string }>) {
 
 export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
   const ref = useRef<HTMLElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const campaignsRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [campaignsVisible, setCampaignsVisible] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -68,7 +84,32 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
     if (campaignsRef.current) observer.observe(campaignsRef.current);
     return () => observer.disconnect();
   }, []);
+  useEffect(() => {
+    if (activeIndex === null) return;
+
+    window.requestAnimationFrame(() => {
+      gridRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActiveIndex(null);
+    };
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activeIndex]);
   const collaborators = data.worked.filter((person) => !SPONSORSHIP_SHOWS.has(person.name));
+  const activePerson = activeIndex !== null ? collaborators[activeIndex] : undefined;
+  const activeImage = activePerson ? realImage(activePerson.image) : null;
   const campaigns = data.campaigns.length
     ? data.campaigns
     : data.worked
@@ -101,18 +142,80 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                 {collaborators.length} {data.collaboratorsLabel}
               </span>
             </div>
-            {/* Names and what we made together, and nothing else: opening a
-                portrait of someone else's face was the only thing the click did,
-                and those portraits were never ours to show. */}
-            <ul className="impact__worked-grid">
-              {collaborators.map((person) => (
-                <li key={person.name}>
-                  <span>{person.name}</span>
-                  <small>{person.context}</small>
-                </li>
-              ))}
-            </ul>
+            <div className="impact__worked-grid" ref={gridRef}>
+              {collaborators.map((person, index) => {
+                const isActive = index === activeIndex;
+                const image = realImage(person.image);
+                return (
+                  <button
+                    type="button"
+                    key={person.name}
+                    aria-expanded={isActive}
+                    disabled={!image}
+                    className={isActive ? "is-active" : undefined}
+                    onClick={() => setActiveIndex(isActive ? null : index)}
+                  >
+                    {/* The card carries the photo the way a work card carries
+                        its still: visible up front, and the same picture the
+                        click opens full size. Without one, the initials keep
+                        the tile the same shape as its neighbours. */}
+                    <span className="impact__worked-thumb" aria-hidden={!image}>
+                      {image ? (
+                        <MediaImage
+                          src={image.url}
+                          alt={image.alt}
+                          fill
+                          sizes="(max-width: 560px) 20vw, 88px"
+                        />
+                      ) : (
+                        <em>{initials(person.name)}</em>
+                      )}
+                    </span>
+                    <span className="impact__worked-copy">
+                      <span>{person.name}</span>
+                      <small>{person.context}</small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+          {activePerson && activeImage ? (
+            <>
+              <div
+                className="impact__preview-scrim"
+                aria-hidden="true"
+                onClick={() => setActiveIndex(null)}
+              />
+              <div
+                className="impact__preview"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`${activePerson.name} preview`}
+              >
+                <button
+                  type="button"
+                  className="impact__preview-close"
+                  onClick={() => setActiveIndex(null)}
+                  aria-label="Close"
+                >
+                  &times;
+                </button>
+                <MediaImage
+                  src={activeImage.url}
+                  alt={activeImage.alt}
+                  width={640}
+                  height={640}
+                  sizes="(max-width: 560px) 100vw, (max-width: 900px) 34vw, 30vw"
+                />
+                <div className="impact__preview-copy">
+                  <em>{data.detailLabel}</em>
+                  <b>{activePerson.name}</b>
+                  <span>{activePerson.context}</span>
+                </div>
+              </div>
+            </>
+          ) : null}
           {campaigns.length ? (
             <div
               className={`impact__campaigns${campaignsVisible ? " is-visible" : ""}`}

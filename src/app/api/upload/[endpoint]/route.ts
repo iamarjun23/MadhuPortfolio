@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
-import { isUploadEndpoint, uploadEndpoints } from "@/lib/media-upload";
+import {
+  isAllowedMimeType,
+  isUploadEndpoint,
+  normalizeMimeType,
+  uploadEndpoints,
+} from "@/lib/media-upload";
 
 type RouteParams = Readonly<{ params: Promise<{ endpoint: string }> }>;
 
@@ -28,9 +33,17 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   const config = uploadEndpoints[endpoint];
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.startsWith(config.accept)) {
-    return NextResponse.json({ error: `Expected a ${config.accept}* file.` }, { status: 400 });
+  const contentType = normalizeMimeType(request.headers.get("content-type") ?? "");
+  if (!isAllowedMimeType(contentType, config.accept)) {
+    return NextResponse.json(
+      {
+        error:
+          config.accept === "image/"
+            ? "Choose a JPEG, PNG, WebP, AVIF or GIF image."
+            : "Choose an MP4, WebM or MOV video.",
+      },
+      { status: 415 },
+    );
   }
 
   const declaredBytes = Number(request.headers.get("content-length") ?? "0");
@@ -64,15 +77,20 @@ export async function POST(request: Request, { params }: RouteParams) {
   // size. FixedLengthStream re-attaches the declared Content-Length; a body that does not
   // match the header errors the stream rather than storing a truncated object, so the size
   // check above holds for the bytes actually written.
+  //
+  // FixedLengthStream is a workerd-only global: it exists in the deployed Worker but not in
+  // the plain Node.js process `next dev` runs API routes in, where constructing one throws
+  // immediately. Buffering there instead is fine - dev uploads never approach the Worker's
+  // memory limit because there is no Worker.
   const key = `${endpoint}/${randomUUID()}`;
   try {
-    await env.MEDIA_BUCKET.put(
-      key,
-      request.body.pipeThrough(new FixedLengthStream(declaredBytes)),
-      {
-        httpMetadata: { contentType },
-      },
-    );
+    const body =
+      typeof FixedLengthStream === "undefined"
+        ? await request.arrayBuffer()
+        : request.body.pipeThrough(new FixedLengthStream(declaredBytes));
+    await env.MEDIA_BUCKET.put(key, body, {
+      httpMetadata: { contentType },
+    });
   } catch (error) {
     console.error(`Storing the ${endpoint} upload failed`, error);
     await discard(env.MEDIA_BUCKET, key);

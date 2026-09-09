@@ -11,6 +11,11 @@
   "observability": {
     "enabled": true,
   },
+  // No effect on the Free plan (hard-capped at 10ms, not configurable) — this only takes
+  // effect if/when the account moves to a paid plan, where the default is also 30000ms.
+  "limits": {
+    "cpu_ms": 30000,
+  },
   // Created by `wrangler hyperdrive create <name> --connection-string=<DATABASE_URL>`.
   // Paste the resulting id below — see DEPLOYMENT.md.
   "hyperdrive": [
