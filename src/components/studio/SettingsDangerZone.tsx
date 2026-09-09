@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { changePassword } from "@/actions/account";
 import { getUnusedMedia, purgeUnusedMedia } from "@/actions/media";
 import { revertDraftsToPublished } from "@/actions/publish";
 import type { UnusedMediaSummary } from "@/actions/media-types";
@@ -22,6 +23,9 @@ export function SettingsDangerZone() {
   const [unused, setUnused] = useState<UnusedMediaSummary | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const revertDrafts = () => {
     if (!window.confirm("Replace every draft with the last published version?")) return;
@@ -82,8 +86,62 @@ export function SettingsDangerZone() {
     router.refresh();
   };
 
+  const submitPasswordChange = async (event: FormEvent) => {
+    event.preventDefault();
+    setIsChangingPassword(true);
+    const result = await changePassword(currentPassword, newPassword);
+    setIsChangingPassword(false);
+    if (!result.ok) {
+      pushToast(result.error, "error");
+      return;
+    }
+    setCurrentPassword("");
+    setNewPassword("");
+    pushToast("Password changed", "success");
+  };
+
   return (
     <>
+      <section className="studio-account-card" aria-labelledby="password-title">
+        <div>
+          <span className="slate">Account</span>
+          <h2 id="password-title">Change password</h2>
+          <p>Update the password used to sign in to the Studio.</p>
+        </div>
+        <form onSubmit={submitPasswordChange} className="studio-account-card__form">
+          <label className="studio-field" htmlFor="current-password">
+            <span>Current password</span>
+            <input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              required
+            />
+          </label>
+          <label className="studio-field" htmlFor="new-password">
+            <span>New password</span>
+            <input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              minLength={8}
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="button button--primary"
+            disabled={isChangingPassword}
+          >
+            {isChangingPassword ? "Changing..." : "Change password"}
+          </button>
+        </form>
+      </section>
+
       <section className="studio-danger-zone" aria-labelledby="danger-zone-title">
         <div>
           <span className="slate">Danger zone</span>
