@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { PlaceholderImage } from "@/components/public/PlaceholderImage";
+import { MediaImage } from "@/components/public/MediaImage";
 import { reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
 import type { Work } from "@/schemas";
 
@@ -435,7 +435,7 @@ export function WorkConsole({
                     <span className="work__card-frame">
                       <span className={`work__card-media ${project.thumbHint}`}>
                         {thumbnail ? (
-                          <PlaceholderImage
+                          <MediaImage
                             src={thumbnail}
                             alt={`${project.title} still`}
                             fill

@@ -1,23 +1,25 @@
 import type { Metadata } from "next";
 import { ProcessPage } from "@/components/public/ProcessPage";
-import { getBooth, getSettings } from "@/lib/content";
+import { getBooth, getProcess, getSettings } from "@/lib/content";
+import { realImage } from "@/lib/placeholders";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await getSettings();
-  const description = "How N Madhu Kumar organises, edits, reviews, and delivers video work.";
+  const [settings, process] = await Promise.all([getSettings(), getProcess()]);
+  const description = process.seo.description;
+  const shareImage = realImage(settings.seo.ogImage);
 
   return {
-    title: "Studio",
+    title: process.seo.title,
     description,
     openGraph: {
-      title: `Studio | ${settings.seo.title}`,
+      title: `${process.seo.title} | ${settings.seo.title}`,
       description,
-      ...(settings.seo.ogImage ? { images: [settings.seo.ogImage] } : {}),
+      ...(shareImage ? { images: [shareImage] } : {}),
     },
   };
 }
 
 export default async function ProcessRoute() {
-  const booth = await getBooth();
-  return <ProcessPage booth={booth} />;
+  const [data, booth, settings] = await Promise.all([getProcess(), getBooth(), getSettings()]);
+  return <ProcessPage data={data} booth={booth} fallbackImage={settings.fallbackImage} />;
 }

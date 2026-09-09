@@ -48,6 +48,12 @@ function getSummary(section: SectionKey, data: PreviewData) {
         title: stringValue(data, "heading", studioSectionLabels[section]),
         detail: `${arrayLength(data, section === "booth" ? "slots" : "quotes")} items on display`,
       };
+    case "process":
+      return {
+        eyebrow: stringValue(data, "eyebrow", "Studio"),
+        title: stringValue(data, "heading", "The work behind the cut."),
+        detail: "The /process page: how you work, turnaround and its search listing",
+      };
     case "room":
       return {
         eyebrow: stringValue(data, "eyebrow", "Off the clock"),

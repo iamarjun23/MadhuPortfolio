@@ -11,10 +11,12 @@ const EDGE_CACHE_MAX_BYTES = 8 * 1024 * 1024;
 // `caches.default` is a Workers-only member that the ambient DOM `CacheStorage` type
 // (pulled in by tsconfig's "dom" lib) doesn't declare, and it is not reachable from every
 // bundle this route ends up in — reading media 500'd on every non-Range request because
-// the previous unchecked cast assumed it was always there. The edge cache is an
+// the previous unchecked cast assumed it was always there. Go through `globalThis`: under
+// `next dev` there is no `caches` binding at all, and naming it directly throws a
+// ReferenceError before any of the guards below get to run. The edge cache is an
 // optimisation, so treat it as absent unless it is genuinely usable.
 function getEdgeCache(): Cache | undefined {
-  const store = (caches as unknown as { default?: Cache }).default;
+  const store = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
   return typeof store?.match === "function" && typeof store.put === "function" ? store : undefined;
 }
 

@@ -75,7 +75,7 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
   const caption = isDrawingRoom
     ? navigation.drawingRoomCaption
     : isProcess
-      ? "How I work"
+      ? navigation.studioCaption
       : formatAvailabilityTicker(contact?.availabilityLabel);
 
   return (

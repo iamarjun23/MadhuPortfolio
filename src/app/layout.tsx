@@ -28,6 +28,14 @@ const serif = Instrument_Serif({
 export const metadata: Metadata = {
   title: "madhu.edit",
   description: "Portfolio foundation for N Madhu Kumar.",
+  // The mark in the browser tab and on a bookmark. One SVG covers every size,
+  // and naming it here is what puts the <link> in the head - a file sitting in
+  // public/ is served but never declared.
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+  },
 };
 
 type RootLayoutProps = Readonly<{

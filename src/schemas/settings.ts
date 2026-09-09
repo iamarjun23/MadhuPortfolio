@@ -10,6 +10,7 @@ const defaultBrand = {
 const defaultNavigation = {
   captionPrefix: "—",
   drawingRoomCaption: "The Drawing Room",
+  studioCaption: "How I work",
   workLabel: "Work",
   drawingRoomLabel: "Drawing Room",
   studioLabel: "Studio",
@@ -59,6 +60,10 @@ export const SettingsSchema = z.object({
     showThemeToggle: z.boolean().default(true),
     motion: z.boolean().default(true),
   }),
+  /* One picture of the owner's own choosing to stand in wherever a photo has
+     not been uploaded yet. Nothing is bundled with the site any more, so with
+     this empty each section simply shows its own empty state. */
+  fallbackImage: z.object({ url: MediaUrlSchema }).nullable().default(null),
   domain: z.string().max(60),
   site: z
     .object({
@@ -74,6 +79,7 @@ export const SettingsSchema = z.object({
         .object({
           captionPrefix: z.string().max(20).default(defaultNavigation.captionPrefix),
           drawingRoomCaption: z.string().max(40).default(defaultNavigation.drawingRoomCaption),
+          studioCaption: z.string().max(40).default(defaultNavigation.studioCaption),
           workLabel: z.string().max(30).default(defaultNavigation.workLabel),
           drawingRoomLabel: z.string().max(40).default(defaultNavigation.drawingRoomLabel),
           studioLabel: z.string().max(30).default(defaultNavigation.studioLabel),

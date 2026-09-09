@@ -1,28 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { PlaceholderImage } from "@/components/public/PlaceholderImage";
-import { displayImageSrc, isPlaceholderImageSrc } from "@/lib/placeholders";
 import type { Impact } from "@/schemas";
 
-const TEMPORARY_IMPACT_IMAGES = [
-  "https://images.pexels.com/photos/2379004/pexels-photo-2379004.jpeg?auto=compress&cs=tinysrgb&w=600",
-  "https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=600",
-  "https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=600",
-  "https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=600",
-] as const;
-
 const SPONSORSHIP_SHOWS = new Set(["Mahanati", "Bigg Boss Kannada", "Sa Re Ga Ma Pa"]);
-
-function getImpactImage(image: Impact["worked"][number]["image"], index: number, name: string) {
-  if (image && !isPlaceholderImageSrc(displayImageSrc(image.url))) {
-    return image;
-  }
-
-  return {
-    url: TEMPORARY_IMPACT_IMAGES[index % TEMPORARY_IMPACT_IMAGES.length]!,
-    alt: `Temporary preview portrait for ${name}`,
-  };
-}
 
 function CountUp({ value }: Readonly<{ value: string }>) {
   const match = value.match(/^(\d[\d,.]*)(.*)$/);
@@ -62,11 +42,9 @@ function CountUp({ value }: Readonly<{ value: string }>) {
 
 export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
   const ref = useRef<HTMLElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
   const campaignsRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const [campaignsVisible, setCampaignsVisible] = useState(false);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   useEffect(() => {
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -90,34 +68,7 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
     if (campaignsRef.current) observer.observe(campaignsRef.current);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => {
-    if (activeIndex === null) return;
-
-    window.requestAnimationFrame(() => {
-      gridRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActiveIndex(null);
-    };
-
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
-    };
-  }, [activeIndex]);
   const collaborators = data.worked.filter((person) => !SPONSORSHIP_SHOWS.has(person.name));
-  const activePerson = activeIndex !== null ? collaborators[activeIndex] : undefined;
-  const activeImage = activePerson
-    ? getImpactImage(activePerson.image, activeIndex!, activePerson.name)
-    : null;
   const campaigns = data.campaigns.length
     ? data.campaigns
     : data.worked
@@ -150,60 +101,18 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                 {collaborators.length} {data.collaboratorsLabel}
               </span>
             </div>
-            <div className="impact__worked-grid" ref={gridRef}>
-              {collaborators.map((person, index) => {
-                const isActive = index === activeIndex;
-                return (
-                  <button
-                    type="button"
-                    key={person.name}
-                    aria-expanded={isActive}
-                    className={isActive ? "is-active" : undefined}
-                    onClick={() => setActiveIndex(isActive ? null : index)}
-                  >
-                    <span>{person.name}</span>
-                    <small>{person.context}</small>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Names and what we made together, and nothing else: opening a
+                portrait of someone else's face was the only thing the click did,
+                and those portraits were never ours to show. */}
+            <ul className="impact__worked-grid">
+              {collaborators.map((person) => (
+                <li key={person.name}>
+                  <span>{person.name}</span>
+                  <small>{person.context}</small>
+                </li>
+              ))}
+            </ul>
           </div>
-          {activePerson && activeImage ? (
-            <>
-              <div
-                className="impact__preview-scrim"
-                aria-hidden="true"
-                onClick={() => setActiveIndex(null)}
-              />
-              <div
-                className="impact__preview"
-                role="dialog"
-                aria-modal="true"
-                aria-label={`${activePerson.name} preview`}
-              >
-                <button
-                  type="button"
-                  className="impact__preview-close"
-                  onClick={() => setActiveIndex(null)}
-                  aria-label="Close"
-                >
-                  &times;
-                </button>
-                <PlaceholderImage
-                  src={activeImage.url}
-                  alt={activeImage.alt}
-                  width={640}
-                  height={640}
-                  sizes="(max-width: 560px) 100vw, (max-width: 900px) 34vw, 30vw"
-                />
-                <div className="impact__preview-copy">
-                  <em>{data.detailLabel}</em>
-                  <b>{activePerson.name}</b>
-                  <span>{activePerson.context}</span>
-                </div>
-              </div>
-            </>
-          ) : null}
           {campaigns.length ? (
             <div
               className={`impact__campaigns${campaignsVisible ? " is-visible" : ""}`}

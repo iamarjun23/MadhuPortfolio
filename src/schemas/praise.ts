@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
 
 export const PraiseSchema = z.object({
   visible: z.boolean().default(false),
@@ -14,7 +13,6 @@ export const PraiseSchema = z.object({
         name: z.string().max(60),
         role: z.string().max(60),
         initials: z.string().max(3),
-        image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
         isSample: z.boolean().default(false),
       }),
     )

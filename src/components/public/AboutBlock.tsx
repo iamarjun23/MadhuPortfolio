@@ -1,24 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PlaceholderImage } from "@/components/public/PlaceholderImage";
-import { displayImageSrc, isPlaceholderImageSrc } from "@/lib/placeholders";
+import { MediaImage } from "@/components/public/MediaImage";
+import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
 import type { About } from "@/schemas";
 
-const STAND_IN_VIDEO_URL =
-  "https://videos.pexels.com/video-files/3195650/3195650-hd_1920_1080_25fps.mp4";
-const STAND_IN_VIDEO_POSTER =
-  "https://images.pexels.com/videos/3195650/pexels-photo-3195650.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750";
-
-export function AboutBlock({ data }: Readonly<{ data: About }>) {
+export function AboutBlock({
+  data,
+  fallbackImage = null,
+}: Readonly<{ data: About; fallbackImage?: FallbackImage }>) {
   const sectionRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const portraitVideo = data.portraitVideo;
-  const portraitImage =
-    data.portrait && !isPlaceholderImageSrc(displayImageSrc(data.portrait.url))
-      ? data.portrait
-      : null;
+  const portraitImage = imageOrFallback(data.portrait, fallbackImage, "N Madhu Kumar");
+  // With no portrait, no clip and no site-wide stand-in, the frame is dropped
+  // and the story takes the full width rather than sitting beside an empty box.
+  const hasPortrait = Boolean(portraitImage || portraitVideo);
 
   // Observe the section, not .portrait: the portrait's entrance clip-path
   // collapses it to zero area, which would keep intersectionRatio pinned at 0.
@@ -42,34 +40,21 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
 
   return (
     <section className="section" id="about" ref={sectionRef}>
-      <div className="wrap about">
+      <div className={`wrap about${hasPortrait ? "" : " about--no-portrait"}`}>
         {/* The portrait photo is the subject of this section, so it fills the
             frame whenever there is one. A portrait video no longer replaces it:
             with both set the video plays as a clip inset into the corner, and it
             only fills the frame itself when there is no photo to show. */}
-        <div className={`portrait${isVisible ? " portrait--in" : ""}`}>
-          {portraitImage ? (
-            <PlaceholderImage
-              src={portraitImage.url}
-              alt={portraitImage.alt}
-              fill
-              sizes="(max-width: 900px) min(100vw, 420px), 40vw"
-            />
-          ) : (
-            <video
-              ref={videoRef}
-              muted
-              loop
-              playsInline
-              preload="none"
-              poster={portraitVideo?.poster ?? STAND_IN_VIDEO_POSTER}
-              aria-label="Madhu editing"
-            >
-              <source src={portraitVideo?.url ?? STAND_IN_VIDEO_URL} type="video/mp4" />
-            </video>
-          )}
-          {portraitImage && portraitVideo ? (
-            <div className="portrait__clip">
+        {hasPortrait ? (
+          <div className={`portrait${isVisible ? " portrait--in" : ""}`}>
+            {portraitImage ? (
+              <MediaImage
+                src={portraitImage.url}
+                alt={portraitImage.alt}
+                fill
+                sizes="(max-width: 900px) min(100vw, 420px), 40vw"
+              />
+            ) : portraitVideo ? (
               <video
                 ref={videoRef}
                 muted
@@ -77,13 +62,28 @@ export function AboutBlock({ data }: Readonly<{ data: About }>) {
                 playsInline
                 preload="none"
                 poster={portraitVideo.poster}
-                aria-label="Madhu at the edit desk"
+                aria-label="Madhu editing"
               >
                 <source src={portraitVideo.url} type="video/mp4" />
               </video>
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+            {portraitImage && portraitVideo ? (
+              <div className="portrait__clip">
+                <video
+                  ref={videoRef}
+                  muted
+                  loop
+                  playsInline
+                  preload="none"
+                  poster={portraitVideo.poster}
+                  aria-label="Madhu at the edit desk"
+                >
+                  <source src={portraitVideo.url} type="video/mp4" />
+                </video>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="about__text">
           <span className="slate">
             <b className="slate__index">01</b>

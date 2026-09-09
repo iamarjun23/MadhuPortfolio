@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Footer } from "@/components/public/Footer";
 import { Nav } from "@/components/public/Nav";
 import { getContact, getSettings } from "@/lib/content";
+import { realImage } from "@/lib/placeholders";
 import { getSiteUrl } from "@/lib/site-url";
 import { defaultSiteSettings } from "@/schemas/settings";
 
@@ -32,6 +33,7 @@ export const viewport: Viewport = {
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
   const siteUrl = getSiteUrl(settings.domain);
+  const shareImage = realImage(settings.seo.ogImage);
 
   return {
     metadataBase: siteUrl,
@@ -45,7 +47,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: settings.seo.title,
       description: settings.seo.description,
       url: "/",
-      ...(settings.seo.ogImage ? { images: [settings.seo.ogImage] } : {}),
+      ...(shareImage ? { images: [shareImage] } : {}),
     },
   };
 }

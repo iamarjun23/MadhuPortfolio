@@ -9,6 +9,7 @@ import { ImpactStrip } from "@/components/public/ImpactStrip";
 import { MoodBoard } from "@/components/public/MoodBoard";
 import { Nav } from "@/components/public/Nav";
 import { Photobooth } from "@/components/public/Photobooth";
+import { ProcessPage } from "@/components/public/ProcessPage";
 import { Testimonials } from "@/components/public/Testimonials";
 import { WorkConsole } from "@/components/public/WorkConsole";
 import type { SectionKey } from "@/lib/sections";
@@ -20,6 +21,7 @@ import {
   HeroSchema,
   ImpactSchema,
   PraiseSchema,
+  ProcessSchema,
   RoomSchema,
   SettingsSchema,
   WorkSchema,
@@ -29,7 +31,13 @@ type StudioLandingPreviewProps = Readonly<{
   section: SectionKey;
   data: unknown;
   contactData: unknown;
+  settingsData: unknown;
 }>;
+
+/* The Studio page renders the photo wall from the Photobooth section, which this
+   editor does not load. Its own preview switches the wall off, so this only has to
+   satisfy the prop. */
+const emptyBooth = BoothSchema.parse({ slots: [] });
 
 function PreviewUnavailable() {
   return (
@@ -39,7 +47,17 @@ function PreviewUnavailable() {
   );
 }
 
-export function StudioLandingPreview({ section, data, contactData }: StudioLandingPreviewProps) {
+export function StudioLandingPreview({
+  section,
+  data,
+  contactData,
+  settingsData,
+}: StudioLandingPreviewProps) {
+  /* The stand-in photo is a site-wide setting, so the preview reads it from
+     there rather than from the section being edited - the same way the page
+     does. Anything unparseable simply means no stand-in. */
+  const fallbackImage = SettingsSchema.safeParse(settingsData).data?.fallbackImage ?? null;
+
   switch (section) {
     case "hero": {
       const parsed = HeroSchema.safeParse(data);
@@ -47,7 +65,11 @@ export function StudioLandingPreview({ section, data, contactData }: StudioLandi
     }
     case "about": {
       const parsed = AboutSchema.safeParse(data);
-      return parsed.success ? <AboutBlock data={parsed.data} /> : <PreviewUnavailable />;
+      return parsed.success ? (
+        <AboutBlock data={parsed.data} fallbackImage={fallbackImage} />
+      ) : (
+        <PreviewUnavailable />
+      );
     }
     case "impact": {
       const parsed = ImpactSchema.safeParse(data);
@@ -64,7 +86,11 @@ export function StudioLandingPreview({ section, data, contactData }: StudioLandi
     }
     case "booth": {
       const parsed = BoothSchema.safeParse(data);
-      return parsed.success ? <Photobooth data={parsed.data} /> : <PreviewUnavailable />;
+      return parsed.success ? (
+        <Photobooth data={parsed.data} fallbackImage={fallbackImage} />
+      ) : (
+        <PreviewUnavailable />
+      );
     }
     case "praise": {
       const parsed = PraiseSchema.safeParse(data);
@@ -72,11 +98,33 @@ export function StudioLandingPreview({ section, data, contactData }: StudioLandi
     }
     case "experience": {
       const parsed = ExperienceSchema.safeParse(data);
-      return parsed.success ? <Experience data={parsed.data} /> : <PreviewUnavailable />;
+      return parsed.success ? (
+        <Experience data={parsed.data} fallbackImage={fallbackImage} />
+      ) : (
+        <PreviewUnavailable />
+      );
+    }
+    case "process": {
+      const parsed = ProcessSchema.safeParse(data);
+      // The photo wall belongs to the Photobooth section, so the Studio page
+      // preview shows the page's own blocks with an empty wall behind them.
+      return parsed.success ? (
+        <ProcessPage
+          data={{ ...parsed.data, showPhotobooth: false }}
+          booth={emptyBooth}
+          fallbackImage={fallbackImage}
+        />
+      ) : (
+        <PreviewUnavailable />
+      );
     }
     case "room": {
       const parsed = RoomSchema.safeParse(data);
-      return parsed.success ? <MoodBoard data={parsed.data} /> : <PreviewUnavailable />;
+      return parsed.success ? (
+        <MoodBoard data={parsed.data} fallbackImage={fallbackImage} />
+      ) : (
+        <PreviewUnavailable />
+      );
     }
     case "contact": {
       const parsed = ContactSchema.safeParse(data);

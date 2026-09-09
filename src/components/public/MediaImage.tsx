@@ -1,7 +1,6 @@
 import Image from "next/image";
-import { displayImageSrc, isPlaceholderImageSrc } from "@/lib/placeholders";
 
-type PlaceholderImageProps = Readonly<{
+type MediaImageProps = Readonly<{
   src: string;
   alt: string;
   sizes: string;
@@ -25,14 +24,13 @@ type PlaceholderImageProps = Readonly<{
 // same-origin `url=` through the ASSETS binding, which only serves the build's static
 // files - our media lives in R2 behind the `/api/media/[...key]` route, so the lookup
 // misses and `/_next/image` answers 404 ("upstream response is invalid"), leaving every
-// uploaded photo broken while the bundled placeholders kept working. The route already
-// serves the stored file with an immutable year-long cache lifetime, so going direct
-// costs nothing but the optimizer's resizing.
+// uploaded photo broken. The route already serves the stored file with an immutable
+// year-long cache lifetime, so going direct costs nothing but the optimizer's resizing.
 function isUploadedMediaSrc(url: string) {
   return url.startsWith("/api/media/");
 }
 
-export function PlaceholderImage({
+export function MediaImage({
   src,
   alt,
   sizes,
@@ -41,15 +39,13 @@ export function PlaceholderImage({
   height,
   onError,
   unoptimized,
-}: PlaceholderImageProps) {
-  const displaySrc = displayImageSrc(src);
-
-  if (unoptimized || isUploadedMediaSrc(displaySrc) || isPlaceholderImageSrc(displaySrc)) {
+}: MediaImageProps) {
+  if (unoptimized || isUploadedMediaSrc(src)) {
     return fill ? (
-      <Image src={displaySrc} alt={alt} fill sizes={sizes} unoptimized onError={onError} />
+      <Image src={src} alt={alt} fill sizes={sizes} unoptimized onError={onError} />
     ) : (
       <Image
-        src={displaySrc}
+        src={src}
         alt={alt}
         width={width}
         height={height}
@@ -61,8 +57,8 @@ export function PlaceholderImage({
   }
 
   return fill ? (
-    <Image src={displaySrc} alt={alt} fill sizes={sizes} onError={onError} />
+    <Image src={src} alt={alt} fill sizes={sizes} onError={onError} />
   ) : (
-    <Image src={displaySrc} alt={alt} width={width} height={height} sizes={sizes} onError={onError} />
+    <Image src={src} alt={alt} width={width} height={height} sizes={sizes} onError={onError} />
   );
 }

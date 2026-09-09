@@ -26,7 +26,6 @@ export const ExperienceSchema = z.object({
           .object({ url: MediaUrlSchema, alt: z.string().default("") })
           .nullable()
           .default(null),
-        logo: z.object({ url: MediaUrlSchema }).nullable(),
         logoHint: z.enum(["l-jar", "l-onep", "l-ulc", "l-hb", "custom"]).default("custom"),
         initials: z.string().max(4),
         start: z.string().max(20),

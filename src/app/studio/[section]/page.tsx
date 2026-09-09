@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { Status } from "@/generated/prisma/client";
 import { SectionEditor } from "@/components/studio/SectionEditor";
-import { getContact } from "@/lib/content";
+import { getContact, getSettings } from "@/lib/content";
 import { sectionKeys } from "@/lib/sections";
 import { getStudioDraft } from "@/lib/studio-drafts";
 import { isMediaUploadConfigured } from "@/lib/media-config";
@@ -18,9 +18,10 @@ export default async function StudioSectionPage({ params }: StudioSectionPagePro
   }
 
   const sectionKey = section as (typeof sectionKeys)[number];
-  const [data, contact, uploadEnabled] = await Promise.all([
+  const [data, contact, settings, uploadEnabled] = await Promise.all([
     getStudioDraft(sectionKey),
     getContact(Status.DRAFT),
+    getSettings(Status.DRAFT),
     isMediaUploadConfigured(),
   ]);
 
@@ -31,6 +32,7 @@ export default async function StudioSectionPage({ params }: StudioSectionPagePro
       data={data}
       uploadEnabled={uploadEnabled}
       contactData={contact}
+      settingsData={settings}
     />
   );
 }

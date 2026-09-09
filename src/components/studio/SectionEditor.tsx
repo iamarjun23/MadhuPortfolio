@@ -610,25 +610,21 @@ function getMediaConfig(
   if (key === "portrait" && (value === null || isEditorObject(value))) {
     return { endpoint: "portrait", acceptsAlt: true };
   }
-  if (key === "logo" && (value === null || isEditorObject(value))) {
-    return { endpoint: "logoImage", acceptsAlt: false };
-  }
   if (key === "ogImage" && (value === null || isEditorObject(value))) {
     return { endpoint: "ogImage", acceptsAlt: false };
   }
+  if (key === "fallbackImage" && (value === null || isEditorObject(value))) {
+    return { endpoint: "fallbackImage", acceptsAlt: false, isOptional: true };
+  }
   if (key === "image" && (value === null || isEditorObject(value))) {
     const pathKeys = path.filter((part): part is string => typeof part === "string");
-    const endpoint = pathKeys.includes("quotes")
-      ? "praiseImage"
-      : pathKeys.includes("roles")
-        ? "experienceImage"
-        : pathKeys.includes("slots")
-          ? "boothImage"
-          : pathKeys.includes("worked")
-            ? "impactImage"
-            : pathKeys.includes("projects")
-              ? "reelCover"
-              : "roomImage";
+    const endpoint = pathKeys.includes("roles")
+      ? "experienceImage"
+      : pathKeys.includes("slots")
+        ? "boothImage"
+        : pathKeys.includes("projects")
+          ? "reelCover"
+          : "roomImage";
     return {
       endpoint,
       acceptsAlt: true,
@@ -918,11 +914,7 @@ function LinkEditor({
         <span className="studio-media-field__name">{label}</span>
       </legend>
       {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
-      <FieldHint
-        id={`${inputId}-field-hint`}
-        className="studio-media-field__hint"
-        hint={hint}
-      />
+      <FieldHint id={`${inputId}-field-hint`} className="studio-media-field__hint" hint={hint} />
       <div className="studio-link-field__preview">
         {reel.playable ? (
           <MediaPreview
@@ -1473,9 +1465,16 @@ type SectionEditorProps = Readonly<{
   data: unknown;
   uploadEnabled: boolean;
   contactData: unknown;
+  settingsData: unknown;
 }>;
 
-export function SectionEditor({ section, data, uploadEnabled, contactData }: SectionEditorProps) {
+export function SectionEditor({
+  section,
+  data,
+  uploadEnabled,
+  contactData,
+  settingsData,
+}: SectionEditorProps) {
   const router = useRouter();
   const [savedData, setSavedData] = useState(() => normalizeObject(data));
   const [currentData, setCurrentData] = useState(() => normalizeObject(data));
@@ -1712,7 +1711,12 @@ export function SectionEditor({ section, data, uploadEnabled, contactData }: Sec
               setInspectorTab("content");
             }}
           >
-            <StudioLandingPreview section={section} data={previewData} contactData={contactData} />
+            <StudioLandingPreview
+              section={section}
+              data={previewData}
+              contactData={contactData}
+              settingsData={settingsData}
+            />
           </div>
         </section>
         <aside className="studio-ins" aria-label="Editing panel">

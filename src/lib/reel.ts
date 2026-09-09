@@ -1,4 +1,5 @@
 import { getInstagramEmbed, getInstagramThumbnail } from "@/lib/instagram";
+import { realImage } from "@/lib/placeholders";
 import { getLinkedInEmbed, getLinkedInThumbnail } from "@/lib/linkedin";
 import { getYouTubeId, getYouTubeThumbnail } from "@/lib/youtube";
 
@@ -51,7 +52,7 @@ type ReelInput = Readonly<{
 }>;
 
 export function resolveReel({ href = null, video = null, image = null }: ReelInput): Reel {
-  const cover = image?.url ?? null;
+  const cover = realImage(image)?.url ?? null;
   /* An uploaded file wins over a link: someone who has gone to the trouble of
      uploading the video wants that played, not a link left over beside it. */
   if (video?.url) {

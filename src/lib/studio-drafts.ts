@@ -7,6 +7,7 @@ import {
   HeroSchema,
   ImpactSchema,
   PraiseSchema,
+  ProcessSchema,
   RoomSchema,
   SettingsSchema,
   WorkSchema,
@@ -19,6 +20,7 @@ import {
   getHero,
   getImpact,
   getPraise,
+  getProcess,
   getRoom,
   getSettings,
   getWork,
@@ -32,6 +34,7 @@ export const sectionSchemas = {
   work: WorkSchema,
   booth: BoothSchema,
   praise: PraiseSchema,
+  process: ProcessSchema,
   experience: ExperienceSchema,
   room: RoomSchema,
   contact: ContactSchema,
@@ -54,6 +57,8 @@ export async function getStudioDraft(section: SectionKey): Promise<unknown> {
       return getPraise(Status.DRAFT);
     case "experience":
       return getExperience(Status.DRAFT);
+    case "process":
+      return getProcess(Status.DRAFT);
     case "room":
       return getRoom(Status.DRAFT);
     case "contact":

@@ -5,6 +5,7 @@ export { ExperienceSchema, type Experience } from "./experience";
 export { HeroSchema, type Hero } from "./hero";
 export { ImpactSchema, type Impact } from "./impact";
 export { PraiseSchema, type Praise } from "./praise";
+export { ProcessSchema, type Process } from "./process";
 export { RoomSchema, type Room } from "./room";
 export { SettingsSchema, type Settings } from "./settings";
 export { WorkSchema, type Work } from "./work";

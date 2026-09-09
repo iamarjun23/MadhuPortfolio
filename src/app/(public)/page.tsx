@@ -39,11 +39,11 @@ export default async function PortfolioPage() {
         {settings.site?.navigation?.skipLinkLabel ?? defaultSiteSettings.navigation.skipLinkLabel}
       </a>
       <Hero data={hero} />
-      <AboutBlock data={about} />
+      <AboutBlock data={about} fallbackImage={settings.fallbackImage} />
       <ImpactStrip data={impact} />
       <WorkConsole data={work} contactEmail={contact.email} />
       <Testimonials data={praise} />
-      <Experience data={experience} />
+      <Experience data={experience} fallbackImage={settings.fallbackImage} />
       <DrawingRoomTeaser data={room} />
       <ContactBlock contact={contact} />
     </main>

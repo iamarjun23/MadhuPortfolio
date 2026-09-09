@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { deleteMedia } from "@/actions/media";
 import { MediaPreview } from "@/components/studio/MediaPreview";
 import { useMediaUpload } from "@/lib/media-upload-client";
+import { isPlaceholderImageSrc } from "@/lib/placeholders";
 import type { UploadEndpoint } from "@/lib/media-upload";
 
 export type { UploadEndpoint };
@@ -93,7 +94,11 @@ export function Dropzone({
   };
 
   const accept = isVideo ? "video/*" : "image/*";
-  const displayUrl = previewUrl ?? value;
+  // Records seeded before the placeholder artwork was retired still carry its
+  // address. The page treats that as no picture at all, so the field here shows
+  // its empty state rather than previewing a file the visitor never sees.
+  const storedUrl = value && !isPlaceholderImageSrc(value) ? value : undefined;
+  const displayUrl = previewUrl ?? storedUrl;
   const displayIsVideo = previewUrl ? previewIsVideo : isVideo;
   const previewFailed = failedPreviewUrl === displayUrl;
 

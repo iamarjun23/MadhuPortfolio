@@ -12,6 +12,7 @@ import {
   HeroSchema,
   ImpactSchema,
   PraiseSchema,
+  ProcessSchema,
   RoomSchema,
   SettingsSchema,
   WorkSchema,
@@ -44,23 +45,30 @@ const readSections = (status: Status) =>
     { tags: sectionKeys.map(contentTag) },
   )();
 
+// Imported on demand: the seed module parses every section's defaults at module
+// scope, so keeping it off the hot path saves that work.
+export async function sectionDefaults(key: SectionKey): Promise<unknown> {
+  const { sectionData } = await import("../../prisma/seed");
+  return sectionData[key];
+}
+
 async function getSection<TSchema extends z.ZodType>(
   key: SectionKey,
   status: Status,
   schema: TSchema,
 ): Promise<z.output<TSchema>> {
   if (!isDatabaseConfigured()) {
-    // Imported on demand: the seed module parses every section's defaults at
-    // module scope, so keeping it off the configured path saves that work.
-    const { sectionData } = await import("../../prisma/seed");
-    return schema.parse(sectionData[key]);
+    return schema.parse(await sectionDefaults(key));
   }
 
   const sections = await readSections(status);
   const data = sections[key];
 
+  // A section added after the database was seeded has no row of its own yet, and
+  // a page is better served its shipped defaults than a 500. The row appears the
+  // first time the section is saved or the site is published.
   if (data === undefined) {
-    throw new Error(`Missing ${status.toLowerCase()} content for the ${key} section.`);
+    return schema.parse(await sectionDefaults(key));
   }
 
   return schema.parse(data);
@@ -95,6 +103,10 @@ export const getPraise = cache((status: Status = Status.PUBLISHED) =>
 
 export const getExperience = cache((status: Status = Status.PUBLISHED) =>
   getSection("experience", status, ExperienceSchema),
+);
+
+export const getProcess = cache((status: Status = Status.PUBLISHED) =>
+  getSection("process", status, ProcessSchema),
 );
 
 export const getRoom = cache((status: Status = Status.PUBLISHED) =>

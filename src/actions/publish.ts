@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { Prisma, Status } from "@/generated/prisma/client";
 import { requireOwner } from "@/auth";
+import { sectionDefaults } from "@/lib/content";
 import { getDb } from "@/lib/db";
 import { updateContent } from "@/lib/revalidate";
 import { sectionKeys } from "@/lib/sections";
@@ -35,6 +36,7 @@ function revalidatePublishedContent() {
   for (const key of sectionKeys) updateContent(key);
   revalidatePath("/", "layout");
   revalidatePath("/room", "layout");
+  revalidatePath("/process", "layout");
   revalidatePath("/studio", "layout");
 }
 
@@ -47,25 +49,27 @@ export async function publishAll(): Promise<PublishResult> {
       });
       const draftsByKey = new Map(drafts.map((draft) => [draft.key, draft]));
 
-      if (draftsByKey.size !== sectionKeys.length) {
-        throw new Error("Every section needs a draft before publishing.");
-      }
-
       let count = 0;
 
       for (const key of sectionKeys) {
+        // A section added since the last seed has no draft row until it is first
+        // edited. Publishing its shipped defaults is what puts both rows on the
+        // record, rather than refusing to publish the whole site over it.
         const draft = draftsByKey.get(key);
-        if (!draft) throw new Error(`Missing draft content for ${key}.`);
+        const data = toSectionInputJson(draft ? draft.data : await sectionDefaults(key));
+
+        if (!draft) {
+          await tx.section.upsert({
+            where: { key_status: { key, status: Status.DRAFT } },
+            create: { key, status: Status.DRAFT, data, updatedBy: user.id },
+            update: { data, updatedBy: user.id },
+          });
+        }
 
         await tx.section.upsert({
           where: { key_status: { key, status: Status.PUBLISHED } },
-          create: {
-            key,
-            status: Status.PUBLISHED,
-            data: toSectionInputJson(draft.data),
-            updatedBy: user.id,
-          },
-          update: { data: toSectionInputJson(draft.data), updatedBy: user.id },
+          create: { key, status: Status.PUBLISHED, data, updatedBy: user.id },
+          update: { data, updatedBy: user.id },
         });
         count += 1;
       }
@@ -92,25 +96,18 @@ export async function revertDraftsToPublished(): Promise<RevertResult> {
       });
       const publishedByKey = new Map(publishedSections.map((section) => [section.key, section]));
 
-      if (publishedByKey.size !== sectionKeys.length) {
-        throw new Error("Every section needs published content before reverting drafts.");
-      }
-
       let count = 0;
 
       for (const key of sectionKeys) {
+        // Same as publishing: a section with nothing published yet reverts to the
+        // defaults the site ships with.
         const published = publishedByKey.get(key);
-        if (!published) throw new Error(`Missing published content for ${key}.`);
+        const data = toSectionInputJson(published ? published.data : await sectionDefaults(key));
 
         await tx.section.upsert({
           where: { key_status: { key, status: Status.DRAFT } },
-          create: {
-            key,
-            status: Status.DRAFT,
-            data: toSectionInputJson(published.data),
-            updatedBy: user.id,
-          },
-          update: { data: toSectionInputJson(published.data), updatedBy: user.id },
+          create: { key, status: Status.DRAFT, data, updatedBy: user.id },
+          update: { data, updatedBy: user.id },
         });
         count += 1;
       }

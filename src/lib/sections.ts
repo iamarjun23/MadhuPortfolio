@@ -6,6 +6,7 @@ export const sectionKeys = [
   "booth",
   "praise",
   "experience",
+  "process",
   "room",
   "contact",
   "settings",

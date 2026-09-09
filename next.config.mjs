@@ -10,7 +10,6 @@ const nextConfig = {
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "madhu.edit" },
-      { protocol: "https", hostname: "placehold.co" },
       { protocol: "https", hostname: "images.pexels.com" },
       // Work project cards fall back to the thumbnail of the project's YouTube video.
       { protocol: "https", hostname: "i.ytimg.com" },
@@ -26,7 +25,7 @@ const nextConfig = {
       "frame-ancestors 'self'",
       scriptSrc,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://madhu.edit https://placehold.co https://images.pexels.com https://i.ytimg.com",
+      "img-src 'self' data: blob: https://madhu.edit https://images.pexels.com https://i.ytimg.com",
       "media-src 'self' blob: https://videos.pexels.com",
       // A reel card plays a YouTube video, an Instagram reel or a LinkedIn post
       // in place, on both the work board and the Drawing Room pinboard.

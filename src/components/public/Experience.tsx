@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { PlaceholderImage } from "@/components/public/PlaceholderImage";
+import { MediaImage } from "@/components/public/MediaImage";
+import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
 import type { Experience as ExperienceData } from "@/schemas";
 
-export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
+export function Experience({
+  data,
+  fallbackImage = null,
+}: Readonly<{ data: ExperienceData; fallbackImage?: FallbackImage }>) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const roles = data.roles;
   /* Deleting roles in the studio can leave the selection past the end of the
@@ -14,6 +18,8 @@ export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
   const activeRole = roles[activeIndex];
 
   if (!activeRole) return null;
+
+  const sceneImage = imageOrFallback(activeRole.image, fallbackImage, "");
 
   function moveChapter(direction: -1 | 1) {
     setSelectedIndex((activeIndex + direction + roles.length) % roles.length);
@@ -34,10 +40,10 @@ export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
         </div>
         <div className="experience-reel">
           <article className="experience-reel__frame" aria-live="polite">
-            {activeRole.image ? (
+            {sceneImage ? (
               <div className="experience-reel__image" aria-hidden="true">
-                <PlaceholderImage
-                  src={activeRole.image.url}
+                <MediaImage
+                  src={sceneImage.url}
                   alt=""
                   fill
                   sizes="(max-width: 720px) 100vw, 1200px"
@@ -57,17 +63,7 @@ export function Experience({ data }: Readonly<{ data: ExperienceData }>) {
             </span>
             <div className="experience-reel__role">
               <span className={`experience__logo ${activeRole.logoHint}`}>
-                {activeRole.logo ? (
-                  <PlaceholderImage
-                    src={activeRole.logo.url}
-                    alt=""
-                    width={84}
-                    height={84}
-                    sizes="84px"
-                  />
-                ) : (
-                  activeRole.initials
-                )}
+                {activeRole.initials}
               </span>
               <p>{activeRole.location ?? data.defaultLocation}</p>
             </div>

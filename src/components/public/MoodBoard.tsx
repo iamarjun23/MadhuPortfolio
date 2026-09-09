@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PlaceholderImage } from "@/components/public/PlaceholderImage";
-import { placeholderImageUrl } from "@/lib/placeholders";
+import { MediaImage } from "@/components/public/MediaImage";
+import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
 import { reelBadge, resolveReel } from "@/lib/reel";
 import type { Room } from "@/schemas";
 
-type MoodBoardProps = Readonly<{ data: Room }>;
+type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage }>;
 type Position = Pick<Room["cards"][number], "fx" | "fy" | "rot">;
 type RoomCard = Room["cards"][number];
 type VideoCard = Extract<RoomCard, { type: "video" }>;
@@ -31,40 +31,43 @@ function getCardLabel(card: Room["cards"][number]) {
 }
 
 /* The face of a reel card: the reel's own still where the link or upload brings
-   one, the editor's chosen photo where they set one, and the placeholder
+   one, the editor's chosen photo where they set one, and nothing at all
    otherwise. Resolved through the same helper the work board uses, so a link
    pinned here behaves exactly as it does there. */
-function videoCardFace(card: VideoCard) {
+function videoCardFace(card: VideoCard, fallbackImage: FallbackImage) {
   const reel = resolveReel(card);
-  if (reel.thumbnail) {
-    return {
-      url: reel.thumbnail,
-      alt: card.image?.alt || `Still from ${card.caption}`,
-      remote: reel.thumbnail !== reel.cover,
-    };
+  if (!reel.thumbnail) {
+    return fallbackImage
+      ? { url: fallbackImage.url, alt: `Still from ${card.caption}`, remote: false }
+      : null;
   }
+
   return {
-    url: placeholderImageUrl(card.caption),
-    alt: `Placeholder still for ${card.caption}`,
-    remote: false,
+    url: reel.thumbnail,
+    alt: card.image?.alt || `Still from ${card.caption}`,
+    remote: reel.thumbnail !== reel.cover,
   };
 }
 
-function cardContent(card: Room["cards"][number]) {
+function cardContent(card: Room["cards"][number], fallbackImage: FallbackImage) {
   switch (card.type) {
     case "video": {
-      const face = videoCardFace(card);
+      const face = videoCardFace(card, fallbackImage);
 
       return (
         <>
+          {/* No still to show is the tint wash on its own - the card still reads
+              as a reel through its label and play badge. */}
           <span className={`mood-card__image ${card.tint}`}>
-            <PlaceholderImage
-              src={face.url}
-              alt={face.alt}
-              fill
-              sizes="220px"
-              unoptimized={face.remote}
-            />
+            {face ? (
+              <MediaImage
+                src={face.url}
+                alt={face.alt}
+                fill
+                sizes="220px"
+                unoptimized={face.remote}
+              />
+            ) : null}
             <span className="mood-card__image-label">{card.tag}</span>
             <span className="mood-card__play" aria-hidden="true">
               {reelBadge(resolveReel(card).kind)}
@@ -76,15 +79,12 @@ function cardContent(card: Room["cards"][number]) {
       );
     }
     case "polaroid": {
-      const image = card.image ?? {
-        url: placeholderImageUrl(card.caption),
-        alt: `Placeholder photo for ${card.caption}`,
-      };
+      const image = imageOrFallback(card.image, fallbackImage, card.caption);
 
       return (
         <>
           <span className={`mood-card__image ${card.tint}`}>
-            <PlaceholderImage src={image.url} alt={image.alt} fill sizes="220px" />
+            {image ? <MediaImage src={image.url} alt={image.alt} fill sizes="220px" /> : null}
             <span className="mood-card__image-label">{card.tag}</span>
           </span>
           <b>{card.caption}</b>
@@ -196,7 +196,7 @@ function ReelPlayer({ card, onClose }: Readonly<{ card: VideoCard; onClose: () =
   );
 }
 
-export function MoodBoard({ data }: MoodBoardProps) {
+export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   // The board and card geometry is measured once per drag; re-measuring on
   // every pointer move forced a layout on each event.
@@ -460,7 +460,7 @@ export function MoodBoard({ data }: MoodBoardProps) {
                 aria-describedby={canReposition ? "mood-board-instructions" : undefined}
                 aria-roledescription={canReposition ? "draggable card" : undefined}
               >
-                {cardContent(card)}
+                {cardContent(card, fallbackImage)}
               </div>
             );
           })}

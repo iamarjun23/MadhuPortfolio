@@ -62,6 +62,12 @@ export const studioNavGroups: readonly StudioNavGroup[] = [
         detail: "Career reel",
         section: "experience",
       },
+      {
+        href: "/studio/process",
+        label: "Studio Page",
+        detail: "How I work & turnaround",
+        section: "process",
+      },
       { href: "/studio/room", label: "Drawing Room", detail: "Off-clock world", section: "room" },
       {
         href: "/studio/contact",
@@ -92,6 +98,7 @@ export const studioSectionLabels: Record<SectionKey, string> = {
   booth: "Photobooth",
   praise: "Praise",
   experience: "Experience",
+  process: "Studio Page",
   room: "Drawing Room",
   contact: "Contact",
   settings: "Site & Navigation",

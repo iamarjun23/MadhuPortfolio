@@ -1,7 +1,6 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient, Status } from "../src/generated/prisma/client";
 import { sectionKeys, type SectionKey } from "../src/lib/sections";
-import { placeholderImageUrl } from "../src/lib/placeholders";
 import {
   AboutSchema,
   BoothSchema,
@@ -10,6 +9,7 @@ import {
   HeroSchema,
   ImpactSchema,
   PraiseSchema,
+  ProcessSchema,
   RoomSchema,
   SettingsSchema,
   WorkSchema,
@@ -33,10 +33,7 @@ export const sectionData = {
     },
   }),
   about: AboutSchema.parse({
-    portrait: {
-      url: placeholderImageUrl("Portrait", 1200, 1600),
-      alt: "Madhu behind the lens",
-    },
+    portrait: null,
     heading: "The edit is invisible. You feel the pace.",
     paragraphs: [
       "I'm a video editor with three years behind me, currently at Jar, where I work with a team of eight across podcasts, campaigns, long form and short form content.",
@@ -64,47 +61,38 @@ export const sectionData = {
       {
         name: "Dulquer Salmaan",
         context: "Jar campaign film",
-        image: { url: placeholderImageUrl("Dulquer Salmaan"), alt: "Dulquer Salmaan" },
       },
       {
         name: "Ramesh Arvind",
         context: "Jar campaign film",
-        image: { url: placeholderImageUrl("Ramesh Arvind"), alt: "Ramesh Arvind" },
       },
       {
         name: "Danish Sait",
         context: "JarXchange, live",
-        image: { url: placeholderImageUrl("Danish Sait"), alt: "Danish Sait" },
       },
       {
         name: "Ankur Warikoo",
         context: "Jar townhall podcast",
-        image: { url: placeholderImageUrl("Ankur Warikoo"), alt: "Ankur Warikoo" },
       },
       {
         name: "Sharan Hegde",
         context: "Finance with Sharan",
-        image: { url: placeholderImageUrl("Sharan Hegde"), alt: "Sharan Hegde" },
       },
       {
         name: "Manjeet Sarkar",
         context: "Untouchable — documentary",
-        image: { url: placeholderImageUrl("Manjeet Sarkar"), alt: "Manjeet Sarkar" },
       },
       {
         name: "Deepak Shenoy",
         context: "JarXchange podcast",
-        image: { url: placeholderImageUrl("Deepak Shenoy"), alt: "Deepak Shenoy" },
       },
       {
         name: "Neil Borate",
         context: "JarXchange podcast",
-        image: { url: placeholderImageUrl("Neil Borate"), alt: "Neil Borate" },
       },
       {
         name: "Ravi Handa",
         context: "JarXchange podcast",
-        image: { url: placeholderImageUrl("Ravi Handa"), alt: "Ravi Handa" },
       },
     ],
     campaignsHeading: "Sponsorship campaigns",
@@ -113,17 +101,17 @@ export const sectionData = {
       {
         name: "Mahanati",
         context: "Jar sponsorship performance film",
-        href: "https://www.youtube.com/watch?v=placeholder-mahanati",
+        href: null,
       },
       {
         name: "Bigg Boss Kannada",
         context: "Jar sponsorship performance film",
-        href: "https://www.youtube.com/watch?v=placeholder-bigg-boss-kannada",
+        href: null,
       },
       {
         name: "Sa Re Ga Ma Pa",
         context: "Jar sponsorship performance film",
-        href: "https://www.youtube.com/watch?v=placeholder-sa-re-ga-ma-pa",
+        href: null,
       },
     ],
   }),
@@ -304,10 +292,7 @@ export const sectionData = {
     slots: [
       {
         id: "ramesh-arvind",
-        image: {
-          url: placeholderImageUrl("Ramesh Arvind"),
-          alt: "Ramesh Arvind",
-        },
+        image: null,
         title: "Ramesh Arvind",
         subtitle: "Jar · Start Saving",
         lightboxCaption: "On set with Ramesh Arvind for Jar · Start Saving",
@@ -316,10 +301,7 @@ export const sectionData = {
       },
       {
         id: "danish-sait",
-        image: {
-          url: placeholderImageUrl("Danish Sait"),
-          alt: "Danish Sait",
-        },
+        image: null,
         title: "Danish Sait",
         subtitle: "JarXchange podcast",
         lightboxCaption: "JarXchange podcast with Danish Sait",
@@ -328,10 +310,7 @@ export const sectionData = {
       },
       {
         id: "ankur-warikoo",
-        image: {
-          url: placeholderImageUrl("Ankur Warikoo"),
-          alt: "Ankur Warikoo",
-        },
+        image: null,
         title: "Ankur Warikoo",
         subtitle: "Jar townhall",
         lightboxCaption: "Jar townhall with Ankur Warikoo",
@@ -340,10 +319,7 @@ export const sectionData = {
       },
       {
         id: "ananth-sriram",
-        image: {
-          url: placeholderImageUrl("Ananth Sriram"),
-          alt: "Ananth Sriram",
-        },
+        image: null,
         title: "Ananth Sriram",
         subtitle: "Jar performance shoot",
         lightboxCaption: "Jar performance shoot with Ananth Sriram",
@@ -352,10 +328,7 @@ export const sectionData = {
       },
       {
         id: "manjeet-sarkar",
-        image: {
-          url: placeholderImageUrl("Manjeet Sarkar"),
-          alt: "Manjeet Sarkar",
-        },
+        image: null,
         title: "Manjeet Sarkar",
         subtitle: "Untouchable: Laughing Out Loud Caste",
         lightboxCaption: "Untouchable: Laughing Out Loud Caste with Manjeet Sarkar",
@@ -364,10 +337,7 @@ export const sectionData = {
       },
       {
         id: "varun-grover",
-        image: {
-          url: placeholderImageUrl("Varun Grover"),
-          alt: "Varun Grover",
-        },
+        image: null,
         title: "Varun Grover",
         subtitle: "Untouchable: Laughing Out Loud Caste",
         lightboxCaption: "Untouchable: Laughing Out Loud Caste project with Varun Grover",
@@ -376,10 +346,7 @@ export const sectionData = {
       },
       {
         id: "jarxchange-podcast",
-        image: {
-          url: placeholderImageUrl("JarXchange podcast"),
-          alt: "JarXchange podcast guests",
-        },
+        image: null,
         title: "JXC Podcast",
         subtitle: "Guests across finance",
         lightboxCaption: "JarXchange podcast guests across the finance field",
@@ -431,7 +398,6 @@ export const sectionData = {
         id: "jar-editor",
         company: "Jar",
         role: "Video Editor",
-        logo: { url: placeholderImageUrl("Jar", 512, 512) },
         logoHint: "l-jar",
         initials: "jar",
         start: "Mar 2025",
@@ -445,7 +411,6 @@ export const sectionData = {
         id: "jar-intern",
         company: "Jar",
         role: "Video Editor Intern → Associate Video Editor",
-        logo: { url: placeholderImageUrl("Jar", 512, 512) },
         logoHint: "l-jar",
         initials: "jar",
         start: "Sep 2024",
@@ -459,7 +424,6 @@ export const sectionData = {
         id: "one-percent-club",
         company: "The 1% Club",
         role: "Video Editor Intern",
-        logo: { url: placeholderImageUrl("The 1% Club", 512, 512) },
         logoHint: "l-onep",
         initials: "1%",
         start: "Apr 2024",
@@ -473,7 +437,6 @@ export const sectionData = {
         id: "untouchable",
         company: "Untouchable: Laughing Out Loud Caste",
         role: "Assistant Video Editor",
-        logo: { url: placeholderImageUrl("ULC", 512, 512) },
         logoHint: "l-ulc",
         initials: "ULC",
         start: "Nov 2023",
@@ -487,7 +450,6 @@ export const sectionData = {
         id: "dhrupad-crew",
         company: "Dhrupad Crew",
         role: "Shooter & Editor",
-        logo: { url: placeholderImageUrl("Dhrupad Crew", 512, 512) },
         logoHint: "custom",
         initials: "DC",
         start: "Aug 2023",
@@ -498,6 +460,77 @@ export const sectionData = {
           "A band starting a YouTube channel. I shot the music videos and cut them. First money I ever made from a timeline.",
       },
     ],
+  }),
+  process: ProcessSchema.parse({
+    eyebrow: "Studio",
+    heading: "The work behind the cut.",
+    intro:
+      "A clear process, realistic turnaround, and a few frames from the rooms where the work happened.",
+    method: {
+      eyebrow: "How I work",
+      heading: "Five passes. One better film.",
+      steps: [
+        {
+          id: "organise",
+          number: "01",
+          title: "Organise",
+          description:
+            "Files named, bins built, script read twice. Nothing hits the timeline until I know where everything lives.",
+        },
+        {
+          id: "assemble",
+          number: "02",
+          title: "Assemble",
+          description:
+            "A rough pass for structure - where the story turns, where it drags, what can go. Structure before polish, always.",
+        },
+        {
+          id: "cut",
+          number: "03",
+          title: "Cut",
+          description:
+            "Dialogue-led, cut on meaning rather than beat. Sound design in the same pass, not bolted on after.",
+        },
+        {
+          id: "feedback",
+          number: "04",
+          title: "Feedback",
+          description:
+            "Send it, take the notes, cut again. This is the part most editors resist and the part that makes the video good.",
+        },
+        {
+          id: "deliver",
+          number: "05",
+          title: "Deliver",
+          description: "Every format the campaign needs, named properly, on time.",
+        },
+      ],
+    },
+    turnaround: {
+      eyebrow: "Turnaround",
+      heading: "Know the rhythm before we start.",
+      rows: [
+        { id: "short-form", format: "Short-form reel", timing: "1 day" },
+        { id: "long-form", format: "Long-form / explainer", timing: "2-3 days" },
+        { id: "podcast", format: "Podcast episode", timing: "4-5 days" },
+        { id: "campaign", format: "Campaign", timing: "~1 month, script to live ads" },
+      ],
+      notes: [
+        {
+          id: "podcast-note",
+          text: "Podcasts run longer because they're multicam and cut to reference.",
+        },
+        {
+          id: "freelance-note",
+          text: "Freelance work starts within a week of the brief. Rates depend on scope - ask.",
+        },
+      ],
+    },
+    showPhotobooth: true,
+    seo: {
+      title: "Studio",
+      description: "How N Madhu Kumar organises, edits, reviews, and delivers video work.",
+    },
   }),
   room: RoomSchema.parse({
     teaser: {
@@ -525,10 +558,7 @@ export const sectionData = {
         fy: 0.06,
         rot: -5,
         pinType: "pin",
-        image: {
-          url: placeholderImageUrl("Bengaluru to Kanyakumari ride"),
-          alt: "Madhu's five-day ride from Bengaluru to Kanyakumari",
-        },
+        image: null,
         tint: "rg3",
         tag: "Ride",
         caption: "Bengaluru → Varkala → Kanyakumari → Bengaluru",
@@ -584,7 +614,7 @@ export const sectionData = {
         fy: 0.37,
         rot: -4,
         pinType: "pin",
-        image: { url: placeholderImageUrl("Dominar 400"), alt: "Madhu's Dominar 400" },
+        image: null,
         tint: "rg4",
         tag: "Bikes",
         caption: "Dominar 400",
@@ -620,7 +650,7 @@ export const sectionData = {
         fy: 0.72,
         rot: 4,
         pinType: "pin-signal",
-        image: { url: placeholderImageUrl("Cockpit view"), alt: "Cockpit view of Madhu's bike" },
+        image: null,
         tint: "rg3",
         tag: "Bike",
         caption: "Cockpit view of my bike",
@@ -648,7 +678,7 @@ export const sectionData = {
         fy: 0.73,
         rot: 5,
         pinType: "pin",
-        image: { url: placeholderImageUrl("Nandi Hills"), alt: "Early ride at Nandi Hills" },
+        image: null,
         tint: "rg1",
         tag: "Ride",
         caption: "Nandi Hills",
@@ -721,13 +751,14 @@ export const sectionData = {
       title: "N Madhu Kumar — Video Editor & Visual Storyteller",
       description:
         "N Madhu Kumar, a Bengaluru video editor driven by emotion and storytelling. Podcasts, TV ads, events and documentary work for Jar and The 1% Club.",
-      ogImage: { url: placeholderImageUrl("Madhu Edit", 1200, 630) },
+      ogImage: null,
     },
     appearance: {
       defaultTheme: "suite",
       showThemeToggle: true,
       motion: true,
     },
+    fallbackImage: null,
     domain: "madhu.edit",
   }),
 } satisfies Record<SectionKey, Prisma.InputJsonObject>;
