@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { Status } from "@/generated/prisma/client";
 import { getBooth, getPraise, getWork } from "@/lib/content";
 import { getDb, isDatabaseConfigured } from "@/lib/db";
@@ -63,7 +64,7 @@ function hasChangedDraft(
   });
 }
 
-export async function hasPendingChanges() {
+export const hasPendingChanges = cache(async () => {
   if (!isDatabaseConfigured()) return false;
 
   const sections = await getDb().section.findMany({
@@ -72,7 +73,7 @@ export async function hasPendingChanges() {
   });
 
   return hasChangedDraft(sections);
-}
+});
 
 export async function getStudioShellData(): Promise<StudioShellData> {
   const [work, booth, praise] = await Promise.all([getWork(), getBooth(), getPraise()]);
