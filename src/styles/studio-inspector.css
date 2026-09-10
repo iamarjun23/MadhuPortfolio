@@ -40,7 +40,44 @@
   background: linear-gradient(120deg, rgba(255, 106, 0, 0.14), transparent 70%);
 }
 
-.studio-ins__head > div > span {
+.studio-ins__headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* The save bar sits beside the section title rather than floating over the page.
+   Its copy is dropped here: the header already names the section being edited, so
+   the bar only needs to be its two buttons - which appear at all only when there
+   is an unsaved draft, and are themselves the "unsaved" signal. */
+.studio-ins__headline .studio-save-bar {
+  position: static;
+  z-index: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: auto;
+  max-width: none;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.studio-ins__headline .studio-save-bar__copy {
+  display: none;
+}
+
+.studio-ins__headline .studio-save-bar .button {
+  min-height: 34px;
+  padding: 0.45rem 0.62rem;
+  font-size: 0.72rem;
+}
+
+.studio-ins__title > span {
   color: var(--accent-text);
   font-family: var(--f-mono);
   font-size: 0.58rem;

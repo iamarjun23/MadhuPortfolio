@@ -27,8 +27,6 @@ export const sectionData = {
     creditLine1: "CUT BY N MADHU KUMAR",
     bgVideo: {
       url: "https://videos.pexels.com/video-files/3129957/3129957-hd_1920_1080_25fps.mp4",
-      poster:
-        "https://images.pexels.com/videos/3129957/pexels-photo-3129957.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750",
       duotone: true,
     },
   }),

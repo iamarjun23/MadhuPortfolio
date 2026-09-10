@@ -17,7 +17,9 @@ const nextConfig = {
   },
   async headers() {
     const isDev = process.env.NODE_ENV === "development";
-    const scriptSrc = `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`;
+    // Cloudflare injects the Web Analytics beacon into every proxied HTML response, so the
+    // script and the endpoint it reports to have to be allowed here or the browser blocks it.
+    const scriptSrc = `script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com${isDev ? " 'unsafe-eval'" : ""}`;
     const contentSecurityPolicy = [
       "default-src 'self'",
       "base-uri 'self'",
@@ -30,7 +32,7 @@ const nextConfig = {
       // A reel card plays a YouTube video, an Instagram reel or a LinkedIn post
       // in place, on both the work board and the Drawing Room pinboard.
       "frame-src 'self' https://www.youtube-nocookie.com https://www.linkedin.com https://www.instagram.com",
-      "connect-src 'self'",
+      "connect-src 'self' https://cloudflareinsights.com",
     ].join("; ");
 
     return [

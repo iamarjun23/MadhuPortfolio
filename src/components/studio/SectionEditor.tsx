@@ -1736,9 +1736,12 @@ export function SectionEditor({
         </section>
         <aside className="studio-ins" aria-label="Editing panel">
           <header className="studio-ins__head">
-            <div>
-              <span>Editing</span>
-              <h2>{studioSectionLabels[section]}</h2>
+            <div className="studio-ins__headline">
+              <div className="studio-ins__title">
+                <span>Editing</span>
+                <h2>{studioSectionLabels[section]}</h2>
+              </div>
+              <SaveBar />
             </div>
             <div className="studio-ins__tabs" role="tablist" aria-label="Panel view">
               <button
@@ -1870,7 +1873,6 @@ export function SectionEditor({
               </div>
             </>
           )}
-          <SaveBar />
         </aside>
       </div>
       {section === "settings" ? <SettingsDangerZone /> : null}
