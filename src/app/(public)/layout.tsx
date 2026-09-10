@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import type { Metadata, Viewport } from "next";
 import { Footer } from "@/components/public/Footer";
 import { Nav } from "@/components/public/Nav";
@@ -11,8 +10,10 @@ type PublicLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-function getTheme(value: string | undefined, defaultTheme: "suite" | "sheet" | "system") {
-  if (value === "light" || value === "dark") return value;
+// The visitor's saved theme is applied by the inline script in the root layout, before paint, and
+// the toggle adopts it on mount. The server only supplies the site-wide default, because reading
+// the cookie here would make every public page render per request instead of from the ISR cache.
+function getDefaultTheme(defaultTheme: "suite" | "sheet" | "system") {
   return defaultTheme === "sheet" ? "light" : "dark";
 }
 
@@ -53,7 +54,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function PublicLayout({ children }: PublicLayoutProps) {
-  const cookieStore = await cookies();
   const [contact, settings] = await Promise.all([getContact(), getSettings()]);
   const siteUrl = getSiteUrl(settings.domain).toString();
   const sameAs = Object.values(contact.socials).filter((value): value is string => Boolean(value));
@@ -81,7 +81,7 @@ export default async function PublicLayout({ children }: PublicLayoutProps) {
         <Nav
           contact={contact}
           settings={settings}
-          initialTheme={getTheme(cookieStore.get("theme")?.value, settings.appearance.defaultTheme)}
+          initialTheme={getDefaultTheme(settings.appearance.defaultTheme)}
           showThemeToggle={settings.appearance.showThemeToggle}
         />
         {children}

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { DM_Sans, Instrument_Serif, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
@@ -42,25 +41,26 @@ type RootLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-type ThemeName = "dark" | "light";
-
-function getTheme(value: string | undefined): ThemeName {
-  return value === "light" ? "light" : "dark";
-}
+// Reading the theme cookie on the server would opt every route that renders this layout out of
+// prerendering, which is exactly what left the public site rendering from scratch on every request
+// (`Cache-Control: no-store`) and burning ~0.5-1s of Worker CPU a page. Settling the theme in a
+// blocking inline script instead keeps the pages cacheable and still paints the right theme first
+// time: the script runs before the body renders, so there is no flash.
+const themeScript = `try{var m=document.cookie.match(/(?:^|; )theme=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1]}catch(e){}`;
 
 export default async function RootLayout({ children }: RootLayoutProps) {
-  const cookieStore = await cookies();
-  const theme = getTheme(cookieStore.get("theme")?.value);
-
   return (
     <html
       lang="en"
-      data-theme={theme}
+      data-theme="dark"
       data-scroll-behavior="smooth"
       className={`${display.variable} ${body.variable} ${mono.variable} ${serif.variable}`}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {children}
+      </body>
     </html>
   );
 }

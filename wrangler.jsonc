@@ -28,5 +28,31 @@
       "binding": "MEDIA_BUCKET",
       "bucket_name": "images",
     },
+    // Backs OpenNext's incremental cache — see open-next.config.ts. Create it once with
+    // `wrangler r2 bucket create madhuportfolio-cache`.
+    {
+      "binding": "NEXT_INC_CACHE_R2_BUCKET",
+      "bucket_name": "madhuportfolio-cache",
+    },
+  ],
+  // The classes are already exported by `.open-next/worker.js`; these bindings are what make
+  // OpenNext's tag cache and ISR revalidation queue reachable at runtime.
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NEXT_TAG_CACHE_DO_SHARDED",
+        "class_name": "DOShardedTagCache",
+      },
+      {
+        "name": "NEXT_CACHE_DO_QUEUE",
+        "class_name": "DOQueueHandler",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["DOShardedTagCache", "DOQueueHandler"],
+    },
   ],
 }

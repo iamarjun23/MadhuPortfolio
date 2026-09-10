@@ -1709,6 +1709,12 @@ export function SectionEditor({
               const target = event.target;
               if (!(target instanceof HTMLElement)) return;
 
+              /* Some previews (the Experience reel's chapter arrows and scene
+                 list, carousels, tabs...) are interactive on their own - clicking
+                 them should switch what the preview shows, not hijack the click
+                 into editing a field. */
+              if (target.closest("button, a, input, select, textarea")) return;
+
               const candidates: string[] = [];
               let node: HTMLElement | null = target;
               while (node && node !== event.currentTarget) {
