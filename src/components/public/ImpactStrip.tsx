@@ -155,18 +155,11 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                     className={isActive ? "is-active" : undefined}
                     onClick={() => setActiveIndex(isActive ? null : index)}
                   >
-                    {/* The card carries the photo the way a work card carries
-                        its still: visible up front, and the same picture the
-                        click opens full size. Without one, the initials keep
-                        the tile the same shape as its neighbours. */}
                     <span className="impact__worked-thumb" aria-hidden={!image}>
                       {image ? (
-                        <MediaImage
-                          src={image.url}
-                          alt={image.alt}
-                          fill
-                          sizes="(max-width: 560px) 20vw, 88px"
-                        />
+                        // Plain <img>, not MediaImage: no width/height to force onto it, so
+                        // it keeps whatever aspect ratio the uploaded photo actually has.
+                        <img src={image.url} alt={image.alt} loading="lazy" />
                       ) : (
                         <em>{initials(person.name)}</em>
                       )}
@@ -201,13 +194,15 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                 >
                   &times;
                 </button>
-                <MediaImage
-                  src={activeImage.url}
-                  alt={activeImage.alt}
-                  width={640}
-                  height={640}
-                  sizes="(max-width: 560px) 100vw, (max-width: 900px) 34vw, 30vw"
-                />
+                <span className="impact__preview-photo">
+                  <MediaImage
+                    src={activeImage.url}
+                    alt={activeImage.alt}
+                    width={760}
+                    height={760}
+                    sizes="(max-width: 900px) 60vw, 380px"
+                  />
+                </span>
                 <div className="impact__preview-copy">
                   <em>{data.detailLabel}</em>
                   <b>{activePerson.name}</b>

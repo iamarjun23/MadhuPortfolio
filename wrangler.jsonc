@@ -23,11 +23,9 @@
       "localConnectionString": "postgresql://user:password@localhost:5432/postgres",
     },
   ],
+  // Uploads (bucket `images`) are no longer bound here: they are served from R2's custom domain
+  // and written by the studio on Vercel through R2's S3 API — see DEPLOYMENT.md.
   "r2_buckets": [
-    {
-      "binding": "MEDIA_BUCKET",
-      "bucket_name": "images",
-    },
     // Backs OpenNext's incremental cache — see open-next.config.ts. Create it once with
     // `wrangler r2 bucket create madhuportfolio-cache`.
     {

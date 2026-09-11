@@ -26,6 +26,7 @@ import { MediaPreview } from "@/components/studio/MediaPreview";
 import { SaveBar } from "@/components/studio/SaveBar";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
+import { estimateFocalPoint } from "@/lib/focal-point";
 import type { SectionKey } from "@/lib/sections";
 import {
   describeField,
@@ -49,7 +50,6 @@ const selectOptions: Record<string, readonly string[]> = {
   logoHint: ["l-jar", "l-onep", "l-ulc", "l-hb", "custom"],
   pinType: ["pin", "pin-signal", "tape", "none"],
   thumbHint: ["bd-1", "bd-2", "bd-3", "bd-4"],
-  tile: ["a", "b", "c", "d", "e", "f", "g", "h"],
   tint: roomTints,
   type: ["polaroid", "video", "note", "quote", "ig", "tags"],
   color: ["ember", "signal"],
@@ -205,6 +205,34 @@ function valueAtPath(
   }
 
   return current;
+}
+
+/* A click on a work card in the admin preview names its lane and project id,
+   not a path - the card has no idea it is being edited. This walks the lanes
+   to find the one entry that matches, so the click can jump straight to it. */
+function findWorkProjectPath(
+  data: EditorObject,
+  laneLabel: string,
+  projectId: string,
+): (string | number)[] | null {
+  const lanes = data.lanes;
+  if (!Array.isArray(lanes)) return null;
+
+  for (let laneIndex = 0; laneIndex < lanes.length; laneIndex += 1) {
+    const lane = lanes[laneIndex];
+    if (lane === undefined || !isEditorObject(lane) || lane.label !== laneLabel) continue;
+    const projects = lane.projects;
+    if (!Array.isArray(projects)) continue;
+
+    for (let projectIndex = 0; projectIndex < projects.length; projectIndex += 1) {
+      const project = projects[projectIndex];
+      if (project !== undefined && isEditorObject(project) && project.id === projectId) {
+        return ["lanes", laneIndex, "projects", projectIndex];
+      }
+    }
+  }
+
+  return null;
 }
 
 function normalizePreviewText(value: string) {
@@ -757,7 +785,8 @@ function MediaEditor({
   onChange,
   uploadEnabled,
   showBreadcrumb,
-}: ValueEditorProps & { showBreadcrumb?: boolean }) {
+  parent,
+}: ValueEditorProps & { showBreadcrumb?: boolean; parent?: EditorObject }) {
   const config = getMediaConfig(value, path);
   if (!config) return null;
 
@@ -790,6 +819,29 @@ function MediaEditor({
     onChange(path, { ...object, url: nextUrl });
   };
 
+  /* Only the photobooth wall crops its photos into a fixed tile - everywhere
+     else an image runs at its own shape, so there is nothing to focus. */
+  const supportsFocalPoint = config.endpoint === "boothImage";
+  const focalX = typeof parent?.focalX === "number" ? parent.focalX : 0.5;
+  const focalY = typeof parent?.focalY === "number" ? parent.focalY : 0.5;
+  const parentPath = path.slice(0, -1);
+  const setFocal = (x: number, y: number) => {
+    onChange([...parentPath, "focalX"], Math.min(1, Math.max(0, x)));
+    onChange([...parentPath, "focalY"], Math.min(1, Math.max(0, y)));
+  };
+  const pickFocalPoint = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setFocal((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height);
+  };
+  const autoDetectFocalPoint = async (imageUrl: string) => {
+    try {
+      const point = await estimateFocalPoint(imageUrl);
+      setFocal(point.x, point.y);
+    } catch {
+      // Leave whatever focal point is already set - the picker still works by hand.
+    }
+  };
+
   return (
     <fieldset className={`studio-object studio-media-field studio-media-field--${kind}`}>
       <legend>
@@ -817,9 +869,42 @@ function MediaEditor({
         label={spec.action}
         value={url || undefined}
         enabled={uploadEnabled}
-        onUploaded={(upload) => setUrl(upload.url)}
+        onUploaded={(upload) => {
+          setUrl(upload.url);
+          if (supportsFocalPoint) void autoDetectFocalPoint(upload.url);
+        }}
         onDeleted={() => setUrl("")}
       />
+      {supportsFocalPoint && url ? (
+        <div className="studio-focal-field">
+          <span className="studio-focal-field__label">Crop focus</span>
+          <button
+            type="button"
+            className="studio-focal-picker"
+            style={{ backgroundImage: `url(${url})` }}
+            onClick={pickFocalPoint}
+            aria-label="Click where the crop should centre on this photo"
+          >
+            <span
+              className="studio-focal-picker__marker"
+              style={{ left: `${focalX * 100}%`, top: `${focalY * 100}%` }}
+              aria-hidden="true"
+            />
+          </button>
+          <div className="studio-focal-field__actions">
+            <button type="button" onClick={() => void autoDetectFocalPoint(url)}>
+              Auto-detect
+            </button>
+            <button type="button" onClick={() => setFocal(0.5, 0.5)}>
+              Reset to centre
+            </button>
+          </div>
+          <FieldHint
+            id={`studio-${path.join("-")}-focal-hint`}
+            hint="Click the part of the photo that matters most - a face, say - so a narrow tile crops around it instead of the middle. Auto-detect guesses the busiest spot for you."
+          />
+        </div>
+      ) : null}
       <label className="studio-field" htmlFor={`studio-${path.join("-")}-url`}>
         <span>{kind === "video" ? "Video address" : "Photo address"}</span>
         <input
@@ -1063,6 +1148,7 @@ function GroupView({
                     path={childPath}
                     onChange={onChange}
                     uploadEnabled={uploadEnabled}
+                    parent={value}
                   />
                 )}
               </div>
@@ -1431,7 +1517,8 @@ function InspectorBody({
       </div>
     );
 
-  if (getMediaConfig(value, path))
+  if (getMediaConfig(value, path)) {
+    const parentValue = path.length > 0 ? valueAtPath(data, path.slice(0, -1)) : undefined;
     return (
       <div className="studio-ins-fields">
         <MediaEditor
@@ -1440,9 +1527,11 @@ function InspectorBody({
           path={path}
           onChange={onChange}
           uploadEnabled={uploadEnabled}
+          parent={parentValue !== undefined && isEditorObject(parentValue) ? parentValue : undefined}
         />
       </div>
     );
+  }
 
   if (isEditorObject(value))
     return (
@@ -1497,6 +1586,7 @@ export function SectionEditor({
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [inspectorTab, setInspectorTab] = useState<"content" | "media">("content");
+  const [mediaEntryFilter, setMediaEntryFilter] = useState("all");
   const { formState, handleSubmit, reset, setValue } = useForm<{ data: unknown }>({
     defaultValues: { data: savedData },
   });
@@ -1599,6 +1689,10 @@ export function SectionEditor({
 
   const selectedPath =
     activePath.length === 0 || valueAtPath(currentData, activePath) !== undefined ? activePath : [];
+  const parentOf = (path: readonly (string | number)[]) => {
+    const parentValue = valueAtPath(currentData, path.slice(0, -1));
+    return parentValue !== undefined && isEditorObject(parentValue) ? parentValue : undefined;
+  };
   const mediaFields = collectMediaFields(currentData);
   const photoFields = mediaFields.filter(
     (field) => !getMediaConfig(field.value, field.path)?.isVideo,
@@ -1634,6 +1728,65 @@ export function SectionEditor({
       isLink: true,
     },
   ].filter((group) => group.fields.length > 0);
+
+  /* Every media field sits directly on the entry it belongs to (a project, a
+     picture, ...), so dropping the field's own key off its path names that
+     entry. Grouping by that path turns a flat wall of uploads into one row per
+     entry the editor can filter down to. */
+  const mediaEntries: { key: string; path: readonly (string | number)[]; label: string }[] = [];
+  const mediaEntryKeys = new Set<string>();
+  const addableEntryArrays: { key: string; path: readonly (string | number)[]; label: string }[] =
+    [];
+  const addableEntryArrayKeys = new Set<string>();
+
+  for (const field of [...mediaFields, ...linkFields]) {
+    const entryPath = field.path.slice(0, -1);
+    const entryKey = JSON.stringify(entryPath);
+    const arrayPath = entryPath.slice(0, -1);
+    const arrayKey = JSON.stringify(arrayPath);
+    const containerPath = arrayPath.slice(0, -1);
+    const container = (containerPath.length ? valueAtPath(currentData, containerPath) : null) ?? null;
+    const containerLabel = isEditorObject(container) ? itemTitle(container, "") : "";
+
+    if (!mediaEntryKeys.has(entryKey)) {
+      mediaEntryKeys.add(entryKey);
+      const title = itemTitle(
+        valueAtPath(currentData, entryPath) ?? null,
+        fieldLabel(entryPath),
+      );
+      mediaEntries.push({
+        key: entryKey,
+        path: entryPath,
+        label: containerLabel ? `${containerLabel} · ${title}` : title,
+      });
+    }
+
+    if (!addableEntryArrayKeys.has(arrayKey) && Array.isArray(valueAtPath(currentData, arrayPath))) {
+      addableEntryArrayKeys.add(arrayKey);
+      addableEntryArrays.push({ key: arrayKey, path: arrayPath, label: containerLabel });
+    }
+  }
+
+  function addMediaEntry(arrayPath: readonly (string | number)[]) {
+    const current = valueAtPath(currentData, arrayPath);
+    if (!Array.isArray(current)) return;
+    const next = blankItem(arrayPath, templateFor(arrayPath));
+    if (next === undefined) return;
+    updateValue(arrayPath, [...current, next]);
+    setMediaEntryFilter(JSON.stringify([...arrayPath, current.length]));
+  }
+
+  const scopedAssetGroups =
+    mediaEntryFilter === "all"
+      ? assetGroups
+      : assetGroups
+          .map((group) => ({
+            ...group,
+            fields: group.fields.filter(
+              (field) => JSON.stringify(field.path.slice(0, -1)) === mediaEntryFilter,
+            ),
+          }))
+          .filter((group) => group.fields.length > 0);
 
   return (
     <section
@@ -1737,6 +1890,13 @@ export function SectionEditor({
               data={previewData}
               contactData={contactData}
               settingsData={settingsData}
+              onWorkProjectSelect={(laneLabel, projectId) => {
+                const path = findWorkProjectPath(currentData, laneLabel, projectId);
+                if (!path) return;
+                setActivePath(path);
+                setFocusKey(null);
+                setInspectorTab("content");
+              }}
             />
           </div>
         </section>
@@ -1779,7 +1939,38 @@ export function SectionEditor({
                 they accept; video links are YouTube addresses you paste. Nothing reaches the live
                 site until you save and publish.
               </p>
-              {assetGroups.map((group) => (
+              {mediaEntries.length > 1 || addableEntryArrays.length > 0 ? (
+                <div className="studio-media-toolbar">
+                  {mediaEntries.length > 1 ? (
+                    <label className="studio-media-toolbar__filter">
+                      <span>Show</span>
+                      <select
+                        value={mediaEntryFilter}
+                        onChange={(event) => setMediaEntryFilter(event.target.value)}
+                      >
+                        <option value="all">Everything ({assetCount})</option>
+                        {mediaEntries.map((entry) => (
+                          <option key={entry.key} value={entry.key}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+                  {addableEntryArrays.map((entry) => (
+                    <button
+                      key={entry.key}
+                      type="button"
+                      className="studio-ins-add studio-ins-add--compact"
+                      onClick={() => addMediaEntry(entry.path)}
+                    >
+                      <span aria-hidden="true">+</span> Add {itemNounFor(entry.path).toLowerCase()}
+                      {entry.label ? ` to ${entry.label}` : ""}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {scopedAssetGroups.map((group) => (
                 <section className="studio-media-group" key={group.key}>
                   <h3>
                     <span className={`studio-media-badge studio-media-badge--${group.kind}`}>
@@ -1808,6 +1999,7 @@ export function SectionEditor({
                         onChange={updateValue}
                         uploadEnabled={uploadEnabled}
                         showBreadcrumb
+                        parent={parentOf(path)}
                       />
                     ),
                   )}

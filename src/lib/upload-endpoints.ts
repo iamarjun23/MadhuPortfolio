@@ -1,8 +1,8 @@
-/* The slots an upload can land in. The name is part of the stored address
-   (`/api/media/<endpoint>/<id>`), so this list is what both the upload route and
-   the schema that validates those addresses read from - a slot added in one
-   place and forgotten in the other used to mean an upload that could never be
-   saved back. Kept free of Prisma imports so a client bundle can name a slot
+/* The slots an upload can land in. The name is part of the object key
+   (`<endpoint>/<id>`), so this list is what both the upload actions and the
+   media-usage sweep that finds those keys read from - a slot added in one place
+   and forgotten in the other would mean a file the sweep deletes while it is
+   still in use. Kept free of Prisma imports so a client bundle can name a slot
    without dragging the database client along. */
 export const uploadEndpointNames = [
   "heroVideo",

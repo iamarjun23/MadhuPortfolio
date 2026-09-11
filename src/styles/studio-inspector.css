@@ -663,6 +663,40 @@
   gap: 1rem;
 }
 
+.studio-media-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.studio-media-toolbar__filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--d-text2);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.studio-media-toolbar__filter select {
+  min-height: 40px;
+  padding: 0 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--d-text);
+  font-family: var(--f-body);
+  font-size: 0.82rem;
+}
+
+.studio-ins-add--compact {
+  min-height: 40px;
+  padding: 0 0.85rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+
 /* Save bar sits flush at the foot of the panel ---------------------------- */
 
 .studio-ins .studio-save-bar {

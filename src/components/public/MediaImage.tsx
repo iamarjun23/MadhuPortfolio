@@ -20,14 +20,13 @@ type MediaImageProps = Readonly<{
   unoptimized?: boolean;
 }>;
 
-// next/image's optimizer cannot read an uploaded photo. On Workers, OpenNext resolves a
-// same-origin `url=` through the ASSETS binding, which only serves the build's static
-// files - our media lives in R2 behind the `/api/media/[...key]` route, so the lookup
-// misses and `/_next/image` answers 404 ("upstream response is invalid"), leaving every
-// uploaded photo broken. The route already serves the stored file with an immutable
-// year-long cache lifetime, so going direct costs nothing but the optimizer's resizing.
+// Uploaded photos are served straight from R2's custom domain, off the Worker entirely.
+// Sending them through next/image's optimizer would put every resize back on the Worker's
+// CPU budget, and the objects already carry an immutable year-long cache lifetime. A
+// not-yet-rewritten `/api/media/` path reaches the same file through the redirect in next.config.
 function isUploadedMediaSrc(url: string) {
-  return url.startsWith("/api/media/");
+  const mediaUrl = process.env.NEXT_PUBLIC_MEDIA_URL;
+  return url.startsWith("/api/media/") || (Boolean(mediaUrl) && url.startsWith(`${mediaUrl}/`));
 }
 
 export function MediaImage({

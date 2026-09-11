@@ -575,10 +575,19 @@ const fieldRules: readonly FieldRule[] = [
     doc: { label: "Show tape", hint: "Draws a strip of tape across the corner of this photo." },
   },
   {
-    key: "tile",
+    key: "width",
+    within: ["slots"],
     doc: {
-      label: "Wall position",
-      hint: "Which spot on the photo wall this fills, a through h. Each letter is a different size and tilt.",
+      label: "Width on the wall",
+      hint: "How many of the wall's 12 columns this photo spans. Bigger number, bigger photo.",
+    },
+  },
+  {
+    key: "height",
+    within: ["slots"],
+    doc: {
+      label: "Height on the wall",
+      hint: "How many rows tall this photo sits. Bigger number, taller photo.",
     },
   },
   { key: "lightboxCloseLabel", doc: { label: '"Close" button text' } },

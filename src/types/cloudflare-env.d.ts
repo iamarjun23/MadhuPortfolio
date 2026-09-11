@@ -9,6 +9,5 @@ export {};
 declare global {
   interface CloudflareEnv {
     HYPERDRIVE: Hyperdrive;
-    MEDIA_BUCKET: R2Bucket;
   }
 }

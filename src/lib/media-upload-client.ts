@@ -1,16 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createUpload, finishUpload } from "@/actions/media";
+import type { MediaUploadResult } from "@/actions/media-types";
 import { useStudioStore } from "@/stores/studio-store";
 import type { UploadEndpoint } from "@/lib/media-upload";
-
-export type MediaUploadResult = Readonly<{
-  id: string;
-  url: string;
-  key: string;
-  width: number | null;
-  height: number | null;
-}>;
 
 /* A hung socket never fires load or error, so without this the studio-wide lock
    would stay held for the rest of the session and every other control would sit
@@ -18,6 +12,37 @@ export type MediaUploadResult = Readonly<{
    it is a floor under a dead connection, not a speed requirement - a 64MB video
    has to survive a slow line. */
 const UPLOAD_TIMEOUT_MS = 30 * 60 * 1000;
+
+/* Stored on the object and served back by R2's custom domain. Keys are random
+   and never reused for different content, so a year-long immutable lifetime is safe. */
+const CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+// XHR rather than fetch: fetch still reports no upload progress.
+function putFile(
+  xhr: XMLHttpRequest,
+  uploadUrl: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+) {
+  return new Promise<void>((resolve, reject) => {
+    xhr.timeout = UPLOAD_TIMEOUT_MS;
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", file.type);
+    xhr.setRequestHeader("Cache-Control", CACHE_CONTROL);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error("Upload failed."));
+    xhr.onerror = () => reject(new Error("Upload failed."));
+    xhr.ontimeout = () =>
+      reject(new Error("The upload timed out. Check your connection and try again."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+
+    xhr.send(file);
+  });
+}
 
 export function useMediaUpload(endpoint: UploadEndpoint, label: string) {
   const [isUploading, setIsUploading] = useState(false);
@@ -43,73 +68,43 @@ export function useMediaUpload(endpoint: UploadEndpoint, label: string) {
     () => () => {
       request.current?.abort();
       if (token.current !== null) useStudioStore.getState().endUpload(token.current);
+      token.current = null;
     },
     [],
   );
 
   const startUpload = useCallback(
-    (file: File, onProgress?: (percent: number) => void) =>
-      new Promise<MediaUploadResult>((resolve, reject) => {
-        const acquired = useStudioStore.getState().beginUpload(label);
-        if (acquired === null) {
-          const holder = useStudioStore.getState().activeUpload?.label;
-          reject(
-            new Error(
-              holder
-                ? `${holder} is still uploading. Wait for it to finish, then try again.`
-                : "Another upload is already running.",
-            ),
-          );
-          return;
-        }
+    async (file: File, onProgress?: (percent: number) => void): Promise<MediaUploadResult> => {
+      const acquired = useStudioStore.getState().beginUpload(label);
+      if (acquired === null) {
+        const holder = useStudioStore.getState().activeUpload?.label;
+        throw new Error(
+          holder
+            ? `${holder} is still uploading. Wait for it to finish, then try again.`
+            : "Another upload is already running.",
+        );
+      }
 
-        token.current = acquired;
-        setIsUploading(true);
+      token.current = acquired;
+      setIsUploading(true);
+
+      try {
+        const upload = await createUpload(endpoint, file.type, file.size);
+        if (!upload.ok) throw new Error(upload.error);
+        // Unmounted while the URL was being signed: nobody is left to use the file.
+        if (token.current !== acquired) throw new Error("Upload cancelled.");
+
         const xhr = new XMLHttpRequest();
         request.current = xhr;
-        xhr.timeout = UPLOAD_TIMEOUT_MS;
-        xhr.open("POST", `/api/upload/${endpoint}`);
-        xhr.setRequestHeader("Content-Type", file.type);
+        await putFile(xhr, upload.uploadUrl, file, onProgress);
 
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 100));
-        };
-
-        xhr.onload = () => {
-          release();
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              resolve(JSON.parse(xhr.responseText) as MediaUploadResult);
-            } catch {
-              reject(new Error("Could not parse the upload response."));
-            }
-            return;
-          }
-          try {
-            const body = JSON.parse(xhr.responseText) as { error?: string };
-            reject(new Error(body.error ?? "Upload failed."));
-          } catch {
-            reject(new Error("Upload failed."));
-          }
-        };
-
-        xhr.onerror = () => {
-          release();
-          reject(new Error("Upload failed."));
-        };
-
-        xhr.ontimeout = () => {
-          release();
-          reject(new Error("The upload timed out. Check your connection and try again."));
-        };
-
-        xhr.onabort = () => {
-          release();
-          reject(new Error("Upload cancelled."));
-        };
-
-        xhr.send(file);
-      }),
+        const finished = await finishUpload(upload.key);
+        if (!finished.ok) throw new Error(finished.error);
+        return finished.media;
+      } finally {
+        release();
+      }
+    },
     [endpoint, label, release],
   );
 

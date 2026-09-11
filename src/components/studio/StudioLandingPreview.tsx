@@ -32,6 +32,7 @@ type StudioLandingPreviewProps = Readonly<{
   data: unknown;
   contactData: unknown;
   settingsData: unknown;
+  onWorkProjectSelect?: (laneLabel: string, projectId: string) => void;
 }>;
 
 /* The Studio page renders the photo wall from the Photobooth section, which this
@@ -52,6 +53,7 @@ export function StudioLandingPreview({
   data,
   contactData,
   settingsData,
+  onWorkProjectSelect,
 }: StudioLandingPreviewProps) {
   /* The stand-in photo is a site-wide setting, so the preview reads it from
      there rather than from the section being edited - the same way the page
@@ -83,7 +85,12 @@ export function StudioLandingPreview({
       const parsed = WorkSchema.safeParse(data);
       const contact = ContactSchema.safeParse(contactData);
       return parsed.success && contact.success ? (
-        <WorkConsole data={parsed.data} contactEmail={contact.data.email} />
+        <WorkConsole
+          data={parsed.data}
+          contactEmail={contact.data.email}
+          interactive={false}
+          onSelectProject={onWorkProjectSelect}
+        />
       ) : (
         <PreviewUnavailable />
       );

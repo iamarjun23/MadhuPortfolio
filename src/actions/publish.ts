@@ -5,7 +5,7 @@ import { Prisma, Status } from "@/generated/prisma/client";
 import { requireOwner } from "@/auth";
 import { sectionDefaults } from "@/lib/content";
 import { getDb } from "@/lib/db";
-import { updateContent } from "@/lib/revalidate";
+import { publicPaths, refreshLiveSite, updateContent } from "@/lib/revalidate";
 import { sectionKeys } from "@/lib/sections";
 import type { PublishResult, RevertResult } from "@/actions/publish-types";
 
@@ -34,9 +34,7 @@ function toSectionInputJson(value: unknown): Prisma.InputJsonObject {
 
 function revalidatePublishedContent() {
   for (const key of sectionKeys) updateContent(key);
-  revalidatePath("/", "layout");
-  revalidatePath("/room", "layout");
-  revalidatePath("/process", "layout");
+  for (const path of publicPaths) revalidatePath(path, "layout");
   revalidatePath("/studio", "layout");
 }
 
@@ -81,6 +79,10 @@ export async function publishAll(): Promise<PublishResult> {
     });
 
     revalidatePublishedContent();
+    // Reverting only rewrites drafts, so publishing is the one action the live site has to hear about.
+    if (!(await refreshLiveSite())) {
+      return { ok: false, error: "Published, but the live site did not refresh. Publish again to retry." };
+    }
     return { ok: true, publishedSections };
   } catch {
     return { ok: false, error: "Could not publish the site. Please try again." };

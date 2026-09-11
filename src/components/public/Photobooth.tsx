@@ -86,11 +86,29 @@ export function Photobooth({
           {slots.map((item, index) => (
             <button
               key={item.id}
-              className={`booth__item booth__item--${item.tile}`}
+              className="booth__item"
               type="button"
+              style={
+                {
+                  "--tile-w": item.width,
+                  "--tile-h": item.height,
+                } as React.CSSProperties
+              }
               onClick={(event) => openLightbox(index, event.currentTarget)}
+              /* Pressing on the photo would otherwise start the browser's own image
+                 drag, which cancels the click and leaves the lightbox never opening -
+                 the same fix the work board needed for its thumbnails. */
+              onDragStart={(event) => event.preventDefault()}
             >
-              <span className="booth__image">
+              <span
+                className="booth__image"
+                style={
+                  {
+                    "--focal-x": `${item.focalX * 100}%`,
+                    "--focal-y": `${item.focalY * 100}%`,
+                  } as React.CSSProperties
+                }
+              >
                 <MediaImage
                   src={item.image.url}
                   alt={item.image.alt}

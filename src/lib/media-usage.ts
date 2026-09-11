@@ -1,42 +1,31 @@
 import { getDb } from "@/lib/db";
 import { studioSectionLabels } from "@/lib/studio-nav";
+import { uploadEndpointNames } from "@/lib/upload-endpoints";
 import { Status } from "@/generated/prisma/client";
 
-/* Nothing joins an upload to the section using it: media rows carry a URL and
+/* Nothing joins an upload to the section using it: media rows carry a key and
    sections carry free-form JSON, with no foreign key between them. Working out
    whether a file is still in use therefore means reading the stored JSON and
-   collecting the addresses out of it, which is what everything here is for. */
+   collecting the uploads out of it, which is what everything here is for. */
 
-const UPLOADED_PREFIX = "/api/media/";
+/* An upload is recognised by its object key (`<endpoint>/<uuid>`) wherever it
+   appears in a string, not by the address around it: the media domain's URL, a
+   hand-typed variant and a pre-migration `/api/media/...` path all name the same
+   file. Keying on a URL prefix instead would make every file look unused - and
+   swept - the moment that prefix changed or was unset. */
+const uploadedKey = new RegExp(`(?:${uploadEndpointNames.join("|")})/[0-9a-f-]{36}`, "g");
 
-/* Uploads are stored as the site-relative `/api/media/...` path, which is what
-   the studio writes and what the media row records. A field can still be typed
-   by hand, though, and the schema accepts a complete https address - so the same
-   file written as `https://the-site/api/media/...` has to be recognised too, or
-   the sweep would read it as unreferenced and delete a file the site is using. */
-function toUploadedPath(value: string) {
-  if (value.startsWith(UPLOADED_PREFIX)) return value;
-  if (!value.includes(UPLOADED_PREFIX)) return undefined;
-  try {
-    const { pathname } = new URL(value);
-    return pathname.startsWith(UPLOADED_PREFIX) ? pathname : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function collectUploadedUrls(value: unknown, into: Set<string>) {
+function collectUploadedKeys(value: unknown, into: Set<string>) {
   if (typeof value === "string") {
-    const path = toUploadedPath(value);
-    if (path) into.add(path);
+    for (const match of value.matchAll(uploadedKey)) into.add(match[0]);
     return;
   }
   if (Array.isArray(value)) {
-    for (const entry of value) collectUploadedUrls(entry, into);
+    for (const entry of value) collectUploadedKeys(entry, into);
     return;
   }
   if (value !== null && typeof value === "object") {
-    for (const entry of Object.values(value)) collectUploadedUrls(entry, into);
+    for (const entry of Object.values(value)) collectUploadedKeys(entry, into);
   }
 }
 
@@ -45,7 +34,7 @@ function placeLabel(key: string, status: Status) {
   return status === Status.PUBLISHED ? `${label} (live)` : label;
 }
 
-/* Every uploaded address any section still points at, mapped to the places that
+/* Every upload key any section still points at, mapped to the places that
    point at it. Drafts and the published rows are both read: a file the live site
    is serving must not be removable just because the draft no longer uses it. */
 export async function getMediaUsage(): Promise<Map<string, string[]>> {
@@ -55,30 +44,30 @@ export async function getMediaUsage(): Promise<Map<string, string[]>> {
   const usage = new Map<string, string[]>();
 
   for (const section of sections) {
-    const urls = new Set<string>();
-    collectUploadedUrls(section.data, urls);
-    for (const url of urls) {
-      const places = usage.get(url) ?? [];
+    const keys = new Set<string>();
+    collectUploadedKeys(section.data, keys);
+    for (const mediaKey of keys) {
+      const places = usage.get(mediaKey) ?? [];
       places.push(placeLabel(section.key, section.status));
-      usage.set(url, places);
+      usage.set(mediaKey, places);
     }
   }
 
   return usage;
 }
 
-/* Same lookup as getMediaUsage, narrowed to one URL: a `LIKE` filter at the database
-   lets Postgres skip sections whose JSON text can't contain the address at all, instead
+/* Same lookup as getMediaUsage, narrowed to one upload: a `LIKE` filter at the database
+   lets Postgres skip sections whose JSON text can't contain the key at all, instead
    of pulling and deep-walking every section's JSON just to check one file. */
-export async function getMediaUsageForUrl(url: string): Promise<string[]> {
+export async function getMediaUsageForKey(mediaKey: string): Promise<string[]> {
   const sections = await getDb().$queryRaw<{ key: string; status: Status; data: unknown }[]>`
-    SELECT key, status, data FROM "Section" WHERE data::text LIKE ${`%${url}%`}
+    SELECT key, status, data FROM "Section" WHERE data::text LIKE ${`%${mediaKey}%`}
   `;
   const places: string[] = [];
   for (const section of sections) {
-    const urls = new Set<string>();
-    collectUploadedUrls(section.data, urls);
-    if (urls.has(url)) places.push(placeLabel(section.key, section.status));
+    const keys = new Set<string>();
+    collectUploadedKeys(section.data, keys);
+    if (keys.has(mediaKey)) places.push(placeLabel(section.key, section.status));
   }
   return places;
 }

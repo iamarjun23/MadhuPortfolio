@@ -1,16 +1,136 @@
 "use server";
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { randomUUID } from "node:crypto";
 import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
-import { describePlaces, getMediaUsage, getMediaUsageForUrl } from "@/lib/media-usage";
-import type { DeleteMediaResult, PurgeMediaResult, UnusedMediaResult } from "@/actions/media-types";
+import {
+  deleteObject,
+  headObject,
+  isMediaUploadConfigured,
+  mediaPublicUrl,
+  signUpload,
+} from "@/lib/media-config";
+import {
+  type UploadEndpoint,
+  isAllowedMimeType,
+  isUploadEndpoint,
+  normalizeMimeType,
+  uploadEndpoints,
+} from "@/lib/media-upload";
+import { describePlaces, getMediaUsage, getMediaUsageForKey } from "@/lib/media-usage";
+import type {
+  CreateUploadResult,
+  DeleteMediaResult,
+  FinishUploadResult,
+  PurgeMediaResult,
+  UnusedMediaResult,
+} from "@/actions/media-types";
 
 /* An upload only reaches a section when the draft holding it is saved, so a file
    that has just been added is legitimately unreferenced for as long as the editor
    sits open. Sweeping those away would delete the file out from under whoever is
    still working on it, so only uploads old enough to have been abandoned count. */
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+
+const uploadKeyPattern = /^([A-Za-z]+)\/[0-9a-f-]{36}$/;
+
+function describeLimits(endpoint: UploadEndpoint) {
+  const { accept, maxBytes } = uploadEndpoints[endpoint];
+  const kinds =
+    accept === "image/" ? "a JPEG, PNG, WebP, AVIF or GIF image" : "an MP4, WebM or MOV video";
+  return `Choose ${kinds} under ${Math.round(maxBytes / (1024 * 1024))}MB.`;
+}
+
+async function discard(key: string) {
+  try {
+    await deleteObject(key);
+  } catch (error) {
+    console.error(`Could not remove the orphaned upload ${key}`, error);
+  }
+}
+
+/* Vercel refuses a function request body over 4.5MB, so a file never passes
+   through the studio: the browser PUTs it straight to R2 through the URL signed
+   here, then calls `finishUpload`. The type and size checked now are only the
+   browser's word, which is why `finishUpload` checks them again against what was
+   actually stored. */
+export async function createUpload(
+  endpoint: string,
+  contentType: string,
+  bytes: number,
+): Promise<CreateUploadResult> {
+  try {
+    await requireOwner();
+    if (!isUploadEndpoint(endpoint)) return { ok: false, error: "Unknown upload slot." };
+
+    const config = uploadEndpoints[endpoint];
+    if (
+      !isAllowedMimeType(contentType, config.accept) ||
+      !Number.isSafeInteger(bytes) ||
+      bytes <= 0 ||
+      bytes > config.maxBytes
+    ) {
+      return { ok: false, error: describeLimits(endpoint) };
+    }
+    if (!isMediaUploadConfigured()) return { ok: false, error: "Uploads are not configured." };
+
+    const key = `${endpoint}/${randomUUID()}`;
+    return { ok: true, key, uploadUrl: await signUpload(key) };
+  } catch {
+    return { ok: false, error: "Could not start the upload. Please try again." };
+  }
+}
+
+// ponytail: an upload abandoned between its PUT and this call leaves an R2 object with no media row,
+// which the unused-media sweep cannot see. Add an R2 lifecycle rule or a bucket listing if it adds up.
+export async function finishUpload(key: string): Promise<FinishUploadResult> {
+  /* Checked on its own, before anything else: every failure below deletes the
+     object, and only the owner may cause that. */
+  try {
+    await requireOwner();
+  } catch {
+    return { ok: false, error: "Unauthorised" };
+  }
+
+  const endpoint = uploadKeyPattern.exec(key)?.[1];
+  if (!endpoint || !isUploadEndpoint(endpoint)) return { ok: false, error: "Unknown upload." };
+  const config = uploadEndpoints[endpoint];
+
+  try {
+    const stored = await headObject(key);
+    if (!stored.ok) return { ok: false, error: "The file did not reach storage. Please try again." };
+
+    const bytes = Number(stored.headers.get("content-length"));
+    const mime = normalizeMimeType(stored.headers.get("content-type") ?? "");
+    if (
+      !isAllowedMimeType(mime, config.accept) ||
+      !Number.isSafeInteger(bytes) ||
+      bytes <= 0 ||
+      bytes > config.maxBytes
+    ) {
+      await discard(key);
+      return { ok: false, error: describeLimits(endpoint) };
+    }
+
+    const media = await getDb().media.create({
+      data: { key, url: mediaPublicUrl(key), kind: config.kind, bytes, mime },
+    });
+    return {
+      ok: true,
+      media: {
+        id: media.id,
+        url: media.url,
+        key: media.key,
+        width: media.width,
+        height: media.height,
+      },
+    };
+  } catch (error) {
+    console.error(`Recording the upload ${key} failed`, error);
+    await discard(key);
+    return { ok: false, error: "Could not record the upload." };
+  }
+}
 
 export async function deleteMedia(mediaId: string): Promise<DeleteMediaResult> {
   try {
@@ -22,18 +142,17 @@ export async function deleteMedia(mediaId: string): Promise<DeleteMediaResult> {
     /* Deleting a file a section still points at leaves a broken image behind -
        on the live site, if the published row is one of the places using it. The
        reference has to be cleared in the editor first. */
-    const places = await getMediaUsageForUrl(media.url);
-    if (places && places.length > 0) {
+    const places = await getMediaUsageForKey(media.key);
+    if (places.length > 0) {
       return {
         ok: false,
         error: `Still used by ${describePlaces(places)}. Remove it there first, then delete the file.`,
       };
     }
 
-    const { env } = await getCloudflareContext({ async: true });
-    if (!env.MEDIA_BUCKET) return { ok: false, error: "Uploads are not configured." };
+    if (!isMediaUploadConfigured()) return { ok: false, error: "Uploads are not configured." };
 
-    await env.MEDIA_BUCKET.delete(media.key);
+    await deleteObject(media.key);
     await getDb().media.delete({ where: { id: media.id } });
     return { ok: true };
   } catch {
@@ -45,9 +164,9 @@ async function findOrphans() {
   const usage = await getMediaUsage();
   const candidates = await getDb().media.findMany({
     where: { createdAt: { lt: new Date(Date.now() - ORPHAN_GRACE_MS) } },
-    select: { id: true, key: true, url: true, bytes: true },
+    select: { id: true, key: true, bytes: true },
   });
-  return candidates.filter((media) => !usage.has(media.url));
+  return candidates.filter((media) => !usage.has(media.key));
 }
 
 /* Uploads that were made and then abandoned - the draft was never saved, or the
@@ -72,8 +191,7 @@ export async function getUnusedMedia(): Promise<UnusedMediaResult> {
 export async function purgeUnusedMedia(): Promise<PurgeMediaResult> {
   try {
     await requireOwner();
-    const { env } = await getCloudflareContext({ async: true });
-    if (!env.MEDIA_BUCKET) return { ok: false, error: "Uploads are not configured." };
+    if (!isMediaUploadConfigured()) return { ok: false, error: "Uploads are not configured." };
 
     const orphans = await findOrphans();
     let deleted = 0;
@@ -81,7 +199,7 @@ export async function purgeUnusedMedia(): Promise<PurgeMediaResult> {
 
     for (const media of orphans) {
       try {
-        await env.MEDIA_BUCKET.delete(media.key);
+        await deleteObject(media.key);
         await getDb().media.delete({ where: { id: media.id } });
         deleted += 1;
       } catch (error) {

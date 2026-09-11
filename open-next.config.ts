@@ -17,9 +17,16 @@ export default defineCloudflareConfig({
   incrementalCache: withRegionalCache(r2IncrementalCache, { mode: "long-lived" }),
   tagCache: doShardedTagCache({ baseShardSize: 4, regionalCache: true }),
   queue: doQueue,
-  // The Worker lazily `import()`s the Next server and every route module the first time an isolate
-  // handles a request, and that evaluation is billed to whichever request triggers it — which is
-  // where the 0.3-1s CPU spikes in the analytics come from. Preloading the routes in `waitUntil`
-  // moves that work off the critical path so only the isolate's first response carries it.
-  routePreloadingBehavior: "withWaitUntil",
+  // Serve a cached page from the Worker's own routing layer instead of booting the Next server to
+  // do it. That server boot is the single biggest slice of per-request CPU here, and a cache hit
+  // does not need it. Flagged "dangerous" upstream because the interception happens before Next's
+  // own resolution, so a route relying on PPR or on middleware rewriting into a cached path would
+  // be served the pre-rewrite entry — nothing this app does. Every cacheable route here is a plain
+  // prerendered page.
+  enableCacheInterception: true,
+  // NOTE: `routePreloadingBehavior: "withWaitUntil"` was set here and has been removed. Preloading
+  // evaluates every route module in `waitUntil`, and that CPU is still billed to the invocation
+  // that scheduled it. Against a 10ms budget that turns a cheap request into a killed one — the
+  // error rate went up, not down, on the version that shipped it. Only worth revisiting on a plan
+  // where the per-invocation CPU ceiling is seconds rather than milliseconds.
 });

@@ -1,3 +1,6 @@
+// Uploads are served from R2's custom domain (e.g. https://media.nmadhukumar.com), no trailing slash.
+const mediaUrl = process.env.NEXT_PUBLIC_MEDIA_URL ?? "";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -27,12 +30,13 @@ const nextConfig = {
       "frame-ancestors 'self'",
       scriptSrc,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://madhu.edit https://images.pexels.com https://i.ytimg.com",
-      "media-src 'self' blob: https://videos.pexels.com",
+      `img-src 'self' data: blob: https://madhu.edit https://images.pexels.com https://i.ytimg.com ${mediaUrl}`,
+      `media-src 'self' blob: https://videos.pexels.com ${mediaUrl}`,
       // A reel card plays a YouTube video, an Instagram reel or a LinkedIn post
       // in place, on both the work board and the Drawing Room pinboard.
       "frame-src 'self' https://www.youtube-nocookie.com https://www.linkedin.com https://www.instagram.com",
-      "connect-src 'self' https://cloudflareinsights.com",
+      // The studio PUTs uploads straight to R2 through a signed URL (actions/media.ts).
+      "connect-src 'self' https://cloudflareinsights.com https://*.r2.cloudflarestorage.com",
     ].join("; ");
 
     return [
@@ -47,7 +51,25 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    return [{ source: "/admin/:path*", destination: "/studio/:path*", permanent: false }];
+    const redirects = [{ source: "/admin/:path*", destination: "/studio/:path*", permanent: false }];
+
+    // Old `/api/media/<key>` links (share previews scrapers cached, pages not yet revalidated) now
+    // live on R2's custom domain.
+    if (mediaUrl) {
+      redirects.push({ source: "/api/media/:key*", destination: `${mediaUrl}/:key*`, permanent: true });
+    }
+
+    // The Worker serves only the public site; the studio and its sign-in run on Vercel, which
+    // sets VERCEL during its own build - so the studio deployment can never redirect to itself.
+    // OpenNext answers these from its routing layer, without booting the Next server.
+    const studioUrl = process.env.VERCEL ? undefined : process.env.STUDIO_URL;
+    if (studioUrl) {
+      for (const source of ["/studio/:path*", "/login", "/api/auth/:path*"]) {
+        redirects.push({ source, destination: `${studioUrl}${source}`, permanent: false });
+      }
+    }
+
+    return redirects;
   },
 };
 

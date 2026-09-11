@@ -44,10 +44,13 @@ function resolveConnectionString() {
 
 function createClient() {
   return new PrismaClient({
-    // Worker requests cannot safely reuse a PostgreSQL connection pool. Limit
-    // each client to the request that created it, then let pg retire the
-    // connection after its first use.
-    adapter: new PrismaPg({ connectionString: resolveConnectionString(), maxUses: 1 }),
+    // Hyperdrive is the pool. It holds the real PostgreSQL connections on Cloudflare's side and
+    // hands the Worker a proxied one, so retiring the client's connection after a single use
+    // (`maxUses: 1`, which this used to set) bought no safety and cost a TLS handshake on every
+    // query — CPU billed against a per-invocation budget measured in milliseconds. The client
+    // itself is still per-request: `getDb` is wrapped in React's `cache` below, so nothing here
+    // leaks across request contexts, which is the constraint the Workers runtime actually imposes.
+    adapter: new PrismaPg({ connectionString: resolveConnectionString() }),
   });
 }
 

@@ -145,7 +145,17 @@ function getBoardBounds(card: HTMLElement, rendered: CardOffset) {
 export function WorkConsole({
   data,
   contactEmail,
-}: Readonly<{ data: Work; contactEmail: string }>) {
+  interactive = true,
+  onSelectProject,
+}: Readonly<{
+  data: Work;
+  contactEmail: string;
+  interactive?: boolean;
+  /* Studio's admin preview is not interactive - a click there opens the
+     project's own editor instead of the video, so onSelectProject stands in
+     for setPreview. */
+  onSelectProject?: (laneLabel: string, projectId: string) => void;
+}>) {
   const [activeLane, setActiveLane] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
   const [cardOffsets, setCardOffsets] = useState<Record<string, CardOffset>>({});
@@ -267,6 +277,10 @@ export function WorkConsole({
     const state = drag.current;
     if (state?.moved) {
       state.moved = false;
+      return;
+    }
+    if (!interactive) {
+      onSelectProject?.(laneLabel, project.id);
       return;
     }
     setPreview({ project, laneLabel });
