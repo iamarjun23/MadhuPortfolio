@@ -5,6 +5,14 @@ generator client {
   compilerBuild = "small"
 }
 
+// Standalone scripts (seed, admin creation, one-off migrations) run via `tsx` outside any
+// Workers/workerd context, where the client above's cloudflare-targeted WASM loading fails
+// ("loaded wasm module was unexpectedly undefined"). This generator targets plain Node instead.
+generator clientNode {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma-node"
+}
+
 datasource db {
   provider = "postgresql"
 }

@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient, Status } from "../src/generated/prisma/client";
+import { Prisma, PrismaClient, Status } from "../src/generated/prisma-node/client";
 import { sectionKeys, type SectionKey } from "../src/lib/sections";
 import {
   AboutSchema,

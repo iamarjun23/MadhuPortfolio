@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaClient } from "../src/generated/prisma-node/client";
 
 /* One-off: points every upload stored as `/api/media/<key>` - or hand-typed as
    `https://<site>/api/media/<key>` - at R2's custom domain, in the media rows and
