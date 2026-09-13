@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { studioNavGroups, studioSectionLabels, type StudioBadgeCounts } from "@/lib/studio-nav";
+import { studioHome, studioNavGroups, studioSectionLabels, type StudioBadgeCounts } from "@/lib/studio-nav";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type RailProps = Readonly<{
@@ -13,7 +13,7 @@ type RailProps = Readonly<{
 }>;
 
 function isCurrentPath(pathname: string, href: string) {
-  return href === "/studio" ? pathname === href : pathname.startsWith(`${href}/`);
+  return href === studioHome ? pathname === href : pathname.startsWith(`${href}/`);
 }
 
 export function Rail({ badges, open, onClose }: RailProps) {
@@ -59,7 +59,7 @@ export function Rail({ badges, open, onClose }: RailProps) {
       <div className="studio-rail__brand">
         <Link
           className="studio-rail__home"
-          href="/studio"
+          href={studioHome}
           onClick={(event) => {
             if (uploadBlocked) {
               event.preventDefault();
@@ -68,7 +68,7 @@ export function Rail({ badges, open, onClose }: RailProps) {
             }
             if (dirtySection) {
               event.preventDefault();
-              setPendingHref("/studio");
+              setPendingHref(studioHome);
               return;
             }
             onClose();

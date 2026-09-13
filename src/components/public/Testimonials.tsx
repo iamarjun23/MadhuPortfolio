@@ -1,3 +1,4 @@
+import { realImage } from "@/lib/placeholders";
 import type { Praise } from "@/schemas";
 
 // Card width (incl. gap) used to size the marquee. Keep in sync with .testimonials figure in base.css.
@@ -22,19 +23,31 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
         </header>
         <div className="testimonials">
           <div className="testimonials__track" style={{ animationDuration: `${duration}s` }}>
-            {[...set, ...set].map((quote, i) => (
-              <figure className={quote.isSample ? "is-sample" : undefined} key={`${quote.id}-${i}`}>
-                <blockquote>{quote.quote}</blockquote>
-                <figcaption>
-                  <span>{quote.initials}</span>
-                  <div>
-                    <b>{quote.name}</b>
-                    <small>{quote.role}</small>
-                  </div>
-                  {quote.isSample ? <small>{data.sampleLabel}</small> : null}
-                </figcaption>
-              </figure>
-            ))}
+            {[...set, ...set].map((quote, i) => {
+              const image = realImage(quote.image);
+              return (
+                <figure
+                  className={quote.isSample ? "is-sample" : undefined}
+                  key={`${quote.id}-${i}`}
+                >
+                  <blockquote>{quote.quote}</blockquote>
+                  <figcaption>
+                    <span className="testimonials__avatar">
+                      {image ? (
+                        <img src={image.url} alt={image.alt} loading="lazy" />
+                      ) : (
+                        quote.initials
+                      )}
+                    </span>
+                    <div>
+                      <b>{quote.name}</b>
+                      <small>{quote.role}</small>
+                    </div>
+                    {quote.isSample ? <small>{data.sampleLabel}</small> : null}
+                  </figcaption>
+                </figure>
+              );
+            })}
           </div>
         </div>
       </div>

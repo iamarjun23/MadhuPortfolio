@@ -157,8 +157,6 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                   >
                     <span className="impact__worked-thumb" aria-hidden={!image}>
                       {image ? (
-                        // Plain <img>, not MediaImage: no width/height to force onto it, so
-                        // it keeps whatever aspect ratio the uploaded photo actually has.
                         <img src={image.url} alt={image.alt} loading="lazy" />
                       ) : (
                         <em>{initials(person.name)}</em>

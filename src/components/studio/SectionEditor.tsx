@@ -495,6 +495,21 @@ function FieldHint({
   );
 }
 
+/* Bounds for the handful of number fields that are spans on a fixed grid
+   (the photobooth wall is 12 columns by 4 rows) rather than free numbers -
+   kept in sync with the min/max in booth.ts so the input can't be dragged
+   outside what the layout actually supports. */
+function numberBoundsForPath(
+  path: readonly (string | number)[],
+): Readonly<{ min: number; max: number }> | undefined {
+  const key = String(path[path.length - 1] ?? "");
+  const arrayKey = path[path.length - 3];
+  if (arrayKey !== "slots") return undefined;
+  if (key === "width") return { min: 2, max: 12 };
+  if (key === "height") return { min: 1, max: 4 };
+  return undefined;
+}
+
 function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
   const key = String(path[path.length - 1] ?? "");
   const options = optionsForPath(path);
@@ -522,6 +537,7 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
   }
 
   if (typeof value === "number") {
+    const bounds = numberBoundsForPath(path);
     return (
       <label className="studio-field" htmlFor={id}>
         <span>{label}</span>
@@ -529,11 +545,16 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
           id={id}
           type="number"
           value={value}
-          step="any"
+          step={bounds ? 1 : "any"}
+          min={bounds?.min}
+          max={bounds?.max}
           aria-describedby={describedBy}
           onChange={(event) => onChange(path, Number(event.target.value))}
         />
-        <FieldHint id={hintId} hint={hint} />
+        <FieldHint
+          id={hintId}
+          hint={bounds ? `${hint ?? ""} (${bounds.min}–${bounds.max})`.trim() : hint}
+        />
       </label>
     );
   }
@@ -657,15 +678,17 @@ function getMediaConfig(
             ? "reelCover"
             : arrayKey === "worked"
               ? "collaboratorImage"
-              : "roomImage";
+              : arrayKey === "quotes"
+                ? "testimonialImage"
+                : "roomImage";
     return {
       endpoint,
       acceptsAlt: true,
       // A YouTube link brings its own still, so a cover here is a deliberate
       // override rather than something every project has to fill in. A
-      // collaborator portrait is the same kind of optional: the credit
-      // stands on its own until a real photo is uploaded.
-      isOptional: arrayKey === "projects" || arrayKey === "worked",
+      // collaborator portrait and a testimonial's face are the same kind of
+      // optional: the credit stands on its own until a real photo is uploaded.
+      isOptional: arrayKey === "projects" || arrayKey === "worked" || arrayKey === "quotes",
     };
   }
   return undefined;

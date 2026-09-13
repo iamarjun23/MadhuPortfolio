@@ -1447,14 +1447,16 @@ button {
   line-height: 1.2;
   overflow-wrap: break-word;
 }
-/* Photo-forward tile: the picture fills its own square so the grid reads
-   like a wall of portraits rather than a list of rows. Initials fill the
-   same square when there is no photo, so the grid stays even. */
+/* Photo-forward tile: every tile is the same square regardless of the
+   uploaded photo's own aspect ratio, so the grid stays even and doesn't
+   reflow when a tile is clicked open. Initials fill the same square when
+   there is no photo. */
 .impact__worked-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
+  aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
@@ -1464,15 +1466,11 @@ button {
     border-color 0.2s var(--e-cut),
     box-shadow 0.25s var(--e-reveal);
 }
-/* No photo yet: keep the tile square so the initials placeholder doesn't
-   leave the grid ragged. A real photo instead keeps its own aspect ratio. */
-.impact__worked-thumb:not(:has(img)) {
-  aspect-ratio: 1;
-}
 .impact__worked-thumb img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
   transition: transform 0.4s var(--e-reveal);
 }
 .impact__worked-thumb em {
@@ -2515,6 +2513,7 @@ button {
 }
 .testimonials figcaption > span {
   display: grid;
+  flex-shrink: 0;
   width: 36px;
   height: 36px;
   place-items: center;
@@ -2524,6 +2523,11 @@ button {
   font-family: var(--f-mono);
   font-size: 0.7rem;
   overflow: hidden;
+}
+.testimonials figcaption > span img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .testimonials b,
 .testimonials small {

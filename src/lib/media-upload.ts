@@ -23,6 +23,7 @@ export const uploadEndpoints: Record<UploadEndpoint, EndpointConfig> = {
   experienceImage: { kind: MediaKind.IMAGE, ...endpointLimits.experienceImage },
   roomImage: { kind: MediaKind.IMAGE, ...endpointLimits.roomImage },
   collaboratorImage: { kind: MediaKind.IMAGE, ...endpointLimits.collaboratorImage },
+  testimonialImage: { kind: MediaKind.IMAGE, ...endpointLimits.testimonialImage },
   // A reel uploaded to a work project or a pinboard card, rather than linked.
   reelVideo: { kind: MediaKind.VIDEO, ...endpointLimits.reelVideo },
   // The still shown on a reel card when its link brings none of its own.

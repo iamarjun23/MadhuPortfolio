@@ -2,16 +2,17 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { studioHome } from "@/lib/studio-nav";
 
 function getSafeRedirect(callbackUrl: string | null) {
-  if (!callbackUrl) return "/studio";
+  if (!callbackUrl) return studioHome;
 
   try {
     const target = new URL(callbackUrl, window.location.origin);
-    if (target.origin !== window.location.origin) return "/studio";
+    if (target.origin !== window.location.origin) return studioHome;
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {
-    return "/studio";
+    return studioHome;
   }
 }
 

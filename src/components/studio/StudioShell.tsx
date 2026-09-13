@@ -12,9 +12,10 @@ type StudioShellProps = Readonly<{
   children: React.ReactNode;
   initialTheme: ThemeName;
   shellData: StudioShellData;
+  publicSiteUrl: string;
 }>;
 
-export function StudioShell({ children, initialTheme, shellData }: StudioShellProps) {
+export function StudioShell({ children, initialTheme, shellData, publicSiteUrl }: StudioShellProps) {
   const [railOpen, setRailOpen] = useState(false);
   const setHasUnpublishedChanges = useStudioStore((state) => state.setHasUnpublishedChanges);
   const { blocked: uploadBlocked } = useUploadBlock();
@@ -37,7 +38,7 @@ export function StudioShell({ children, initialTheme, shellData }: StudioShellPr
     <div className="studio-shell">
       <Rail badges={shellData.badges} open={railOpen} onClose={() => setRailOpen(false)} />
       <div className="studio-shell__body">
-        <Topbar initialTheme={initialTheme} onMenu={() => setRailOpen(true)} />
+        <Topbar initialTheme={initialTheme} onMenu={() => setRailOpen(true)} publicSiteUrl={publicSiteUrl} />
         <main className="studio-main">{children}</main>
       </div>
       <button

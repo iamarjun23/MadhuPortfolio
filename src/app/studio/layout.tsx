@@ -16,7 +16,11 @@ export default async function StudioLayout({ children }: StudioLayoutProps) {
   const [cookieStore, shellData] = await Promise.all([cookies(), getStudioShellData()]);
 
   return (
-    <StudioShell initialTheme={getTheme(cookieStore.get("theme")?.value)} shellData={shellData}>
+    <StudioShell
+      initialTheme={getTheme(cookieStore.get("theme")?.value)}
+      shellData={shellData}
+      publicSiteUrl={process.env.PUBLIC_SITE_URL || "/"}
+    >
       {children}
     </StudioShell>
   );

@@ -1,9 +1,15 @@
 // Uploads are served from R2's custom domain (e.g. https://media.nmadhukumar.com), no trailing slash.
 const mediaUrl = process.env.NEXT_PUBLIC_MEDIA_URL ?? "";
 
+// On Vercel this deployment serves only the studio (see DEPLOYMENT.md): studio.<domain> has no
+// /studio segment, so every studio link and the middleware rewrite that backs it need to agree
+// on the same base path. Exposed to the browser bundle too, since Rail/LoginForm build hrefs client-side.
+const studioBase = process.env.VERCEL ? "" : "/studio";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  env: { NEXT_PUBLIC_STUDIO_BASE: studioBase },
   // `pg`'s Cloudflare Workers support (`pg-cloudflare`) uses a "workerd"-conditional export that
   // Next's file tracer resolves differently than OpenNext's later esbuild bundle pass, so the
   // tracer's default build only copies part of the package — leaving `dist/index.js` missing when
@@ -64,7 +70,9 @@ const nextConfig = {
     // OpenNext answers these from its routing layer, without booting the Next server.
     const studioUrl = process.env.VERCEL ? undefined : process.env.STUDIO_URL;
     if (studioUrl) {
-      for (const source of ["/studio/:path*", "/login", "/api/auth/:path*"]) {
+      // The studio host serves its own routes at the bare path (no /studio segment), so drop it here.
+      redirects.push({ source: "/studio/:path*", destination: `${studioUrl}/:path*`, permanent: false });
+      for (const source of ["/login", "/api/auth/:path*"]) {
         redirects.push({ source, destination: `${studioUrl}${source}`, permanent: false });
       }
     }

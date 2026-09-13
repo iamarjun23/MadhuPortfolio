@@ -1,5 +1,12 @@
 import type { SectionKey } from "@/lib/sections";
 
+// "" on the studio deployment (bare paths), "/studio" everywhere else — see next.config.mjs.
+export const STUDIO_BASE = process.env.NEXT_PUBLIC_STUDIO_BASE ?? "/studio";
+export const studioHome = STUDIO_BASE || "/";
+export function studioHref(path: string) {
+  return `${STUDIO_BASE}${path}`;
+}
+
 export type StudioBadgeCounts = Readonly<{
   work: number;
   booth: number;
@@ -27,50 +34,50 @@ type StudioNavGroup = Readonly<{
 export const studioNavGroups: readonly StudioNavGroup[] = [
   {
     label: "Overview",
-    items: [{ href: "/studio", label: "Dashboard", detail: "Page map" }],
+    items: [{ href: studioHome, label: "Dashboard", detail: "Page map" }],
   },
   {
     label: "Page content",
     items: [
-      { href: "/studio/hero", label: "Hero", detail: "Opening scene", section: "hero" },
-      { href: "/studio/about", label: "About", detail: "Story & portrait", section: "about" },
-      { href: "/studio/impact", label: "Impact", detail: "Metrics & people", section: "impact" },
+      { href: studioHref("/hero"), label: "Hero", detail: "Opening scene", section: "hero" },
+      { href: studioHref("/about"), label: "About", detail: "Story & portrait", section: "about" },
+      { href: studioHref("/impact"), label: "Impact", detail: "Metrics & people", section: "impact" },
       {
-        href: "/studio/work",
+        href: studioHref("/work"),
         label: "Work",
         detail: "Video projects",
         section: "work",
         badge: "work",
       },
       {
-        href: "/studio/booth",
+        href: studioHref("/booth"),
         label: "Photobooth",
         detail: "On-set moments",
         section: "booth",
         badge: "booth",
       },
       {
-        href: "/studio/praise",
+        href: studioHref("/praise"),
         label: "Praise",
         detail: "Testimonials",
         section: "praise",
         badge: "praise",
       },
       {
-        href: "/studio/experience",
+        href: studioHref("/experience"),
         label: "Experience",
         detail: "Career reel",
         section: "experience",
       },
       {
-        href: "/studio/process",
+        href: studioHref("/process"),
         label: "Studio Page",
         detail: "How I work & turnaround",
         section: "process",
       },
-      { href: "/studio/room", label: "Drawing Room", detail: "Off-clock world", section: "room" },
+      { href: studioHref("/room"), label: "Drawing Room", detail: "Off-clock world", section: "room" },
       {
-        href: "/studio/contact",
+        href: studioHref("/contact"),
         label: "Contact",
         detail: "Project invitation",
         section: "contact",
@@ -81,7 +88,7 @@ export const studioNavGroups: readonly StudioNavGroup[] = [
     label: "Shared site",
     items: [
       {
-        href: "/studio/settings",
+        href: studioHref("/settings"),
         label: "Site & Navigation",
         detail: "Brand, footer & SEO",
         section: "settings",

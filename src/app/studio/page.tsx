@@ -1,79 +1,80 @@
 import Link from "next/link";
 import { getStudioDashboardData } from "@/lib/studio";
+import { studioHref } from "@/lib/studio-nav";
 
 const sections = [
   {
-    href: "/studio/hero",
+    href: studioHref("/hero"),
     number: "01",
     label: "Hero",
     detail: "Headline, buttons and film-frame labels",
     media: "1 background video",
   },
   {
-    href: "/studio/about",
+    href: studioHref("/about"),
     number: "02",
     label: "About",
     detail: "Your story, current status and tools",
     media: "1 portrait photo + optional video",
   },
   {
-    href: "/studio/impact",
+    href: studioHref("/impact"),
     number: "03",
     label: "Impact",
     detail: "Numbers strip, collaborators and campaigns",
     media: "1 photo per collaborator",
   },
   {
-    href: "/studio/work",
+    href: studioHref("/work"),
     number: "04",
     label: "Work",
     detail: "Project cards grouped into filter categories",
     media: "YouTube link per project · no uploads at all",
   },
   {
-    href: "/studio/booth",
+    href: studioHref("/booth"),
     number: "05",
     label: "Photobooth",
     detail: "On-set photo wall and lightbox captions",
     media: "1 photo per slot",
   },
   {
-    href: "/studio/praise",
+    href: studioHref("/praise"),
     number: "06",
     label: "Praise",
     detail: "Testimonials and who said them",
     media: "Optional photo per person",
   },
   {
-    href: "/studio/experience",
+    href: studioHref("/experience"),
     number: "07",
     label: "Experience",
     detail: "One scene per role, with dates and location",
     media: "One scene photo per role",
   },
   {
-    href: "/studio/process",
+    href: studioHref("/process"),
     number: "08",
     label: "Studio Page",
     detail: "The /process page: five passes, turnaround and its SEO",
     media: "No uploads · the photo wall comes from Photobooth",
   },
   {
-    href: "/studio/room",
+    href: studioHref("/room"),
     number: "09",
     label: "Drawing Room",
     detail: "Pinboard of polaroids, notes and quotes",
     media: "1 photo per polaroid card",
   },
   {
-    href: "/studio/contact",
+    href: studioHref("/contact"),
     number: "10",
     label: "Contact",
     detail: "Invitation, contact details and social links",
     media: "No uploads",
   },
   {
-    href: "/studio/settings",
+    href: studioHref("/settings"),
     number: "11",
     label: "Site & Navigation",
     detail: "Brand wordmark, menu, footer, SEO and theme",
@@ -93,21 +94,21 @@ export default async function StudioPage() {
   const dashboard = await getStudioDashboardData();
   const readiness = [
     {
-      href: "/studio/work",
+      href: studioHref("/work"),
       label: "Selected work",
       detail:
         dashboard.workItems > 0 ? `${dashboard.workItems} videos ready` : "Add your first video",
       ready: dashboard.workItems > 0,
     },
     {
-      href: "/studio/booth",
+      href: studioHref("/booth"),
       label: "Photobooth",
       detail:
         dashboard.photos > 0 ? `${dashboard.photos} photographs ready` : "Add on-set photographs",
       ready: dashboard.photos > 0,
     },
     {
-      href: "/studio/praise",
+      href: studioHref("/praise"),
       label: "Praise",
       detail:
         dashboard.testimonials > 0
@@ -116,7 +117,7 @@ export default async function StudioPage() {
       ready: dashboard.testimonials > 0,
     },
     {
-      href: "/studio/settings",
+      href: studioHref("/settings"),
       label: "Site & navigation",
       detail: "Review menu, footer, SEO, and domain",
       ready: true,
@@ -135,12 +136,12 @@ export default async function StudioPage() {
           </p>
         </div>
         <div className="studio-dashboard__actions">
-          <Link className="studio-dashboard__site-link" href="/studio/work">
+          <Link className="studio-dashboard__site-link" href={studioHref("/work")}>
             Edit selected work <span aria-hidden="true">→</span>
           </Link>
-          <Link className="studio-dashboard__view-link" href="/" target="_blank">
+          <a className="studio-dashboard__view-link" href={process.env.PUBLIC_SITE_URL || "/"} target="_blank" rel="noreferrer">
             View live site <span aria-hidden="true">↗</span>
-          </Link>
+          </a>
         </div>
       </div>
 

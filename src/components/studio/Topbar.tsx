@@ -1,26 +1,27 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { publishAll } from "@/actions/publish";
 import { ThemeToggle, type ThemeName } from "@/components/public/ThemeToggle";
-import { studioSectionLabels } from "@/lib/studio-nav";
+import { STUDIO_BASE, studioSectionLabels } from "@/lib/studio-nav";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type TopbarProps = Readonly<{
   initialTheme: ThemeName;
   onMenu: () => void;
+  publicSiteUrl: string;
 }>;
 
 function getCrumb(pathname: string) {
-  const section = pathname.split("/")[2];
+  const relative = pathname.startsWith(STUDIO_BASE) ? pathname.slice(STUDIO_BASE.length) : pathname;
+  const section = relative.split("/")[1];
   return section && section in studioSectionLabels
     ? studioSectionLabels[section as keyof typeof studioSectionLabels]
     : "Dashboard";
 }
 
-export function Topbar({ initialTheme, onMenu }: TopbarProps) {
+export function Topbar({ initialTheme, onMenu, publicSiteUrl }: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const pushToast = useStudioStore((state) => state.pushToast);
@@ -108,9 +109,9 @@ export function Topbar({ initialTheme, onMenu }: TopbarProps) {
           </p>
         ) : null}
         <ThemeToggle initialTheme={initialTheme} />
-        <Link className="studio-view-site" href="/" target="_blank" rel="noreferrer">
+        <a className="studio-view-site" href={publicSiteUrl} target="_blank" rel="noreferrer">
           View site
-        </Link>
+        </a>
         <button
           className="button button--primary studio-publish"
           type="button"
