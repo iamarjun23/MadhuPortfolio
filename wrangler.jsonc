@@ -33,20 +33,17 @@
       "bucket_name": "madhuportfolio-cache",
     },
   ],
-  // The classes are already exported by `.open-next/worker.js`; these bindings are what make
-  // OpenNext's tag cache and ISR revalidation queue reachable at runtime.
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "NEXT_TAG_CACHE_DO_SHARDED",
-        "class_name": "DOShardedTagCache",
-      },
-      {
-        "name": "NEXT_CACHE_DO_QUEUE",
-        "class_name": "DOQueueHandler",
-      },
-    ],
-  },
+  // Backs OpenNext's tag cache (open-next.config.ts). `opennextjs-cloudflare deploy` creates the
+  // `revalidations` table in it.
+  "d1_databases": [
+    {
+      "binding": "NEXT_TAG_CACHE_D1",
+      "database_name": "madhuportfolio-tag-cache",
+      "database_id": "8b534561-88ed-4ac9-8519-35fcd4c1d00c",
+    },
+  ],
+  // The Durable Object tag cache/queue are no longer bound (they burned the free DO quota). The
+  // migration stays because Cloudflare already applied it; the classes are still exported by worker.js.
   "migrations": [
     {
       "tag": "v1",
