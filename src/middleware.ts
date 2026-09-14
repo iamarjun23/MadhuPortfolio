@@ -27,7 +27,12 @@ export default async function middleware(req: NextRequest) {
       : undefined;
   }
 
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
+  // Auth.js prefixes the session cookie with __Secure- over HTTPS; getToken assumes plain HTTP unless told.
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: nextUrl.protocol === "https:",
+  });
   if (!token) {
     const loginUrl = new URL("/login", nextUrl);
     loginUrl.searchParams.set("callbackUrl", externalPathname);
