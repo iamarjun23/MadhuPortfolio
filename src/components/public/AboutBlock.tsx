@@ -29,7 +29,8 @@ export function AboutBlock({
           // once the section is actually reached instead of competing with the
           // hero for bandwidth on first paint.
           videoRef.current?.play().catch(() => {});
-          observer.disconnect();
+        } else {
+          videoRef.current?.pause();
         }
       },
       { threshold: 0.25 },

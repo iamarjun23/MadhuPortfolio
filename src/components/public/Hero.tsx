@@ -19,8 +19,16 @@ export function Hero({ data }: HeroProps) {
 
   // The autoPlay attribute alone is unreliable under browser autoplay policies;
   // a muted play() call is permitted. Falls back to the poster if it still refuses.
+  // Paused once scrolled past so it stops decoding under the rest of the page.
   useEffect(() => {
-    videoRef.current?.play().catch(() => {});
+    const video = videoRef.current;
+    if (!video) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) video.play().catch(() => {});
+      else video.pause();
+    });
+    observer.observe(video);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {

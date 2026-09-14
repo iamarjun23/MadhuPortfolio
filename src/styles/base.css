@@ -2006,9 +2006,7 @@ button {
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 50%;
-  background: rgba(5, 5, 5, 0.42);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(5, 5, 5, 0.6);
   color: #fff;
   font-size: 0.62rem;
   opacity: 0;
@@ -2083,9 +2081,7 @@ button {
   place-content: center;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--r-sm);
-  background: rgba(5, 5, 5, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(5, 5, 5, 0.7);
   opacity: 0.5;
   cursor: grab;
   touch-action: none;
@@ -2389,7 +2385,6 @@ button {
   padding: 0.45rem 0.6rem;
   border-radius: 4px;
   background: rgba(6, 7, 12, 0.82);
-  backdrop-filter: blur(2px);
 }
 .booth__item b,
 .booth__item small {
@@ -6496,12 +6491,10 @@ button {
   from {
     opacity: 0;
     transform: scale(1.03);
-    filter: blur(4px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 @keyframes story-tilt {
@@ -6518,12 +6511,10 @@ button {
   from {
     opacity: 0;
     transform: scale(0.97);
-    filter: blur(6px) brightness(0.75);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 
@@ -6551,16 +6542,16 @@ button {
   }
 }
 
+/* No filter in any scroll-linked keyframes: blur can't be composited, so it
+   repainted whole sections and every image on each scrolled frame. */
 @keyframes media-in {
   from {
     opacity: 0;
     transform: scale(1.04);
-    filter: blur(6px);
   }
   to {
     opacity: 1;
     transform: none;
-    filter: none;
   }
 }
 
