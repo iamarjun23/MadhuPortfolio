@@ -56,4 +56,14 @@ function createClient() {
 
 // React's request cache shares one client between Server Components rendered
 // for the same request without retaining it in the Worker global scope.
-export const getDb = cache(createClient);
+const getRequestDb = cache(createClient);
+
+// Off Workers (Vercel, local) nothing forbids sharing I/O across requests, and a per-request
+// client there meant a fresh TCP + TLS handshake to Postgres on every studio click, plus a pool
+// that was never closed. One client per process keeps the connection warm.
+const globalForDb = globalThis as unknown as { prisma?: PrismaClient };
+
+export function getDb() {
+  if (getHyperdriveConnectionString()) return getRequestDb();
+  return (globalForDb.prisma ??= createClient());
+}
