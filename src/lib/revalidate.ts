@@ -1,4 +1,5 @@
 import { updateTag } from "next/cache";
+import { after } from "next/server";
 import type { SectionKey } from "@/lib/sections";
 
 export function contentTag(key: SectionKey) {
@@ -25,7 +26,17 @@ export async function refreshLiveSite() {
       method: "POST",
       headers: { authorization: `Bearer ${process.env.REVALIDATE_SECRET}` },
     });
-    if (response.ok) return true;
+    if (response.ok) {
+      /* The first request after a clear re-renders the page (~3-4s). Make that request ourselves,
+         once the publish response has gone out, so no visitor is the one who waits. One at a time:
+         parallel renders of the same page collide on the R2 cache write (error 10058). */
+      after(async () => {
+        for (const path of publicPaths) {
+          await fetch(new URL(path, siteUrl), { cache: "no-store" }).catch(() => {});
+        }
+      });
+      return true;
+    }
     console.error(`Refreshing the live site answered ${response.status}`);
   } catch (error) {
     console.error("Refreshing the live site failed", error);
