@@ -157,6 +157,7 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                   >
                     <span className="impact__worked-thumb" aria-hidden={!image}>
                       {image ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- tiny lazy thumb, not LCP
                         <img src={image.url} alt={image.alt} loading="lazy" />
                       ) : (
                         <em>{initials(person.name)}</em>

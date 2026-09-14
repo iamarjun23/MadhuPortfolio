@@ -16,6 +16,8 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
+    // eslint-plugin-react's "detect" calls context.getFilename(), which ESLint 10 removed.
+    settings: { react: { version: "19" } },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/no-unused-vars": [
