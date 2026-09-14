@@ -8118,3 +8118,39 @@ button {
     transform: none;
   }
 }
+
+/* Studio loading skeleton ------------------------------------------------- */
+.studio-skeleton {
+  display: grid;
+  gap: 1rem;
+}
+
+.studio-skeleton__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, currentColor 8%, transparent),
+      transparent
+    )
+    no-repeat var(--surface-2);
+  background-size: 50% 100%;
+  animation: skeleton-shimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: -100% 0; }
+  to { background-position: 200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
