@@ -12,8 +12,13 @@ function getTheme(value: string | undefined): "dark" | "light" {
 }
 
 export default async function StudioLayout({ children }: StudioLayoutProps) {
-  await requireOwner();
-  const [cookieStore, shellData] = await Promise.all([cookies(), getStudioShellData()]);
+  // The owner check is its own DB round trip; running it beside the shell reads instead of
+  // before them saves one. A failed check still throws before anything renders.
+  const [, cookieStore, shellData] = await Promise.all([
+    requireOwner(),
+    cookies(),
+    getStudioShellData(),
+  ]);
 
   return (
     <StudioShell

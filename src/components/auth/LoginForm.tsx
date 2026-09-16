@@ -3,6 +3,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { studioHome } from "@/lib/studio-nav";
+import StudioLoading from "@/app/studio/loading";
 
 function getSafeRedirect(callbackUrl: string | null) {
   if (!callbackUrl) return studioHome;
@@ -38,6 +39,16 @@ export function LoginForm() {
       setPending(false);
       setError("Sign-in could not be completed. Please try again.");
     }
+  }
+  // signIn hard-navigates to the studio, whose layout blocks on auth + shell data, so the
+  // login page stays on screen for the whole round trip. Swap in the studio skeleton at
+  // click time; it remains until the studio (or the ?error= reload) paints.
+  if (pending) {
+    return (
+      <div style={{ width: "min(100%, 72rem)" }}>
+        <StudioLoading />
+      </div>
+    );
   }
   return (
     <form className="login-form" action={submit}>

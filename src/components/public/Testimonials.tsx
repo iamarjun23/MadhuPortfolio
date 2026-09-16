@@ -34,6 +34,7 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
                   <figcaption>
                     <span className="testimonials__avatar">
                       {image ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- tiny lazy avatar, not LCP
                         <img src={image.url} alt={image.alt} loading="lazy" />
                       ) : (
                         quote.initials
