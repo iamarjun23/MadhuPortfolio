@@ -23,6 +23,7 @@ import { useForm } from "react-hook-form";
 import { saveDraft } from "@/actions/save-draft";
 import { Dropzone, type UploadEndpoint } from "@/components/studio/Dropzone";
 import { MediaPreview } from "@/components/studio/MediaPreview";
+import { PreviewFrame } from "@/components/studio/PreviewFrame";
 import { SaveBar } from "@/components/studio/SaveBar";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
@@ -45,6 +46,7 @@ type EditorObject = { [key: string]: EditorValue };
 const roomTints = ["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"] as const;
 
 const selectOptions: Record<string, readonly string[]> = {
+  allLayout: ["globe", "canvas", "grid"],
   defaultTheme: ["suite", "sheet", "system"],
   hrefLabel: ["", "YouTube", "LinkedIn"],
   logoHint: ["l-jar", "l-onep", "l-ulc", "l-hb", "custom"],
@@ -237,6 +239,14 @@ function findWorkProjectPath(
 
 function normalizePreviewText(value: string) {
   return value.replace(/\s+/g, " ").trim().toLocaleLowerCase();
+}
+
+/* Realm-independent stand-in for an `instanceof HTMLElement` check, so a click
+   arriving from the mobile preview's frame counts as an element too. */
+function asElement(value: unknown): HTMLElement | null {
+  return value !== null && typeof value === "object" && (value as Node).nodeType === 1
+    ? (value as HTMLElement)
+    : null;
 }
 
 const nonContentKeys = new Set([
@@ -1811,6 +1821,22 @@ export function SectionEditor({
           }))
           .filter((group) => group.fields.length > 0);
 
+  const preview = (
+    <StudioLandingPreview
+      section={section}
+      data={previewData}
+      contactData={contactData}
+      settingsData={settingsData}
+      onWorkProjectSelect={(laneLabel, projectId) => {
+        const path = findWorkProjectPath(currentData, laneLabel, projectId);
+        if (!path) return;
+        setActivePath(path);
+        setFocusKey(null);
+        setInspectorTab("content");
+      }}
+    />
+  );
+
   return (
     <section
       className={`studio-page studio-editor studio-editor--${section}`}
@@ -1882,8 +1908,12 @@ export function SectionEditor({
           <div
             className="studio-canvas__viewport studio-canvas__viewport--editable"
             onClickCapture={(event) => {
-              const target = event.target;
-              if (!(target instanceof HTMLElement)) return;
+              /* Not `instanceof HTMLElement`: on the mobile preview the click
+                 comes from inside the frame's document, whose elements belong
+                 to that realm and fail the host's instance check. A node type
+                 is the same number in every realm. */
+              const target = asElement(event.target);
+              if (!target) return;
 
               /* Some previews (the Experience reel's chapter arrows and scene
                  list, carousels, tabs...) are interactive on their own - clicking
@@ -1893,7 +1923,10 @@ export function SectionEditor({
 
               const candidates: string[] = [];
               let node: HTMLElement | null = target;
-              while (node && node !== event.currentTarget) {
+              /* On the mobile preview the walk never meets `currentTarget` -
+                 that element lives outside the frame - so the frame's own root
+                 ends it, before <body> can offer the whole page as a match. */
+              while (node && node !== event.currentTarget && !node.dataset.previewRoot) {
                 const text = normalizePreviewText(node.textContent ?? "");
                 if (text && !candidates.includes(text)) candidates.push(text);
                 node = node.parentElement;
@@ -1908,19 +1941,11 @@ export function SectionEditor({
               setInspectorTab("content");
             }}
           >
-            <StudioLandingPreview
-              section={section}
-              data={previewData}
-              contactData={contactData}
-              settingsData={settingsData}
-              onWorkProjectSelect={(laneLabel, projectId) => {
-                const path = findWorkProjectPath(currentData, laneLabel, projectId);
-                if (!path) return;
-                setActivePath(path);
-                setFocusKey(null);
-                setInspectorTab("content");
-              }}
-            />
+            {previewDevice === "mobile" ? (
+              <PreviewFrame title="Mobile preview">{preview}</PreviewFrame>
+            ) : (
+              preview
+            )}
           </div>
         </section>
         <aside className="studio-ins" aria-label="Editing panel">

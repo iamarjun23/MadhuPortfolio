@@ -1854,14 +1854,17 @@ button {
 /* No frame, no grid, no panel: the cards sit straight on the page in a ring,
    and every one of them can be picked up and dropped anywhere on it. */
 .work__board {
-  --board-edge-x: 9%;
-  --board-edge-y: 7%;
-  --board-spread-x: 37%;
-  --board-spread-y: 33%;
+  --board-edge-x: 7%;
+  --board-edge-y: 6%;
+  --board-spread-x: 41%;
+  --board-spread-y: 38%;
 
   position: relative;
   isolation: isolate;
+  width: 100vw;
   min-height: clamp(560px, 54vw, 760px);
+  margin-right: calc(50% - 50vw);
+  margin-left: calc(50% - 50vw);
   user-select: none;
 }
 .work__board-empty {
@@ -1875,6 +1878,210 @@ button {
   font-family: var(--f-mono);
   font-size: 0.72rem;
   text-align: center;
+}
+
+/* The "All work" view can swap the canvas for a globe: cards ride stacked
+   latitude bands around one Y axis, spun by drag or a slow idle rotation.
+   The sphere is laid out at one size in WorkConsole and scaled to the board
+   from the outside, so the 3D space inside never has to know the viewport. */
+.work__board--globe {
+  min-height: clamp(560px, 64vw, 860px);
+  overflow: hidden;
+}
+.work__globe-fit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(var(--globe-scale, 1));
+}
+.work__globe-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: var(--globe-perspective, 1900px);
+  cursor: grab;
+  touch-action: none;
+}
+.work__globe-stage:active {
+  cursor: grabbing;
+}
+.work__globe-axis {
+  position: relative;
+  width: 1px;
+  height: 1px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+.work__globe-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--globe-card-w);
+  margin: calc(var(--globe-card-h) / -2) 0 0 calc(var(--globe-card-w) / -2);
+  /* Flat, deliberately: a card is a flat thing, and keeping it flat is what
+     lets backface-visibility hide the whole card once it turns away. Under
+     preserve-3d only this element's own (transparent) back would be hidden and
+     its contents would carry on drawing through the near side of the sphere. */
+  transform-style: flat;
+  backface-visibility: hidden;
+}
+/* The sphere already turns. Cards drifting on top of that is one motion too
+   many, and it breaks the spacing the bands were laid out to hold. */
+.work__globe-card .work__card-frame,
+.work__rail-card .work__card-frame {
+  animation: none;
+}
+.work__globe-card .work__card-media {
+  aspect-ratio: 2.4 / 1;
+}
+.work__globe-card .work__card-body {
+  gap: 0.12rem;
+  padding: 0.38rem 0.48rem 0.45rem;
+}
+.work__globe-card .work__card-open {
+  margin-top: 0.1rem;
+  padding-top: 0.3rem;
+}
+/* A long list is drawn smaller on the canvas: at full size the cards cover
+   more ground than the board has, and no amount of spreading stops them
+   burying one another. Matched to the id in the rule that sets the card's
+   width in the first place, or that one keeps winning. */
+#work .work__board--dense .work__card {
+  width: clamp(104px, 9.6vw, 132px);
+}
+.work__board--dense {
+  min-height: clamp(620px, 60vw, 840px);
+}
+.work__globe-card-btn {
+  display: block;
+  width: 100%;
+  backface-visibility: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  -webkit-user-drag: none;
+}
+.work__globe-card-btn .work__card-frame {
+  transition:
+    border-color 0.3s var(--e-cut),
+    box-shadow 0.35s var(--e-reveal);
+}
+.work__globe-card-btn:hover .work__card-frame,
+.work__globe-card-btn:focus-visible .work__card-frame {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow:
+    0 24px 44px -22px rgba(0, 0, 0, 0.92),
+    0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.work__globe-card-btn:hover .work__card-media > img,
+.work__globe-card-btn:focus-visible .work__card-media > img {
+  filter: none;
+  transform: scale(1.06);
+}
+.work__globe-card-btn:hover .work__card-play,
+.work__globe-card-btn:focus-visible .work__card-play {
+  border-color: transparent;
+  background: var(--accent);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.work__globe-card-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+@media (max-width: 640px) {
+  .work__board--globe {
+    min-height: 460px;
+  }
+}
+
+/* The rail layout: a horizontal grid, three rows deep, drifting sideways of
+   its own accord. The cards are laid twice and the track slides exactly one
+   copy's width, so the drift comes back round to where it started with no
+   seam to see. */
+.work__board--rail {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.work__rail {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.work__rail::-webkit-scrollbar {
+  display: none;
+}
+.work__rail-track {
+  display: flex;
+  width: max-content;
+}
+.work__rail-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, 1fr);
+  grid-auto-columns: 196px;
+  gap: 1px;
+  background: var(--border);
+  border-right: 1px solid var(--border);
+}
+@keyframes work-rail-drift {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .work__rail-track {
+    animation: work-rail-drift 120s linear infinite;
+  }
+  /* Reading a card, reaching for one, or tabbing onto one all stop the drift,
+     so nothing has to be chased across the rail to be clicked. */
+  .work__rail:hover .work__rail-track,
+  .work__rail:focus-within .work__rail-track {
+    animation-play-state: paused;
+  }
+}
+.work__rail-card {
+  display: block;
+  padding: 0.5rem;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.work__rail-card .work__card-frame {
+  border-radius: var(--r-sm);
+}
+.work__rail-card:hover .work__card-frame,
+.work__rail-card:focus-visible .work__card-frame {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  box-shadow:
+    0 24px 44px -22px rgba(0, 0, 0, 0.92),
+    0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.work__rail-card:hover .work__card-media > img,
+.work__rail-card:focus-visible .work__card-media > img {
+  filter: none;
+  transform: scale(1.06);
+}
+.work__rail-card:hover .work__card-play,
+.work__rail-card:focus-visible .work__card-play {
+  border-color: transparent;
+  background: var(--accent);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.work__rail-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 /* Every card is the same size wherever it lands. It is placed by its centre,
    and the clamp keeps a card whose ring reaches past the board from hanging
@@ -2068,6 +2275,34 @@ button {
   letter-spacing: 0.03em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.work__card-open {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border);
+  color: var(--accent-text);
+  font-family: var(--f-mono);
+  font-size: 0.5rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.work__card-open i {
+  font-size: 0.7rem;
+  font-style: normal;
+  transition: transform 0.25s var(--e-reveal);
+}
+.work__globe-card-btn:hover .work__card-open i,
+.work__globe-card-btn:focus-visible .work__card-open i,
+.work__rail-card:hover .work__card-open i,
+.work__rail-card:focus-visible .work__card-open i,
+#work .work__card:hover .work__card-open i,
+#work .work__card:focus-visible .work__card-open i {
+  transform: translate(2px, -2px);
 }
 /* The grip is the one part of the card that claims a touch gesture, so a
    finger can drag a card without the page scrolling out from under it. */
@@ -4994,15 +5229,25 @@ button {
   text-transform: uppercase;
 }
 
+/* The phone preview is an iframe, not a narrowed box: an `@media (max-width:)`
+   rule answers to the browser window, so shrinking a container here would show
+   desktop styling in a narrow column rather than the mobile layout. */
 .studio-canvas--mobile .studio-canvas__viewport {
-  width: min(100%, 390px);
-  margin: 0 auto;
+  display: grid;
+  justify-items: center;
+  padding: 1.1rem 0;
 }
 
-.studio-canvas--mobile .studio-canvas-hero,
-.studio-canvas--mobile .studio-canvas-generic {
-  width: min(100%, 390px);
-  min-height: 610px;
+.studio-preview-frame {
+  width: 390px;
+  height: 780px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--bg);
+  box-shadow:
+    0 0 0 7px #16191d,
+    0 0 0 8px rgba(255, 255, 255, 0.12),
+    0 20px 44px rgba(0, 0, 0, 0.45);
 }
 
 .studio-canvas-hero {
@@ -6530,10 +6775,14 @@ button {
 /* Premium touches: CTAs fade in slightly delayed, media parallax-drifts on scroll. */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    /* Work cards are excluded: this reveal ends on a bare transform, which
-       would wipe out the transform a card is placed and dragged with. */
+    /* Work cards of every layout are excluded: this reveal ends on a bare
+       transform, which would wipe out the transform a canvas card is placed
+       and dragged with, fights the globe a card is turned onto, and cannot
+       track a rail card being carried sideways by its track. */
     .landing > section:not(:first-of-type) a[href],
-    .landing > section:not(:first-of-type) button:not(.work__card) {
+    .landing
+      > section:not(:first-of-type)
+      button:not(.work__card, .work__globe-card-btn, .work__rail-card) {
       animation: reveal-up linear both;
       animation-timeline: view();
       animation-range: entry 25% cover 45%;
@@ -8147,10 +8396,16 @@ button {
 }
 
 @keyframes skeleton-shimmer {
-  from { background-position: -100% 0; }
-  to { background-position: 200% 0; }
+  from {
+    background-position: -100% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
+  .skeleton {
+    animation: none;
+  }
 }

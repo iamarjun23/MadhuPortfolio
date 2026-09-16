@@ -17,18 +17,19 @@ function getDefaultTheme(defaultTheme: "suite" | "sheet" | "system") {
   return defaultTheme === "sheet" ? "light" : "dark";
 }
 
-// Keep the public portfolio on its 1280px artboard across phones and tablets.
-// Browsers auto-fit that artboard to the device while desktop browsers continue
-// to use their real viewport, preserving the responsive laptop layout.
+// Pinned to the desktop container width (see base.css's 1280px max-width) instead
+// of device-width, so phones render the exact desktop layout and the browser
+// scales it to fit rather than the CSS reflowing into separate mobile rules.
 export const viewport: Viewport = {
   themeColor: "#050505",
   width: 1280,
+  // Explicit null (not omitted): Next.js defaults initialScale to 1 when the
+  // key is absent, which would stop the browser auto-fitting the pinned
+  // width to the screen. Only an explicit null/undefined suppresses it.
+  initialScale: null as unknown as undefined,
   viewportFit: "cover",
   userScalable: true,
   maximumScale: 5,
-  // Override Next.js's implicit scale so mobile browsers can calculate the
-  // correct fit for the fixed-width artboard.
-  initialScale: undefined,
 };
 
 export async function generateMetadata(): Promise<Metadata> {

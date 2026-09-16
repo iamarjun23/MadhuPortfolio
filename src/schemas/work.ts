@@ -14,6 +14,9 @@ export const WorkSchema = z.object({
   briefPrompt: z.string().max(50).default("Have a story?"),
   briefCta: z.string().max(40).default("Hire me"),
   canvasHint: z.string().max(120).default("Drag any card to rearrange · click to preview"),
+  // Only the "All work" view honours this. Filtering to one category always
+  // draws the canvas, whose rings are what a short list reads best as.
+  allLayout: z.enum(["globe", "canvas", "grid"]).default("globe"),
   previewUnavailableLabel: z.string().max(60).default("Preview coming soon"),
   lanes: z
     .array(

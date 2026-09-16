@@ -235,19 +235,46 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
   const canReposition = data.allowDrag && isDesktopLayout;
 
   const reset = useCallback(() => setPositions({}), []);
-  const shuffle = () =>
+  /* Cards are dealt one to a cell of a notional grid, which cell they get
+     decided at random, and then jogged about inside it. Drawing each position
+     at random instead piles three cards into one corner and leaves a hole
+     beside it - the clumping a shuffle is meant to undo. */
+  const shuffle = useCallback(() => {
+    const columns = Math.ceil(Math.sqrt(data.cards.length));
+    const rows = Math.ceil(data.cards.length / columns);
+    const cells = data.cards.map((_, index) => index);
+
+    for (let index = cells.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      [cells[index], cells[swap]] = [cells[swap]!, cells[index]!];
+    }
+
     setPositions(
       Object.fromEntries(
-        data.cards.map((card) => [
-          card.id,
-          {
-            fx: 0.04 + Math.random() * 0.66,
-            fy: 0.04 + Math.random() * 0.66,
-            rot: -6 + Math.random() * 12,
-          },
-        ]),
+        data.cards.map((card, index) => {
+          const cell = cells[index]!;
+          const jog = (place: number, count: number) =>
+            0.04 + ((place + 0.15 + Math.random() * 0.7) / count) * 0.66;
+
+          return [
+            card.id,
+            {
+              fx: jog(cell % columns, columns),
+              fy: jog(Math.floor(cell / columns), rows),
+              rot: -6 + Math.random() * 12,
+            },
+          ];
+        }),
       ),
     );
+  }, [data.cards]);
+
+  // Deals a fresh layout every time the room is opened, instead of reusing
+  // whatever fx/fy the cards were last saved with.
+  useEffect(() => {
+    shuffle();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const desktopQuery = window.matchMedia("(min-width: 821px)");

@@ -544,6 +544,13 @@ const fieldRules: readonly FieldRule[] = [
     },
   },
   {
+    key: "allLayout",
+    doc: {
+      label: '"All work" layout',
+      hint: 'How the cards are arranged when no category is picked. Globe turns them on a slowly spinning sphere you can also spin by hand, canvas is the draggable scatter board, grid is a three-row wall that drifts sideways on its own and stops while you are pointing at it. Picking a category always shows the canvas, whichever is set here.',
+    },
+  },
+  {
     key: "previewUnavailableLabel",
     doc: {
       label: "No-preview message",

@@ -52,19 +52,103 @@ const BOARD_SLACK = 16;
 /* Keyboard equivalent of a drag, so the board is not pointer-only. */
 const NUDGE_STEP = 18;
 
-/* Cards ride concentric rings rather than a grid, so the board opens as a
-   circle of stills with the middle left clear. Each ring fills before the next
-   one starts; a board large enough to outrun the last ring simply packs it
-   tighter, and every card can be dragged off its ring anyway. */
-const RINGS: readonly (readonly [capacity: number, radius: number])[] = [
-  [10, 1],
-  [7, 0.6],
-  [5, 0.28],
-];
-/* A handful of cards on the full-width ring reads as a scatter rather than a
-   circle, so a short board draws its one ring in tighter. */
-const SMALL_RING = 5;
-const SMALL_RING_RADIUS = 0.66;
+/* Cards are dealt one to a cell of a notional grid and then jogged out of it,
+   which spreads them over the whole board while still reading as a scatter.
+   Filling fixed rings in turn tipped every card left over into the innermost
+   one and built a heap in the middle of the board; a spiral cures the heap but
+   draws a circle, which leaves the corners of a wide board bare. */
+const BOARD_ASPECT = 1.7;
+/* How far out of its cell a card may be jogged, as a share of the cell. Enough
+   that the grid behind the scatter cannot be read, not so much that cards
+   wander back into each other. */
+const BOARD_JOG = 0.5;
+/* Past this many cards the board is being asked to hold more than it has room
+   for, and they are drawn smaller rather than left to bury one another. */
+const BOARD_DENSE_FROM = 28;
+
+/* The "All work" view can swap the canvas for a globe: cards sit in a plain
+   grid of rows and columns, that grid wrapped around a vertical cylinder so
+   only its left and right edges bend away from the viewer - the rows
+   themselves stay level, same as the flat grid layout. Every measurement here
+   is in the globe's own space; the whole thing is scaled once to the room the
+   board has, so none of it has to know the viewport. */
+const GLOBE_CARD_W = 150;
+const GLOBE_CARD_H = 118;
+/* Clear space between two neighbours in the same row, and between one row
+   and the next. Both are what keep cards from touching. */
+const GLOBE_CARD_GAP = 80;
+const GLOBE_ROW_GAP = 72;
+/* Depth is set as a multiple of the cylinder's own radius, so a card at the
+   front is always the same fraction larger than one out at the side however
+   big the globe ends up. */
+/* A deeper viewing distance keeps front cards from ballooning into their
+   neighbours while preserving the gentle left/right bend. */
+const GLOBE_DEPTH_RATIO = 16;
+/* The cards are photographs, so blowing the globe up much past its laid-out
+   size starts to show. */
+const GLOBE_MAX_SCALE = 1.8;
+const GLOBE_SPIN_DEG_PER_MS = 360 / 80000;
+const GLOBE_DRAG_DEG_PER_PX = 0.35;
+/* Keep the shared middle of both rows level. The cards' own Y rotation creates
+   the curve at the left and right edges without bending the centre section. */
+const GLOBE_TILT_DEG = 0;
+
+type GlobePlacement = { y: number; radius: number; angle: number };
+
+/* Keep the globe broad rather than tall. A large project list spread over
+   three or four rows collapses into a narrow tower on wide screens because
+   height becomes the limiting dimension when the globe is fitted to the
+   board. Two rows let the cards use the full horizontal canvas. */
+function getGlobeRowCount(total: number) {
+  return total <= 12 ? 1 : 2;
+}
+
+/* Where every card sits on the cylinder, plus the depth the stage has to be
+   viewed from for the columns to line up as one round body. Cards fill row by
+   row, same reading order a flat grid uses, then wrap: every `columns`-th
+   card starts the next row down. */
+function getGlobeLayout(total: number) {
+  const rows = getGlobeRowCount(total);
+  const columns = Math.max(1, Math.ceil(total / rows));
+  /* The radius that lets `columns` cards ring the cylinder without touching:
+     each card claims a slice of the circle whose chord has to clear the
+     card's own width. */
+  const radius =
+    columns > 1
+      ? (GLOBE_CARD_W + GLOBE_CARD_GAP) / (2 * Math.sin(Math.PI / columns))
+      : GLOBE_CARD_W;
+  const rowStep = GLOBE_CARD_H + GLOBE_ROW_GAP;
+
+  const placements: GlobePlacement[] = Array.from({ length: total }, (_, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    return {
+      y: (row - (rows - 1) / 2) * rowStep,
+      radius,
+      /* Both rows use the same angles, making their centre cards line up while
+         the outer cards naturally turn away around the cylinder. */
+      angle: (360 * column) / columns,
+    };
+  });
+
+  return { placements, perspective: radius * GLOBE_DEPTH_RATIO };
+}
+
+/* How much room the finished globe needs, measured on screen rather than in
+   its own space: a card grows as it swings towards the viewer, and the front
+   row is what decides where the cylinder's edge falls. */
+function getGlobeSize(placements: readonly GlobePlacement[], perspective: number) {
+  let halfWidth = 0;
+  let halfHeight = 0;
+
+  placements.forEach(({ y, radius }) => {
+    const magnify = perspective / (perspective - radius);
+    halfWidth = Math.max(halfWidth, radius + GLOBE_CARD_W / 2);
+    halfHeight = Math.max(halfHeight, (Math.abs(y) + GLOBE_CARD_H / 2) * magnify);
+  });
+
+  return { width: Math.round(halfWidth * 2), height: Math.round(halfHeight * 2) };
+}
 
 const NUDGE_KEYS: Readonly<Record<string, CardOffset>> = {
   ArrowLeft: { x: -1, y: 0 },
@@ -73,50 +157,42 @@ const NUDGE_KEYS: Readonly<Record<string, CardOffset>> = {
   ArrowDown: { x: 0, y: 1 },
 };
 
-function getRingCounts(total: number) {
-  const counts: number[] = [];
-  let remaining = total;
-
-  for (let ring = 0; ring < RINGS.length && remaining > 0; ring += 1) {
-    const capacity = RINGS[ring]![0];
-    const take = ring === RINGS.length - 1 ? remaining : Math.min(remaining, capacity);
-    counts.push(take);
-    remaining -= take;
-  }
-
-  return counts;
-}
-
 /* Where every card sits before anyone touches it, as a pair of offsets from
    the middle of the board between -1 and 1. How far that actually is stays in
-   CSS, so a narrow screen can pull the whole ring in without this having to
-   know the board's width. Each ring is turned half a step against the one
-   outside it, so the cards interleave rather than line up into spokes, and the
-   numbers are rounded because `Math.sin` can differ in its last digit between
-   the server's runtime and the browser's, which is enough on its own to fail
-   hydration. */
+   CSS, so a narrow screen can pull the whole scatter in without this having to
+   know the board's width. The numbers are rounded because `Math.sin` can
+   differ in its last digit between the server's runtime and the browser's,
+   which is enough on its own to fail hydration. */
+/* Stands in for a random number without being one: the same card is jogged the
+   same way on the server and in the browser, which a real random would not be. */
+function boardNoise(seed: number) {
+  const value = Math.sin(seed * 127.1) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 function getBoardLayout(total: number) {
-  const placements: { ox: string; oy: string; tilt: string; delay: string }[] = [];
-  let index = 0;
+  const columns = Math.max(1, Math.round(Math.sqrt(total * BOARD_ASPECT)));
+  const rows = Math.ceil(total / columns);
+  /* Cells run -1 to 1 either way, the same range the board's CSS spreads a
+     card across, so a card in the last column lands against the right edge
+     rather than somewhere short of it. */
+  const across = (place: number, count: number) => (count > 1 ? (place / (count - 1)) * 2 - 1 : 0);
 
-  getRingCounts(total).forEach((count, ring) => {
-    const base = RINGS[ring]![1];
-    const radius = ring === 0 && count < SMALL_RING ? SMALL_RING_RADIUS : base;
-    const turn = ring % 2 ? Math.PI / count : 0;
+  return Array.from({ length: total }, (_, index) => {
+    const row = Math.floor(index / columns);
+    /* The last row is usually short, and spreading whatever it holds over the
+       full width keeps the scatter from ending on a ragged edge. */
+    const inRow = Math.min(columns, total - row * columns);
+    const jog = (seed: number, count: number) =>
+      (boardNoise(seed) - 0.5) * BOARD_JOG * (2 / Math.max(count - 1, 1));
 
-    for (let slot = 0; slot < count; slot += 1) {
-      const angle = -Math.PI / 2 + turn + (Math.PI * 2 * slot) / count;
-      placements.push({
-        ox: (Math.cos(angle) * radius).toFixed(4),
-        oy: (Math.sin(angle) * radius).toFixed(4),
-        tilt: `${(Math.sin(index * 12.9898) * 3.2).toFixed(2)}deg`,
-        delay: `${(-((index * 0.61) % 4.2)).toFixed(2)}s`,
-      });
-      index += 1;
-    }
+    return {
+      ox: (across(index % columns, inRow) + jog(index + 1, inRow)).toFixed(4),
+      oy: (across(row, rows) + jog(index + 91, rows)).toFixed(4),
+      tilt: `${(Math.sin(index * 12.9898) * 3.2).toFixed(2)}deg`,
+      delay: `${(-((index * 0.61) % 4.2)).toFixed(2)}s`,
+    };
   });
-
-  return placements;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -158,6 +234,10 @@ export function WorkConsole({
 }>) {
   const [activeLane, setActiveLane] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
+  // The globe and freeform canvas are desktop flourishes; a phone gets the
+  // grid regardless of what's picked in the studio, so the board never reads
+  // differently on the two surfaces.
+  const [isMobile, setIsMobile] = useState(false);
   const [cardOffsets, setCardOffsets] = useState<Record<string, CardOffset>>({});
   const [cardStack, setCardStack] = useState<Record<string, number>>({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -168,6 +248,16 @@ export function WorkConsole({
   const stackTop = useRef(0);
   const drag = useRef<DragState | null>(null);
   const boardHintId = useId();
+  const globeAxisRef = useRef<HTMLDivElement>(null);
+  const globeFitRef = useRef<HTMLDivElement>(null);
+  const globeRotation = useRef(0);
+  const globeDrag = useRef<{
+    active: boolean;
+    moved: boolean;
+    pointerId: number;
+    startX: number;
+    startRotation: number;
+  } | null>(null);
 
   const allProjects = data.lanes.flatMap((lane) =>
     lane.projects.map((project) => ({ project, laneLabel: lane.label })),
@@ -181,6 +271,14 @@ export function WorkConsole({
     : allProjects;
   const hasMoved = Object.keys(cardOffsets).length > 0;
   const layout = getBoardLayout(projects.length);
+  /* Only the unfiltered view honours the chosen layout; picking a category
+     always falls back to the canvas. */
+  const isGlobeView = selectedLane === null && !isMobile && data.allLayout === "globe";
+  const isRailView = selectedLane === null && (isMobile || data.allLayout === "grid");
+  const globe = isGlobeView ? getGlobeLayout(projects.length) : null;
+  const globeSize = globe ? getGlobeSize(globe.placements, globe.perspective) : null;
+  const globeWidth = globeSize?.width ?? 0;
+  const globeHeight = globeSize?.height ?? 0;
 
   function resetBoard() {
     setCardOffsets({});
@@ -308,6 +406,174 @@ export function WorkConsole({
   }
 
   useEffect(() => {
+    // The page's viewport is pinned to the desktop width (see the public
+    // layout), so window.innerWidth/matchMedia always read as desktop here.
+    // screen.width still reflects the device's real size.
+    const updateIsMobile = () => setIsMobile(window.screen.width <= 640);
+
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+    window.addEventListener("orientationchange", updateIsMobile);
+    return () => {
+      window.removeEventListener("resize", updateIsMobile);
+      window.removeEventListener("orientationchange", updateIsMobile);
+    };
+  }, []);
+
+  /* The globe idles at a constant spin unless a drag is in progress, driven
+     straight through the ref rather than state so the rotate loop doesn't
+     re-render the whole card list every frame. */
+  useEffect(() => {
+    if (!isGlobeView) return;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let frame = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - last;
+      last = now;
+      if (!globeDrag.current?.active && !preview) {
+        globeRotation.current = (globeRotation.current + elapsed * GLOBE_SPIN_DEG_PER_MS) % 360;
+        if (globeAxisRef.current) {
+          globeAxisRef.current.style.transform = `rotateX(${GLOBE_TILT_DEG}deg) rotateY(${globeRotation.current}deg)`;
+        }
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isGlobeView, preview]);
+
+  /* The globe is laid out once at a size of its own choosing, then scaled to
+     whatever the board actually has room for - so a wide screen gets a bigger
+     sphere rather than the same sphere adrift in empty space. */
+  useEffect(() => {
+    const board = boardRef.current;
+    const fit = globeFitRef.current;
+    if (!board || !fit || !globeWidth || !globeHeight) return;
+
+    const apply = () => {
+      /* A board with no size to report - a hidden tab, a print, a pane
+         collapsed to nothing - would otherwise scale the globe to zero and
+         leave it scaled to zero, since nothing resizes afterwards to put it
+         right. Better to keep the last size that made sense. */
+      if (!board.clientWidth || !board.clientHeight) return;
+
+      const scale = Math.min(
+        board.clientWidth / globeWidth,
+        board.clientHeight / globeHeight,
+        GLOBE_MAX_SCALE,
+      );
+      fit.style.setProperty("--globe-scale", scale.toFixed(4));
+    };
+
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(board);
+
+    return () => observer.disconnect();
+  }, [globeWidth, globeHeight]);
+
+  function globePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    globeDrag.current = {
+      active: true,
+      moved: false,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startRotation: globeRotation.current,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function globePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const state = globeDrag.current;
+    if (!state?.active || state.pointerId !== event.pointerId) return;
+
+    const deltaX = event.clientX - state.startX;
+    if (!state.moved && Math.abs(deltaX) > DRAG_THRESHOLD) state.moved = true;
+    if (!state.moved) return;
+
+    globeRotation.current = state.startRotation + deltaX * GLOBE_DRAG_DEG_PER_PX;
+    if (globeAxisRef.current) {
+      globeAxisRef.current.style.transform = `rotateX(${GLOBE_TILT_DEG}deg) rotateY(${globeRotation.current}deg)`;
+    }
+  }
+
+  function globePointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    const state = globeDrag.current;
+    if (!state?.active || state.pointerId !== event.pointerId) return;
+
+    state.active = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  /* The face of a card - still, badge and caption - is the same whichever
+     layout is holding it, so every layout draws it from here. */
+  function cardFace(project: WorkProject, laneLabel: string, cardId: string, sizes: string) {
+    const reel = resolveReel(project);
+    const thumbnail = reelThumbnail(reel, failedThumbs.has(cardId));
+    const badge = reelBadge(reel.kind);
+
+    return (
+      <span className="work__card-frame">
+        <span className={`work__card-media ${project.thumbHint}`}>
+          {thumbnail ? (
+            <MediaImage
+              src={thumbnail}
+              alt={`${project.title} still`}
+              fill
+              sizes={sizes}
+              unoptimized={reel.kind !== "youtube"}
+              onError={
+                reel.thumbnailCanFail
+                  ? () =>
+                      setFailedThumbs((current) =>
+                        current.has(cardId) ? current : new Set(current).add(cardId),
+                      )
+                  : undefined
+              }
+            />
+          ) : null}
+          <span className="work__card-scrim" aria-hidden="true" />
+          {/* With no fetched still to show, the badge grows into naming where
+              the reel lives instead - the same spot a YouTube card uses for ▶. */}
+          <span
+            className={`work__card-play${badge.length > 1 && !thumbnail ? " work__card-play--post" : ""}`}
+            aria-hidden="true"
+          >
+            {badge}
+          </span>
+        </span>
+        <span className="work__card-body">
+          <small>{laneLabel}</small>
+          <b>{project.title}</b>
+          <em>{project.subtitle}</em>
+          <span className="work__card-open">
+            Click to open <i>↗</i>
+          </span>
+        </span>
+      </span>
+    );
+  }
+
+  function globeCardClick(project: WorkProject, laneLabel: string) {
+    if (globeDrag.current?.moved) {
+      globeDrag.current.moved = false;
+      return;
+    }
+    if (!interactive) {
+      onSelectProject?.(laneLabel, project.id);
+      return;
+    }
+    setPreview({ project, laneLabel });
+  }
+
+  useEffect(() => {
     if (!preview) return;
 
     window.requestAnimationFrame(() => {
@@ -380,21 +646,37 @@ export function WorkConsole({
           </div>
           <div className="work__board-bar">
             <span className="work__board-hint">{data.canvasHint}</span>
-            <button
-              type="button"
-              className="work__board-reset"
-              onClick={resetBoard}
-              disabled={!hasMoved}
-            >
-              Reset layout
-            </button>
+            {/* Nothing on the globe or the rail can be moved out of place, so
+                there is nothing there to put back. */}
+            {isGlobeView || isRailView ? null : (
+              <button
+                type="button"
+                className="work__board-reset"
+                onClick={resetBoard}
+                disabled={!hasMoved}
+              >
+                Reset layout
+              </button>
+            )}
           </div>
           <p className="sr-only" id={boardHintId}>
             Press Enter on a card to preview the video. Use the arrow keys to move a card around the
             board, or drag it with the pointer.
           </p>
           <div
-            className="work__board"
+            className={[
+              "work__board",
+              isGlobeView ? "work__board--globe" : "",
+              isRailView ? "work__board--rail" : "",
+              /* A long list on the canvas is drawn smaller: at full size the
+                 cards cover more than the board has room for and bury one
+                 another however evenly they are spread. */
+              !isGlobeView && !isRailView && projects.length > BOARD_DENSE_FROM
+                ? "work__board--dense"
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             ref={boardRef}
             role="group"
             aria-label="Board of video projects"
@@ -402,12 +684,92 @@ export function WorkConsole({
           >
             {projects.length === 0 ? (
               <p className="work__board-empty">Nothing pinned to this category yet.</p>
+            ) : isGlobeView ? (
+              <div
+                className="work__globe-fit"
+                ref={globeFitRef}
+                style={
+                  {
+                    width: `${globeWidth}px`,
+                    height: `${globeHeight}px`,
+                    "--globe-card-w": `${GLOBE_CARD_W}px`,
+                    "--globe-card-h": `${GLOBE_CARD_H}px`,
+                    "--globe-perspective": `${Math.round(globe!.perspective)}px`,
+                  } as React.CSSProperties
+                }
+              >
+                <div
+                  className="work__globe-stage"
+                  onPointerDown={globePointerDown}
+                  onPointerMove={globePointerMove}
+                  onPointerUp={globePointerUp}
+                  onPointerCancel={globePointerUp}
+                >
+                  <div
+                    className="work__globe-axis"
+                    ref={globeAxisRef}
+                    style={{ transform: `rotateX(${GLOBE_TILT_DEG}deg)` }}
+                  >
+                    {projects.map(({ project, laneLabel }, index) => {
+                      const cardId = `${laneLabel}-${project.id}`;
+                      const place = globe!.placements[index]!;
+                      const cardStyle: React.CSSProperties = {
+                        transform: `translateY(${Math.round(place.y)}px) rotateY(${place.angle.toFixed(3)}deg) translateZ(${Math.round(place.radius)}px)`,
+                      };
+
+                      return (
+                        <div className="work__globe-card" style={cardStyle} key={cardId}>
+                          <button
+                            type="button"
+                            className="work__globe-card-btn"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={() => globeCardClick(project, laneLabel)}
+                            aria-label={`Preview ${project.title}`}
+                          >
+                            {cardFace(project, laneLabel, cardId, "220px")}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ) : isRailView ? (
+              /* A horizontal grid that drifts sideways on its own. The cards
+                 are laid twice so the drift can loop without a seam; the
+                 second pass is scenery, hidden from anything that reads or
+                 tabs through the page. */
+              <div className="work__rail">
+                <div className="work__rail-track">
+                  {[false, true].map((echo) => (
+                    <div
+                      className="work__rail-grid"
+                      key={echo ? "echo" : "cards"}
+                      aria-hidden={echo || undefined}
+                    >
+                      {projects.map(({ project, laneLabel }) => {
+                        const cardId = `${laneLabel}-${project.id}`;
+
+                        return (
+                          <button
+                            type="button"
+                            className="work__rail-card"
+                            key={cardId}
+                            tabIndex={echo ? -1 : undefined}
+                            onClick={() => cardClick(project, laneLabel)}
+                            aria-label={`Preview ${project.title}`}
+                          >
+                            {cardFace(project, laneLabel, cardId, "200px")}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               projects.map(({ project, laneLabel }, index) => {
                 const cardId = `${laneLabel}-${project.id}`;
-                const reel = resolveReel(project);
-                const thumbnail = reelThumbnail(reel, failedThumbs.has(cardId));
-                const badge = reelBadge(reel.kind);
                 const place = layout[index]!;
                 const offset = cardOffsets[cardId];
                 const lifted = cardStack[cardId];
@@ -446,42 +808,7 @@ export function WorkConsole({
                     onClick={() => cardClick(project, laneLabel)}
                     aria-label={`Preview ${project.title}`}
                   >
-                    <span className="work__card-frame">
-                      <span className={`work__card-media ${project.thumbHint}`}>
-                        {thumbnail ? (
-                          <MediaImage
-                            src={thumbnail}
-                            alt={`${project.title} still`}
-                            fill
-                            sizes="(max-width: 560px) 45vw, 190px"
-                            unoptimized={reel.kind !== "youtube"}
-                            onError={
-                              reel.thumbnailCanFail
-                                ? () =>
-                                    setFailedThumbs((current) =>
-                                      current.has(cardId) ? current : new Set(current).add(cardId),
-                                    )
-                                : undefined
-                            }
-                          />
-                        ) : null}
-                        <span className="work__card-scrim" aria-hidden="true" />
-                        {/* With no fetched still to show, the badge grows into
-                            naming where the reel lives instead - the same spot a
-                            YouTube card uses for ▶. */}
-                        <span
-                          className={`work__card-play${badge.length > 1 && !thumbnail ? " work__card-play--post" : ""}`}
-                          aria-hidden="true"
-                        >
-                          {badge}
-                        </span>
-                      </span>
-                      <span className="work__card-body">
-                        <small>{laneLabel}</small>
-                        <b>{project.title}</b>
-                        <em>{project.subtitle}</em>
-                      </span>
-                    </span>
+                    {cardFace(project, laneLabel, cardId, "(max-width: 560px) 45vw, 190px")}
                     <span
                       className="work__card-grip"
                       title="Drag to move this card"
