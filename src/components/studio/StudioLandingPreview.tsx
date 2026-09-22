@@ -3,6 +3,7 @@
 import { AboutBlock } from "@/components/public/AboutBlock";
 import { ClientsMarquee } from "@/components/public/ClientsMarquee";
 import { ContactBlock } from "@/components/public/ContactBlock";
+import { DrawingRoomTeaser } from "@/components/public/DrawingRoomTeaser";
 import { Experience } from "@/components/public/Experience";
 import { Footer } from "@/components/public/Footer";
 import { Hero } from "@/components/public/Hero";
@@ -130,10 +131,18 @@ export function StudioLandingPreview({
     }
     case "room": {
       const parsed = RoomSchema.safeParse(data);
-      return parsed.success ? (
-        <MoodBoard data={parsed.data} fallbackImage={fallbackImage} />
-      ) : (
-        <PreviewUnavailable />
+      const contact = ContactSchema.safeParse(contactData);
+      if (!parsed.success || !contact.success) return <PreviewUnavailable />;
+
+      // The teaser lives on the home page, the pinboard on its own /room page - two
+      // different places a visitor sees this section. Both run here, stacked, so a
+      // field like the teaser's invitation photo has somewhere to show up at all.
+      return (
+        <div className="studio-room-preview">
+          <DrawingRoomTeaser data={parsed.data} />
+          <p className="studio-room-preview__divider">The Drawing Room page (/room)</p>
+          <MoodBoard data={parsed.data} fallbackImage={fallbackImage} contact={contact.data} />
+        </div>
       );
     }
     case "contact": {

@@ -1942,6 +1942,7 @@ export function SectionEditor({
           </header>
           <div
             className="studio-canvas__viewport studio-canvas__viewport--editable"
+            onSubmitCapture={(event) => event.preventDefault()}
             onClickCapture={(event) => {
               /* Not `instanceof HTMLElement`: on the mobile preview the click
                  comes from inside the frame's document, whose elements belong
@@ -1950,11 +1951,18 @@ export function SectionEditor({
               const target = asElement(event.target);
               if (!target) return;
 
-              /* Some previews (the Experience reel's chapter arrows and scene
-                 list, carousels, tabs...) are interactive on their own - clicking
-                 them should switch what the preview shows, not hijack the click
-                 into editing a field. */
-              if (target.closest("button, a, input, select, textarea")) return;
+              /* The preview is a picture of the page, not the page: links never
+                 navigate and buttons never run, so a click on either falls
+                 through to editing the text it carries. The one exception is
+                 controls that are themselves editor hooks (work-board cards,
+                 collaborator tiles), marked with data-studio-hooks. */
+              if (target.closest("input, select, textarea")) return;
+              const control = target.closest("a, button");
+              if (control?.tagName === "BUTTON" && control.closest("[data-studio-hooks]")) return;
+              if (control) {
+                event.preventDefault();
+                event.stopPropagation();
+              }
 
               const candidates: string[] = [];
               let node: HTMLElement | null = target;

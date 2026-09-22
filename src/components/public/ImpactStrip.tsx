@@ -132,7 +132,11 @@ export function ImpactStrip({
                 {collaborators.length} {data.collaboratorsLabel}
               </span>
             </div>
-            <div className="impact__worked-grid" ref={gridRef}>
+            <div
+              className="impact__worked-grid"
+              ref={gridRef}
+              data-studio-hooks={onSelectCollaborator ? "" : undefined}
+            >
               {collaborators.map((person, index) => {
                 const isActive = index === activeIndex;
                 const image = realImage(person.image);

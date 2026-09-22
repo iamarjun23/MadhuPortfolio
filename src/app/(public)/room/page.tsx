@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { MoodBoard } from "@/components/public/MoodBoard";
-import { getRoom, getSettings } from "@/lib/content";
+import { getContact, getRoom, getSettings } from "@/lib/content";
 import { realImage } from "@/lib/placeholders";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,6 +20,6 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function DrawingRoomPage() {
-  const [room, settings] = await Promise.all([getRoom(), getSettings()]);
-  return <MoodBoard data={room} fallbackImage={settings.fallbackImage} />;
+  const [room, settings, contact] = await Promise.all([getRoom(), getSettings(), getContact()]);
+  return <MoodBoard data={room} fallbackImage={settings.fallbackImage} contact={contact} />;
 }

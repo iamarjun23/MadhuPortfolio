@@ -105,6 +105,7 @@ export const RoomSchema = z.object({
   resetLabel: z.string().max(30).default("Reset"),
   closeEyebrow: z.string().max(40).default("That's the room"),
   closeHeading: z.string().max(80).default("Back to business?"),
+  closeCtaLabel: z.string().max(40).default("Back to the portfolio"),
   allowDrag: z.boolean().default(true),
   showShuffle: z.boolean().default(true),
   cards: z

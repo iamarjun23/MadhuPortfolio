@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { HOME_SCROLL_KEY, RESTORE_HOME_SCROLL_KEY } from "@/components/public/Nav";
 import { MediaImage } from "@/components/public/MediaImage";
 import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
-import { reelBadge, resolveReel } from "@/lib/reel";
-import type { Room } from "@/schemas";
+import { reelBadge, reelSourceLabel, resolveReel } from "@/lib/reel";
+import type { Contact, Room } from "@/schemas";
 
-type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage }>;
+type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage; contact: Contact }>;
 type Position = Pick<Room["cards"][number], "fx" | "fy" | "rot">;
 type RoomCard = Room["cards"][number];
 type VideoCard = Extract<RoomCard, { type: "video" }>;
@@ -136,41 +138,45 @@ function cardContent(card: Room["cards"][number], fallbackImage: FallbackImage) 
   }
 }
 
-/* The same pop-up the work board uses, so a reel opens the same way wherever it
-   is pinned: the video plays in place, and a link we cannot embed still opens. */
-function ReelPlayer({ card, onClose }: Readonly<{ card: VideoCard; onClose: () => void }>) {
-  const reel = resolveReel(card);
+type ViewableCard = VideoCard | Extract<RoomCard, { type: "polaroid" }>;
+
+/* Opens whatever a card holds, full size: a reel plays in place, a photo is shown
+   whole. Portrait media (Instagram, LinkedIn, photos) sits beside its caption so
+   the frame is never lost in a wide, empty box. */
+function CardViewer({
+  card,
+  fallbackImage,
+  onClose,
+}: Readonly<{ card: ViewableCard; fallbackImage: FallbackImage; onClose: () => void }>) {
+  const reel = card.type === "video" ? resolveReel(card) : null;
+  const photo = card.type === "polaroid" ? imageOrFallback(card.image, fallbackImage, card.caption) : null;
+  const kind = reel ? reel.kind : "photo";
+  const source = reel ? reelSourceLabel(reel.kind) : "Photograph";
+  const outbound = card.type === "video" ? card.href : null;
 
   return (
     <>
       <div className="mood-player__scrim" aria-hidden="true" onClick={onClose} />
       <div
-        className="mood-player"
+        className={`mood-player mood-player--${kind}`}
         role="dialog"
         aria-modal="true"
         aria-label={`${card.caption} preview`}
       >
-        <button
-          className="mood-player__close"
-          type="button"
-          onClick={onClose}
-          aria-label="Close video preview"
-        >
+        <button className="mood-player__close" type="button" onClick={onClose} aria-label="Close preview">
           &times;
         </button>
-        <div className={`mood-player__media mood-player__media--${reel.kind}`}>
-          {reel.file ? (
-            <video
-              src={reel.file}
-              poster={reel.poster ?? undefined}
-              controls
-              autoPlay
-              playsInline
-            />
-          ) : reel.embed ? (
+        <div className={`mood-player__media mood-player__media--${kind}`}>
+          {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo.url} alt={photo.alt} />
+          ) : reel?.file ? (
+            <video src={reel.file} poster={reel.poster ?? undefined} controls autoPlay playsInline />
+          ) : reel?.embed ? (
             <iframe
               src={reel.embed}
               title={`${card.caption} video`}
+              scrolling="no"
               allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
@@ -178,25 +184,34 @@ function ReelPlayer({ card, onClose }: Readonly<{ card: VideoCard; onClose: () =
           ) : (
             <div className="mood-player__unavailable">
               <span>This card has no video that can play here yet.</span>
-              {card.href ? (
-                <a href={card.href} target="_blank" rel="noreferrer">
-                  Open the link <span aria-hidden="true">&#8599;</span>
-                </a>
-              ) : null}
             </div>
           )}
         </div>
         <div className="mood-player__copy">
+          <span className="mood-player__source">
+            <i aria-hidden="true" />
+            {source}
+          </span>
           <small>{card.tag}</small>
           <h3>{card.caption}</h3>
-          <p>{card.subCaption}</p>
+          {card.subCaption ? <p>{card.subCaption}</p> : null}
+          {outbound ? (
+            <a className="mood-player__cta" href={outbound} target="_blank" rel="noreferrer">
+              {reel?.kind === "instagram" ? "Watch on Instagram" : "Open original"}{" "}
+              <span aria-hidden="true">&#8599;</span>
+            </a>
+          ) : null}
+          <span className="mood-player__hint" aria-hidden="true">
+            Esc to close
+          </span>
         </div>
       </div>
     </>
   );
 }
 
-export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
+export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProps) {
+  const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
   // The board and card geometry is measured once per drag; re-measuring on
   // every pointer move forced a layout on each event.
@@ -225,7 +240,7 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
   const positionOf = (card: Room["cards"][number]) =>
     positions[card.id] ?? { fx: card.fx, fy: card.fy, rot: card.rot };
   const [dragged, setDragged] = useState<string | null>(null);
-  const [playing, setPlaying] = useState<VideoCard | null>(null);
+  const [playing, setPlaying] = useState<ViewableCard | null>(null);
   /* A card is dragged and clicked with the same button, and the click lands after
      the drag has finished. Without this the pop-up opened every time a reel card
      was moved. */
@@ -415,13 +430,26 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
     setMoveAnnouncement(`Moved ${label} ${nextMovement.direction}.`);
   }
 
+  const isViewable = (card: RoomCard): card is ViewableCard =>
+    card.type === "video" ||
+    (card.type === "polaroid" && !!imageOrFallback(card.image, fallbackImage, card.caption));
+
   function openCard(card: RoomCard) {
-    if (card.type !== "video") return;
+    if (!isViewable(card)) return;
     if (draggedRatherThanClicked.current) {
       draggedRatherThanClicked.current = false;
       return;
     }
     setPlaying(card);
+  }
+
+  /* Hands the landing page the spot it should land back on, saved by Nav while
+     the visitor was there; arriving directly (a shared link, a refresh) leaves
+     nothing saved, so the landing page opens on the hero as usual. */
+  function goHome() {
+    const savedScroll = sessionStorage.getItem(HOME_SCROLL_KEY);
+    if (savedScroll) sessionStorage.setItem(RESTORE_HOME_SCROLL_KEY, savedScroll);
+    router.push("/");
   }
 
   return (
@@ -454,10 +482,11 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
           {data.cards.map((card) => {
             const position = positionOf(card);
             const label = getCardLabel(card);
+            const viewable = isViewable(card);
             return (
               <div
                 key={card.id}
-                className={`mood-card mood-card--${card.type} mood-card--${card.pinType} ${dragged === card.id ? "is-dragging" : ""}`}
+                className={`mood-card mood-card--${card.type} mood-card--${card.pinType} ${viewable ? "is-viewable" : ""} ${dragged === card.id ? "is-dragging" : ""}`}
                 style={{
                   left: `${position.fx * 100}%`,
                   top: `${position.fy * 100}%`,
@@ -467,18 +496,18 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
                 onPointerMove={pointerMove}
                 onClick={() => openCard(card)}
                 onKeyDown={(event) => {
-                  if (card.type === "video" && (event.key === "Enter" || event.key === " ")) {
+                  if (viewable && (event.key === "Enter" || event.key === " ")) {
                     event.preventDefault();
                     setPlaying(card);
                     return;
                   }
                   moveCardByKeyboard(event, card.id, label);
                 }}
-                tabIndex={canReposition || card.type === "video" ? 0 : undefined}
-                role={card.type === "video" ? "button" : canReposition ? "group" : undefined}
+                tabIndex={canReposition || viewable ? 0 : undefined}
+                role={viewable ? "button" : canReposition ? "group" : undefined}
                 aria-label={
-                  card.type === "video"
-                    ? `Play ${label}`
+                  viewable
+                    ? `${card.type === "video" ? "Play" : "View"} ${label}`
                     : canReposition
                       ? `Reposition ${label}`
                       : undefined
@@ -492,10 +521,23 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
           })}
         </div>
       </section>
-      {playing ? <ReelPlayer card={playing} onClose={() => setPlaying(null)} /> : null}
+      {playing ? (
+        <CardViewer card={playing} fallbackImage={fallbackImage} onClose={() => setPlaying(null)} />
+      ) : null}
       <section className="room-close">
         <span className="slate">{data.closeEyebrow}</span>
         <h2>{data.closeHeading}</h2>
+        <div className="room-close__actions">
+          <button type="button" className="drawing-teaser__link" onClick={goHome}>
+            {data.closeCtaLabel} <span aria-hidden="true">&larr;</span>
+          </button>
+          <a
+            className="drawing-teaser__link"
+            href={`mailto:${contact.email}?subject=Project%20enquiry`}
+          >
+            {contact.projectCtaLabel} <span aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
       </section>
     </main>
   );

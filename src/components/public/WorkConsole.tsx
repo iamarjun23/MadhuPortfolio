@@ -493,7 +493,7 @@ export function WorkConsole({
   const previewReel = preview ? resolveReel(preview.project) : null;
 
   return (
-    <section className="work section" id="work">
+    <section className="work section" id="work" data-studio-hooks={interactive ? undefined : ""}>
       <div className="wrap">
         <header className="section-heading">
           <span className="slate">{data.eyebrow}</span>
@@ -673,6 +673,14 @@ export function WorkConsole({
                           </button>
                         );
                       })}
+                      {/* grid-auto-flow: column always reserves a full 3-row
+                          last column, so a count not divisible by 3 leaves
+                          empty cells showing the grid's own background - a
+                          stray gray block instead of the hairline it's meant
+                          for. Fillers just occupy those cells. */}
+                      {Array.from({ length: (3 - (projects.length % 3)) % 3 }, (_, i) => (
+                        <span key={`fill-${i}`} className="work__rail-filler" aria-hidden="true" />
+                      ))}
                     </div>
                   ))}
                 </div>

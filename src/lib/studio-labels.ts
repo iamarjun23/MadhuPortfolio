@@ -670,6 +670,7 @@ const fieldRules: readonly FieldRule[] = [
     doc: { label: "Closing eyebrow", hint: "Small line above the sign-off at the bottom." },
   },
   { key: "closeHeading", doc: { label: "Closing heading" } },
+  { key: "closeCtaLabel", doc: { label: "Back-to-portfolio button text" } },
   {
     key: "stamp",
     doc: {

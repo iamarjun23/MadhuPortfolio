@@ -217,7 +217,6 @@ button {
   border-bottom-color: transparent;
   background: transparent;
   box-shadow: none;
-  backdrop-filter: none;
 }
 
 .whatsapp-fab {
@@ -1893,6 +1892,9 @@ button {
   gap: 1px;
   background: var(--border);
   border-right: 1px solid var(--border);
+}
+.work__rail-filler {
+  background: var(--surface);
 }
 @keyframes work-rail-drift {
   to {
@@ -3571,6 +3573,16 @@ button {
   margin-top: 0.7rem;
   font-size: clamp(2rem, 5vw, 3.4rem);
 }
+.room-close__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+.room-close .drawing-teaser__link {
+  cursor: pointer;
+}
 
 .login-page {
   display: grid;
@@ -4972,6 +4984,17 @@ button {
 .studio-settings-preview {
   min-height: min(67vw, 670px);
   background: var(--bg);
+}
+
+.studio-room-preview__divider {
+  padding: 0.6rem 0;
+  background: var(--bg);
+  color: var(--accent-text);
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
 }
 
 .studio-settings-preview .public-nav {
@@ -7416,20 +7439,20 @@ button {
    play badge fades up, and clicking it opens the same pop-up the work board uses.
 --------------------------------------------------------------------------- */
 
-.mood-card--video {
+.mood-card.is-viewable {
   cursor: pointer;
 }
 
-.mood-card--video .mood-card__image {
+.mood-card.is-viewable .mood-card__image {
   transition: transform 260ms var(--e-cut, ease);
 }
 
-.mood-card--video .mood-card__image img {
+.mood-card.is-viewable .mood-card__image img {
   transition: transform 320ms var(--e-cut, ease);
 }
 
-.mood-card--video:hover:not(.is-dragging) .mood-card__image img,
-.mood-card--video:focus-visible .mood-card__image img {
+.mood-card.is-viewable:hover:not(.is-dragging) .mood-card__image img,
+.mood-card.is-viewable:focus-visible .mood-card__image img {
   transform: scale(1.08);
 }
 
@@ -7466,58 +7489,83 @@ button {
 .mood-player__scrim {
   position: fixed;
   inset: 0;
-  z-index: 80;
-  background: rgba(4, 4, 6, 0.84);
-  backdrop-filter: blur(4px);
+  z-index: 210;
+  background:
+    radial-gradient(60% 50% at 50% 45%, rgba(255, 90, 31, 0.1), transparent 70%),
+    rgba(4, 4, 6, 0.88);
+  backdrop-filter: blur(14px) saturate(120%);
+  animation: mood-fade 260ms ease both;
 }
 
+/* Wide media (YouTube, uploads) stacks over its caption; portrait media sits
+   beside it, so the frame always fills the box instead of floating in black. */
 .mood-player {
   position: fixed;
-  z-index: 81;
+  z-index: 211;
   top: 50%;
   left: 50%;
   display: grid;
-  gap: 0.85rem;
-  width: min(980px, 92vw);
-  max-height: 88vh;
-  padding: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  background: var(--ink-950, #050505);
-  color: var(--d-text, #fff);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+  gap: 1.25rem;
+  width: min(1080px, 92vw);
+  max-height: 92vh;
+  padding: 1.1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(28, 28, 32, 0.96), rgba(8, 8, 10, 0.98));
+  box-shadow:
+    0 40px 120px -20px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  color: #f4f1ec;
   transform: translate(-50%, -50%);
+  animation: mood-rise 380ms var(--e-cut, cubic-bezier(0.2, 0.8, 0.2, 1)) both;
+}
+
+.mood-player--instagram,
+.mood-player--linkedin,
+.mood-player--photo {
+  grid-template-columns: auto minmax(15rem, 19rem);
+  align-items: stretch;
+  width: auto;
+  max-width: 94vw;
 }
 
 .mood-player__close {
   position: absolute;
-  top: -0.6rem;
-  right: -0.6rem;
+  z-index: 3;
+  top: 0.9rem;
+  right: 0.9rem;
   display: grid;
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.4rem;
+  height: 2.4rem;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 50%;
-  background: var(--ink-900, #090909);
+  background: rgba(255, 255, 255, 0.06);
   color: inherit;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   line-height: 1;
   cursor: pointer;
+  transition:
+    background 200ms ease,
+    transform 200ms ease;
 }
 
-.mood-player__close:hover {
+.mood-player__close:hover,
+.mood-player__close:focus-visible {
   background: var(--accent, #ff5a1f);
   color: #fff;
+  transform: rotate(90deg);
 }
 
 .mood-player__media {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  max-height: 68vh;
+  max-height: 72vh;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 12px;
   background: #000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .mood-player__media iframe,
@@ -7530,50 +7578,200 @@ button {
   background: #000;
 }
 
-/* An Instagram reel and a LinkedIn post are both taller than they are wide, so
-   the pop-up gives them a portrait frame instead of letterboxing them into 16:9. */
-.mood-player__media--instagram,
 .mood-player__media--linkedin {
-  width: min(420px, 100%);
-  margin-inline: auto;
+  width: min(420px, 60vw);
   aspect-ratio: 9 / 14;
+  max-height: 86vh;
+}
+
+/* Instagram's embed wraps the reel in white chrome (header, likes, "view
+   more"). The frame is cut to the 4:5 media box and the page shifted up past
+   the header, so only the reel shows; the side panel links back to the post. */
+.mood-player__media--instagram {
+  width: min(400px, 60vw, calc(86vh * 0.8));
+  min-width: 326px;
+  aspect-ratio: 4 / 5;
+  max-height: none;
+}
+
+/* ponytail: 54px is Instagram's embed header height; if they change it a sliver
+   of chrome shows at the top - adjust this one number. */
+.mood-player__media--instagram iframe {
+  position: absolute;
+  top: -54px;
+  left: 0;
+  height: calc(100% + 54px + 320px);
+}
+
+.mood-player__media--photo {
+  display: grid;
+  width: auto;
+  aspect-ratio: auto;
+  max-height: none;
+  place-items: center;
+}
+
+.mood-player__media--photo img {
+  display: block;
+  max-width: min(64vw, 820px);
+  max-height: 86vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .mood-player__unavailable {
   display: grid;
-  gap: 0.6rem;
+  height: 100%;
+  place-content: center;
   padding: 3rem 1rem;
   color: var(--d-muted, #8d8d8d);
   font-size: 0.85rem;
   text-align: center;
 }
 
-.mood-player__unavailable a {
-  color: var(--accent, #ff5a1f);
+.mood-player__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.25rem 0.4rem;
 }
 
-.mood-player__copy {
-  display: grid;
-  gap: 0.25rem;
+.mood-player--instagram .mood-player__copy,
+.mood-player--linkedin .mood-player__copy,
+.mood-player--photo .mood-player__copy {
+  justify-content: flex-end;
+  padding: 3.5rem 0.75rem 0.5rem;
+}
+
+.mood-player__source {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  align-self: flex-start;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: rgba(244, 241, 236, 0.7);
+  font-family: var(--f-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mood-player__source i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent, #ff5a1f);
+  box-shadow: 0 0 10px var(--accent, #ff5a1f);
 }
 
 .mood-player__copy small {
+  margin-top: auto;
   color: var(--accent, #ff5a1f);
   font-family: var(--f-mono);
   font-size: 0.66rem;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .mood-player__copy h3 {
   margin: 0;
-  font-size: 1.15rem;
+  font-family: var(--f-display);
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
 }
 
 .mood-player__copy p {
   margin: 0;
-  color: var(--d-muted, #8d8d8d);
+  color: rgba(244, 241, 236, 0.6);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.mood-player__cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem 1.1rem;
+  border-radius: 999px;
+  background: #f4f1ec;
+  color: #0a0a0a;
   font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background 200ms ease,
+    color 200ms ease;
+}
+
+.mood-player__cta:hover,
+.mood-player__cta:focus-visible {
+  background: var(--accent, #ff5a1f);
+  color: #fff;
+}
+
+.mood-player__hint {
+  margin-top: 0.4rem;
+  color: rgba(244, 241, 236, 0.35);
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mood-player:not(.mood-player--instagram, .mood-player--linkedin, .mood-player--photo) .mood-player__hint {
+  display: none;
+}
+
+@keyframes mood-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes mood-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.97);
+  }
+}
+
+@media (max-width: 820px) {
+  .mood-player--instagram,
+  .mood-player--linkedin,
+  .mood-player--photo {
+    grid-template-columns: minmax(0, 1fr);
+    width: 92vw;
+    overflow-y: auto;
+  }
+
+  .mood-player--instagram .mood-player__copy,
+  .mood-player--linkedin .mood-player__copy,
+  .mood-player--photo .mood-player__copy {
+    padding: 0 0.4rem 0.4rem;
+  }
+
+  .mood-player__media--instagram,
+  .mood-player__media--linkedin {
+    width: 100%;
+    min-width: 0;
+    margin-inline: auto;
+    max-width: 400px;
+  }
+
+  .mood-player__media--photo img {
+    max-width: 100%;
+    max-height: 64vh;
+  }
+
+  .mood-player__hint {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -11,6 +11,13 @@ type NavProps = Readonly<{
   settings: Settings;
 }>;
 
+/* Where the Drawing Room's "back to the portfolio" button reads and writes,
+   so it can return a visitor to the spot they left rather than the top of the
+   page. Kept as session storage, not React state, because the Drawing Room
+   needs to read it and it must survive the navigation between the two pages. */
+export const HOME_SCROLL_KEY = "portfolio:home-scroll";
+export const RESTORE_HOME_SCROLL_KEY = "portfolio:restore-home-scroll";
+
 function formatAvailabilityTicker(value: string | undefined) {
   const label = value?.trim();
   const expanded =
@@ -52,6 +59,35 @@ export function Nav({ contact, settings }: NavProps) {
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
+
+  /* Caught here, in the capture phase, rather than on each "Drawing Room" link
+     (Nav's own, Footer's, the teaser's two): a listener on the document sees
+     every one of them without having to be wired into each, and catches the
+     click before Next's own handler starts the transition and resets the
+     scroll - a plain scroll-position effect was tried first and lost that
+     race, saving the post-reset 0 instead of where the visitor actually was. */
+  useEffect(() => {
+    const onClickCapture = (event: MouseEvent) => {
+      if (pathname !== "/") return;
+      const link = (event.target as HTMLElement | null)?.closest?.('a[href="/room"]');
+      if (link) sessionStorage.setItem(HOME_SCROLL_KEY, String(window.scrollY));
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, [pathname]);
+
+  /* The counterpart: on the way in, the click above left the spot to return
+     to, so landing back on "/" jumps straight to it instead of the top.
+     next/navigation's router.back() was tried first and rejected - the App
+     Router's own scroll handling fought it and the page landed at the bottom
+     instead. */
+  useEffect(() => {
+    if (pathname !== "/") return;
+    const target = sessionStorage.getItem(RESTORE_HOME_SCROLL_KEY);
+    if (!target) return;
+    sessionStorage.removeItem(RESTORE_HOME_SCROLL_KEY);
+    window.scrollTo(0, Number(target));
+  }, [pathname]);
 
   // The hero crossing is a geometry question, so let the browser answer it off
   // the main thread rather than measuring the hero on every scroll event.
