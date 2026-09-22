@@ -71,6 +71,7 @@ model Media {
 enum MediaKind {
   IMAGE
   VIDEO
+  DOCUMENT
 }
 
 model Activity {

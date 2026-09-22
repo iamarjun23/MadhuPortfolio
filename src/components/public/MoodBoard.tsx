@@ -363,16 +363,15 @@ export function MoodBoard({ data, fallbackImage = null }: MoodBoardProps) {
   function pointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
     if (!drag) return;
+    // Kept fully inside the board: the board clips overflow, so any overhang
+    // here was invisible anyway - it just cut the card off mid-drag.
     const x = Math.max(
-      -drag.cardWidth * 0.6,
-      Math.min(drag.boardWidth - drag.cardWidth * 0.4, event.clientX - drag.boardLeft - drag.grabX),
+      0,
+      Math.min(drag.boardWidth - drag.cardWidth, event.clientX - drag.boardLeft - drag.grabX),
     );
     const y = Math.max(
-      -drag.cardHeight * 0.6,
-      Math.min(
-        drag.boardHeight - drag.cardHeight * 0.4,
-        event.clientY - drag.boardTop - drag.grabY,
-      ),
+      0,
+      Math.min(drag.boardHeight - drag.cardHeight, event.clientY - drag.boardTop - drag.grabY),
     );
     if (Math.abs(x - drag.grabStartX) + Math.abs(y - drag.grabStartY) > 4) drag.moved = true;
     drag.fx = x / Math.max(1, drag.boardWidth);

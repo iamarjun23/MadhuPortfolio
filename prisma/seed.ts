@@ -3,13 +3,13 @@ import { Prisma, PrismaClient, Status } from "../src/generated/prisma-node/clien
 import { sectionKeys, type SectionKey } from "../src/lib/sections";
 import {
   AboutSchema,
-  BoothSchema,
+  ClientsSchema,
   ContactSchema,
   ExperienceSchema,
   HeroSchema,
   ImpactSchema,
   PraiseSchema,
-  ProcessSchema,
+  ResumeSchema,
   RoomSchema,
   SettingsSchema,
   WorkSchema,
@@ -93,26 +93,9 @@ export const sectionData = {
         context: "JarXchange podcast",
       },
     ],
-    campaignsHeading: "Sponsorship campaigns",
-    campaignsDescription: "Performance films cut for Jar's sponsorship of each show.",
-    campaigns: [
-      {
-        name: "Mahanati",
-        context: "Jar sponsorship performance film",
-        href: null,
-      },
-      {
-        name: "Bigg Boss Kannada",
-        context: "Jar sponsorship performance film",
-        href: null,
-      },
-      {
-        name: "Sa Re Ga Ma Pa",
-        context: "Jar sponsorship performance film",
-        href: null,
-      },
-    ],
   }),
+  // Every company needs an uploaded logo, so the list starts empty.
+  clients: ClientsSchema.parse({ clients: [] }),
   work: WorkSchema.parse({
     eyebrow: "Selected work",
     heading: "Rearrange the room.",
@@ -286,80 +269,6 @@ export const sectionData = {
       },
     ],
   }),
-  booth: BoothSchema.parse({
-    slots: [
-      {
-        id: "ramesh-arvind",
-        image: null,
-        title: "Ramesh Arvind",
-        subtitle: "Jar · Start Saving",
-        lightboxCaption: "On set with Ramesh Arvind for Jar · Start Saving",
-        hasTape: true,
-        width: 4,
-        height: 3,
-      },
-      {
-        id: "danish-sait",
-        image: null,
-        title: "Danish Sait",
-        subtitle: "JarXchange podcast",
-        lightboxCaption: "JarXchange podcast with Danish Sait",
-        hasTape: false,
-        width: 3,
-        height: 2,
-      },
-      {
-        id: "ankur-warikoo",
-        image: null,
-        title: "Ankur Warikoo",
-        subtitle: "Jar townhall",
-        lightboxCaption: "Jar townhall with Ankur Warikoo",
-        hasTape: true,
-        width: 5,
-        height: 2,
-      },
-      {
-        id: "ananth-sriram",
-        image: null,
-        title: "Ananth Sriram",
-        subtitle: "Jar performance shoot",
-        lightboxCaption: "Jar performance shoot with Ananth Sriram",
-        hasTape: false,
-        width: 3,
-        height: 2,
-      },
-      {
-        id: "manjeet-sarkar",
-        image: null,
-        title: "Manjeet Sarkar",
-        subtitle: "Untouchable: Laughing Out Loud Caste",
-        lightboxCaption: "Untouchable: Laughing Out Loud Caste with Manjeet Sarkar",
-        hasTape: true,
-        width: 4,
-        height: 3,
-      },
-      {
-        id: "varun-grover",
-        image: null,
-        title: "Varun Grover",
-        subtitle: "Untouchable: Laughing Out Loud Caste",
-        lightboxCaption: "Untouchable: Laughing Out Loud Caste project with Varun Grover",
-        hasTape: false,
-        width: 5,
-        height: 2,
-      },
-      {
-        id: "jarxchange-podcast",
-        image: null,
-        title: "JXC Podcast",
-        subtitle: "Guests across finance",
-        lightboxCaption: "JarXchange podcast guests across the finance field",
-        hasTape: false,
-        width: 3,
-        height: 2,
-      },
-    ],
-  }),
   praise: PraiseSchema.parse({
     visible: true,
     quotes: [
@@ -466,75 +375,11 @@ export const sectionData = {
       },
     ],
   }),
-  process: ProcessSchema.parse({
-    eyebrow: "Studio",
-    heading: "The work behind the cut.",
-    intro:
-      "A clear process, realistic turnaround, and a few frames from the rooms where the work happened.",
-    method: {
-      eyebrow: "How I work",
-      heading: "Five passes. One better film.",
-      steps: [
-        {
-          id: "organise",
-          number: "01",
-          title: "Organise",
-          description:
-            "Files named, bins built, script read twice. Nothing hits the timeline until I know where everything lives.",
-        },
-        {
-          id: "assemble",
-          number: "02",
-          title: "Assemble",
-          description:
-            "A rough pass for structure - where the story turns, where it drags, what can go. Structure before polish, always.",
-        },
-        {
-          id: "cut",
-          number: "03",
-          title: "Cut",
-          description:
-            "Dialogue-led, cut on meaning rather than beat. Sound design in the same pass, not bolted on after.",
-        },
-        {
-          id: "feedback",
-          number: "04",
-          title: "Feedback",
-          description:
-            "Send it, take the notes, cut again. This is the part most editors resist and the part that makes the video good.",
-        },
-        {
-          id: "deliver",
-          number: "05",
-          title: "Deliver",
-          description: "Every format the campaign needs, named properly, on time.",
-        },
-      ],
-    },
-    turnaround: {
-      eyebrow: "Turnaround",
-      heading: "Know the rhythm before we start.",
-      rows: [
-        { id: "short-form", format: "Short-form reel", timing: "1 day" },
-        { id: "long-form", format: "Long-form / explainer", timing: "2-3 days" },
-        { id: "podcast", format: "Podcast episode", timing: "4-5 days" },
-        { id: "campaign", format: "Campaign", timing: "~1 month, script to live ads" },
-      ],
-      notes: [
-        {
-          id: "podcast-note",
-          text: "Podcasts run longer because they're multicam and cut to reference.",
-        },
-        {
-          id: "freelance-note",
-          text: "Freelance work starts within a week of the brief. Rates depend on scope - ask.",
-        },
-      ],
-    },
-    showPhotobooth: true,
+  resume: ResumeSchema.parse({
+    intro: "Every role, tool and credit so far. Read it here or take a copy with you.",
     seo: {
-      title: "Studio",
-      description: "How N Madhu Kumar organises, edits, reviews, and delivers video work.",
+      title: "Resume",
+      description: "The resume of N Madhu Kumar, video editor based in Bengaluru.",
     },
   }),
   room: RoomSchema.parse({
@@ -768,8 +613,6 @@ export const sectionData = {
       ogImage: null,
     },
     appearance: {
-      defaultTheme: "suite",
-      showThemeToggle: true,
       motion: true,
     },
     fallbackImage: null,

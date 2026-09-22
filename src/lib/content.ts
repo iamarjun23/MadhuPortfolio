@@ -6,13 +6,13 @@ import { contentTag } from "@/lib/revalidate";
 import { sectionKeys, type SectionKey } from "@/lib/sections";
 import {
   AboutSchema,
-  BoothSchema,
+  ClientsSchema,
   ContactSchema,
   ExperienceSchema,
   HeroSchema,
   ImpactSchema,
   PraiseSchema,
-  ProcessSchema,
+  ResumeSchema,
   RoomSchema,
   SettingsSchema,
   WorkSchema,
@@ -111,12 +111,12 @@ export const getImpact = cache((status: Status = Status.PUBLISHED) =>
   getSection("impact", status, ImpactSchema),
 );
 
-export const getWork = cache((status: Status = Status.PUBLISHED) =>
-  getSection("work", status, WorkSchema),
+export const getClients = cache((status: Status = Status.PUBLISHED) =>
+  getSection("clients", status, ClientsSchema),
 );
 
-export const getBooth = cache((status: Status = Status.PUBLISHED) =>
-  getSection("booth", status, BoothSchema),
+export const getWork = cache((status: Status = Status.PUBLISHED) =>
+  getSection("work", status, WorkSchema),
 );
 
 export const getPraise = cache((status: Status = Status.PUBLISHED) =>
@@ -127,8 +127,8 @@ export const getExperience = cache((status: Status = Status.PUBLISHED) =>
   getSection("experience", status, ExperienceSchema),
 );
 
-export const getProcess = cache((status: Status = Status.PUBLISHED) =>
-  getSection("process", status, ProcessSchema),
+export const getResume = cache((status: Status = Status.PUBLISHED) =>
+  getSection("resume", status, ResumeSchema),
 );
 
 export const getRoom = cache((status: Status = Status.PUBLISHED) =>

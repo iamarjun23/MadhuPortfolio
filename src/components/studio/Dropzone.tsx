@@ -47,8 +47,13 @@ export function Dropzone({
      video field behaved as an image field throughout. */
   const { accept: acceptKind, maxBytes } = endpointLimits[endpoint];
   const isVideo = acceptKind === "video/";
+  const isDocument = acceptKind === "application/";
   const maxLabel = `${Math.round(maxBytes / (1024 * 1024))} MB`;
-  const fileHint = isVideo ? `Video up to ${maxLabel}` : `Image up to ${maxLabel}`;
+  const fileHint = isDocument
+    ? `PDF up to ${maxLabel}`
+    : isVideo
+      ? `Video up to ${maxLabel}`
+      : `Image up to ${maxLabel}`;
 
   useEffect(
     () => () => {
@@ -72,9 +77,11 @@ export function Dropzone({
     }
     if (!isAllowedMimeType(file.type, acceptKind)) {
       setError(
-        isVideo
-          ? "Choose an MP4, WebM or MOV video."
-          : "Choose a JPEG, PNG, WebP, AVIF or GIF image.",
+        isDocument
+          ? "Choose a PDF."
+          : isVideo
+            ? "Choose an MP4, WebM or MOV video."
+            : "Choose a JPEG, PNG, WebP, AVIF or GIF image.",
       );
       return;
     }
@@ -168,7 +175,13 @@ export function Dropzone({
                 : `${fileHint} · Drop a file or choose one`}
         </small>
       </label>
-      {displayUrl ? (
+      {displayUrl && isDocument ? (
+        <p className="studio-dropzone__status">
+          <a href={displayUrl} target="_blank" rel="noreferrer">
+            Open the uploaded PDF ↗
+          </a>
+        </p>
+      ) : displayUrl ? (
         <div className="studio-dropzone__preview">
           {previewFailed ? (
             <p className="studio-dropzone__preview-fallback" role="status">

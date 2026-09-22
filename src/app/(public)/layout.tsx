@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Footer } from "@/components/public/Footer";
 import { Nav } from "@/components/public/Nav";
+import { WhatsAppButton } from "@/components/public/WhatsAppButton";
 import { getContact, getSettings } from "@/lib/content";
 import { realImage } from "@/lib/placeholders";
 import { getSiteUrl } from "@/lib/site-url";
@@ -9,13 +10,6 @@ import { defaultSiteSettings } from "@/schemas/settings";
 type PublicLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
-
-// The visitor's saved theme is applied by the inline script in the root layout, before paint, and
-// the toggle adopts it on mount. The server only supplies the site-wide default, because reading
-// the cookie here would make every public page render per request instead of from the ISR cache.
-function getDefaultTheme(defaultTheme: "suite" | "sheet" | "system") {
-  return defaultTheme === "sheet" ? "light" : "dark";
-}
 
 // Pinned to the desktop container width (see base.css's 1280px max-width) instead
 // of device-width, so phones render the exact desktop layout and the browser
@@ -79,14 +73,10 @@ export default async function PublicLayout({ children }: PublicLayoutProps) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <div className={settings.appearance.motion ? undefined : "motion-disabled"}>
-        <Nav
-          contact={contact}
-          settings={settings}
-          initialTheme={getDefaultTheme(settings.appearance.defaultTheme)}
-          showThemeToggle={settings.appearance.showThemeToggle}
-        />
+        <Nav contact={contact} settings={settings} />
         {children}
         <Footer contact={contact} settings={settings} />
+        <WhatsAppButton contact={contact} />
       </div>
     </>
   );

@@ -26,6 +26,9 @@ export const ExperienceSchema = z.object({
           .object({ url: MediaUrlSchema, alt: z.string().default("") })
           .nullable()
           .default(null),
+        // Where the scene and thumbnail crops centre - 0.5/0.5 is the middle.
+        focalX: z.number().min(0).max(1).default(0.5),
+        focalY: z.number().min(0).max(1).default(0.5),
         logoHint: z.enum(["l-jar", "l-onep", "l-ulc", "l-hb", "custom"]).default("custom"),
         initials: z.string().max(4),
         start: z.string().max(20),

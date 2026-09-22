@@ -86,9 +86,6 @@ export function Footer({ contact, settings }: FooterProps) {
               <Link href="/#work">{footer.selectedWorkLabel}</Link>
             </li>
             <li>
-              <Link href="/process#photobooth">{footer.photoboothLabel}</Link>
-            </li>
-            <li>
               <Link href="/#experience">{footer.experienceLabel}</Link>
             </li>
             <li>

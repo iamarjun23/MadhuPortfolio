@@ -11,7 +11,7 @@ export function updateContent(key: SectionKey) {
 }
 
 // The public pages whose prerendered HTML carries published content.
-export const publicPaths = ["/", "/room", "/process"] as const;
+export const publicPaths = ["/", "/room", "/resume"] as const;
 
 /* The studio runs on Vercel and the public site on the Cloudflare Worker, each with its own cache,
    so clearing this deployment's tags leaves the live site serving the old page. This asks the Worker

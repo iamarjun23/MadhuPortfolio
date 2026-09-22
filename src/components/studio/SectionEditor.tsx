@@ -27,6 +27,8 @@ import { PreviewFrame } from "@/components/studio/PreviewFrame";
 import { SaveBar } from "@/components/studio/SaveBar";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
+import { orderAllProjects } from "@/components/public/WorkConsole";
+import { WorkSchema } from "@/schemas";
 import { estimateFocalPoint } from "@/lib/focal-point";
 import type { SectionKey } from "@/lib/sections";
 import {
@@ -46,8 +48,7 @@ type EditorObject = { [key: string]: EditorValue };
 const roomTints = ["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"] as const;
 
 const selectOptions: Record<string, readonly string[]> = {
-  allLayout: ["globe", "canvas", "grid"],
-  defaultTheme: ["suite", "sheet", "system"],
+  layout: ["canvas", "grid"],
   hrefLabel: ["", "YouTube", "LinkedIn"],
   logoHint: ["l-jar", "l-onep", "l-ulc", "l-hb", "custom"],
   pinType: ["pin", "pin-signal", "tape", "none"],
@@ -338,17 +339,13 @@ function emptyFromTemplate(
     result[key] =
       key === "id"
         ? crypto.randomUUID()
-        : key === "href" && typeof entry === "string"
+        : key === "position"
+          ? null
+          : key === "href" && typeof entry === "string"
           ? null
           : emptyFromTemplate(entry, [...path, key]);
   }
   return result;
-}
-
-function reorder(values: EditorValue[], activeId: string, overId: string) {
-  const oldIndex = values.findIndex((value) => isEditorObject(value) && value.id === activeId);
-  const newIndex = values.findIndex((value) => isEditorObject(value) && value.id === overId);
-  return oldIndex < 0 || newIndex < 0 ? values : arrayMove(values, oldIndex, newIndex);
 }
 
 function itemTitle(value: EditorValue, fallback: string) {
@@ -432,6 +429,8 @@ function blankItem(
       return blankRoomPicture();
     case "quotes":
       return blankTestimonial();
+    case "clients":
+      return { name: "", logo: null };
     default:
       return template === undefined ? undefined : emptyFromTemplate(template, path);
   }
@@ -505,21 +504,6 @@ function FieldHint({
   );
 }
 
-/* Bounds for the handful of number fields that are spans on a fixed grid
-   (the photobooth wall is 12 columns by 4 rows) rather than free numbers -
-   kept in sync with the min/max in booth.ts so the input can't be dragged
-   outside what the layout actually supports. */
-function numberBoundsForPath(
-  path: readonly (string | number)[],
-): Readonly<{ min: number; max: number }> | undefined {
-  const key = String(path[path.length - 1] ?? "");
-  const arrayKey = path[path.length - 3];
-  if (arrayKey !== "slots") return undefined;
-  if (key === "width") return { min: 2, max: 12 };
-  if (key === "height") return { min: 1, max: 4 };
-  return undefined;
-}
-
 function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
   const key = String(path[path.length - 1] ?? "");
   const options = optionsForPath(path);
@@ -547,7 +531,6 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
   }
 
   if (typeof value === "number") {
-    const bounds = numberBoundsForPath(path);
     return (
       <label className="studio-field" htmlFor={id}>
         <span>{label}</span>
@@ -555,16 +538,11 @@ function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
           id={id}
           type="number"
           value={value}
-          step={bounds ? 1 : "any"}
-          min={bounds?.min}
-          max={bounds?.max}
+          step="any"
           aria-describedby={describedBy}
           onChange={(event) => onChange(path, Number(event.target.value))}
         />
-        <FieldHint
-          id={hintId}
-          hint={bounds ? `${hint ?? ""} (${bounds.min}–${bounds.max})`.trim() : hint}
-        />
+        <FieldHint id={hintId} hint={hint} />
       </label>
     );
   }
@@ -642,9 +620,14 @@ type MediaConfig = Readonly<{
   endpoint: UploadEndpoint;
   acceptsAlt: boolean;
   isVideo?: boolean;
+  isDocument?: boolean;
   isOptional?: boolean;
   isUrlOnly?: boolean;
 }>;
+
+function mediaKindOf(config: MediaConfig | undefined): MediaKindLabel {
+  return config?.isDocument ? "document" : config?.isVideo ? "video" : "photo";
+}
 
 function getMediaConfig(
   value: EditorValue,
@@ -678,19 +661,23 @@ function getMediaConfig(
   if (key === "fallbackImage" && (value === null || isEditorObject(value))) {
     return { endpoint: "fallbackImage", acceptsAlt: false, isOptional: true };
   }
+  if (key === "logo" && arrayKey === "clients" && (value === null || isEditorObject(value))) {
+    return { endpoint: "clientLogo", acceptsAlt: false };
+  }
+  if (key === "pdf" && (value === null || isEditorObject(value))) {
+    return { endpoint: "resumeFile", acceptsAlt: false, isDocument: true, isOptional: true };
+  }
   if (key === "image" && (value === null || isEditorObject(value))) {
     const endpoint =
       arrayKey === "roles"
         ? "experienceImage"
-        : arrayKey === "slots"
-          ? "boothImage"
-          : arrayKey === "projects"
-            ? "reelCover"
-            : arrayKey === "worked"
-              ? "collaboratorImage"
-              : arrayKey === "quotes"
-                ? "testimonialImage"
-                : "roomImage";
+        : arrayKey === "projects"
+          ? "reelCover"
+          : arrayKey === "worked"
+            ? "collaboratorImage"
+            : arrayKey === "quotes"
+              ? "testimonialImage"
+              : "roomImage";
     return {
       endpoint,
       acceptsAlt: true,
@@ -773,17 +760,16 @@ function mediaSummary(value: EditorValue, path: readonly (string | number)[]) {
   const counts: Record<MediaKindLabel, { total: number; filled: number }> = {
     photo: { total: 0, filled: 0 },
     video: { total: 0, filled: 0 },
+    document: { total: 0, filled: 0 },
   };
 
   for (const field of fields) {
-    const kind: MediaKindLabel = getMediaConfig(field.value, field.path)?.isVideo
-      ? "video"
-      : "photo";
+    const kind = mediaKindOf(getMediaConfig(field.value, field.path));
     counts[kind].total += 1;
     if (hasMedia(field.value)) counts[kind].filled += 1;
   }
 
-  const parts = (["photo", "video"] as const)
+  const parts = (["photo", "video", "document"] as const)
     .filter((kind) => counts[kind].total > 0)
     .map((kind) => {
       const { filled } = counts[kind];
@@ -823,7 +809,7 @@ function MediaEditor({
   const config = getMediaConfig(value, path);
   if (!config) return null;
 
-  const kind: MediaKindLabel = config.isVideo ? "video" : "photo";
+  const kind = mediaKindOf(config);
   const spec = mediaSpecs[kind];
   const { hint } = describeField(path);
   const breadcrumb = showBreadcrumb ? parentLabel(path) : "";
@@ -852,9 +838,9 @@ function MediaEditor({
     onChange(path, { ...object, url: nextUrl });
   };
 
-  /* Only the photobooth wall crops its photos into a fixed tile - everywhere
-     else an image runs at its own shape, so there is nothing to focus. */
-  const supportsFocalPoint = config.endpoint === "boothImage";
+  /* Only the experience reel crops its photos into a
+     fixed box - everywhere else an image runs at its own shape. */
+  const supportsFocalPoint = config.endpoint === "experienceImage";
   const focalX = typeof parent?.focalX === "number" ? parent.focalX : 0.5;
   const focalY = typeof parent?.focalY === "number" ? parent.focalY : 0.5;
   const parentPath = path.slice(0, -1);
@@ -890,7 +876,9 @@ function MediaEditor({
           hint ??
           (kind === "video"
             ? "A video that plays in this part of the page."
-            : "An image that appears in this part of the page.")
+            : kind === "document"
+              ? "A file visitors can view and download."
+              : "An image that appears in this part of the page.")
         }
       />
       <p className="studio-media-field__spec">
@@ -1125,7 +1113,8 @@ function itemNounFor(path: readonly (string | number)[]) {
 function contentsLabel(value: EditorValue, path: readonly (string | number)[]) {
   if (Array.isArray(value)) {
     const noun = itemNounFor(path).toLowerCase();
-    return `${value.length} ${value.length === 1 ? noun : `${noun}s`}`;
+    const plural = /[^aeiou]y$/.test(noun) ? `${noun.slice(0, -1)}ies` : `${noun}s`;
+    return `${value.length} ${value.length === 1 ? noun : plural}`;
   }
   if (isEditorObject(value)) {
     const count = Object.keys(value).length;
@@ -1151,7 +1140,8 @@ function GroupView({
   return (
     <div className="studio-ins-fields">
       {Object.entries(value)
-        .filter(([key]) => key !== "id")
+        // Card positions and the "All work" order are set by dragging in the preview.
+        .filter(([key]) => key !== "id" && key !== "position" && key !== "allOrder")
         .map(([key, entry]) => {
           const childPath = [...path, key];
           const label = fieldLabel(childPath);
@@ -1252,10 +1242,12 @@ function ListView({
   /* The six tiles on an Instagram card are a fixed set the schema counts, so the
      panel lets you recolour them but not add a seventh or drop one. */
   const isFixedLength = path.at(-1) === "tiles";
-  const sortableIds = value.flatMap((item) =>
-    isEditorObject(item) && typeof item.id === "string" ? [item.id] : [],
+  /* Entries without an id of their own (collaborators, stats) are sorted by
+     position instead, so every list of entries can be dragged into order. */
+  const sortableIds = value.map((item, index) =>
+    isEditorObject(item) && typeof item.id === "string" ? item.id : `row-${index}`,
   );
-  const isSortable = !isTextList && sortableIds.length === value.length && value.length > 1;
+  const isSortable = !isTextList && value.every(isEditorObject) && value.length > 1;
 
   const addItem = () => {
     if (nextItem === undefined) return;
@@ -1372,9 +1364,9 @@ function ListView({
         </>
       );
 
-    if (isSortable && isEditorObject(item) && typeof item.id === "string") {
+    if (isSortable) {
       return (
-        <SortableRow key={key} id={item.id}>
+        <SortableRow key={key} id={sortableIds[index]!}>
           {body}
         </SortableRow>
       );
@@ -1408,7 +1400,10 @@ function ListView({
               collisionDetection={closestCenter}
               onDragEnd={(event: DragEndEvent) => {
                 if (!event.over || event.active.id === event.over.id) return;
-                onChange(path, reorder(value, String(event.active.id), String(event.over.id)));
+                const from = sortableIds.indexOf(String(event.active.id));
+                const to = sortableIds.indexOf(String(event.over.id));
+                if (from < 0 || to < 0) return;
+                onChange(path, arrayMove(value, from, to));
               }}
             >
               <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
@@ -1727,12 +1722,11 @@ export function SectionEditor({
     return parentValue !== undefined && isEditorObject(parentValue) ? parentValue : undefined;
   };
   const mediaFields = collectMediaFields(currentData);
-  const photoFields = mediaFields.filter(
-    (field) => !getMediaConfig(field.value, field.path)?.isVideo,
-  );
-  const videoFields = mediaFields.filter(
-    (field) => getMediaConfig(field.value, field.path)?.isVideo,
-  );
+  const fieldsOfKind = (kind: MediaKindLabel) =>
+    mediaFields.filter((field) => mediaKindOf(getMediaConfig(field.value, field.path)) === kind);
+  const photoFields = fieldsOfKind("photo");
+  const videoFields = fieldsOfKind("video");
+  const documentFields = fieldsOfKind("document");
   const linkFields = collectLinkFields(currentData);
   const assetCount = mediaFields.length + linkFields.length;
   const assetGroups = [
@@ -1750,6 +1744,14 @@ export function SectionEditor({
       title: "Videos",
       note: mediaSpecs.video.accepts,
       fields: videoFields,
+      isLink: false,
+    },
+    {
+      key: "document",
+      kind: "document" as const,
+      title: "Files",
+      note: mediaSpecs.document.accepts,
+      fields: documentFields,
       isLink: false,
     },
     {
@@ -1833,6 +1835,39 @@ export function SectionEditor({
         setActivePath(path);
         setFocusKey(null);
         setInspectorTab("content");
+      }}
+      onWorkProjectMove={(laneLabel, projectId, position) => {
+        const path = findWorkProjectPath(currentDataRef.current, laneLabel, projectId);
+        if (path) updateValue([...path, "position"], position);
+      }}
+      onWorkProjectReorder={(laneLabel, fromId, toId) => {
+        const parsed = WorkSchema.safeParse(currentDataRef.current);
+        if (!parsed.success) return;
+        if (laneLabel === null) {
+          const ids = orderAllProjects(parsed.data).map(({ project }) => project.id);
+          updateValue(["allOrder"], arrayMove(ids, ids.indexOf(fromId), ids.indexOf(toId)));
+          return;
+        }
+        const laneIndex = parsed.data.lanes.findIndex((lane) => lane.label === laneLabel);
+        const projects = (currentDataRef.current.lanes as EditorObject[] | undefined)?.[laneIndex]
+          ?.projects;
+        if (laneIndex < 0 || !Array.isArray(projects)) return;
+        const ids = parsed.data.lanes[laneIndex]!.projects.map((project) => project.id);
+        updateValue(
+          ["lanes", laneIndex, "projects"],
+          arrayMove(projects, ids.indexOf(fromId), ids.indexOf(toId)),
+        );
+      }}
+      onCollaboratorSelect={(index) => {
+        if (index < 0) return;
+        setActivePath(["worked", index]);
+        setFocusKey(null);
+        setInspectorTab("content");
+      }}
+      onCollaboratorMove={(from, to) => {
+        const worked = currentDataRef.current.worked;
+        if (!Array.isArray(worked)) return;
+        updateValue(["worked"], arrayMove(worked, from, to));
       }}
     />
   );

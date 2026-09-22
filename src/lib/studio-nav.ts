@@ -9,7 +9,6 @@ export function studioHref(path: string) {
 
 export type StudioBadgeCounts = Readonly<{
   work: number;
-  booth: number;
   praise: number;
 }>;
 
@@ -41,20 +40,24 @@ export const studioNavGroups: readonly StudioNavGroup[] = [
     items: [
       { href: studioHref("/hero"), label: "Hero", detail: "Opening scene", section: "hero" },
       { href: studioHref("/about"), label: "About", detail: "Story & portrait", section: "about" },
-      { href: studioHref("/impact"), label: "Impact", detail: "Metrics & people", section: "impact" },
+      {
+        href: studioHref("/impact"),
+        label: "Impact",
+        detail: "Metrics & people",
+        section: "impact",
+      },
+      {
+        href: studioHref("/clients"),
+        label: "Clients",
+        detail: "Logo marquee",
+        section: "clients",
+      },
       {
         href: studioHref("/work"),
         label: "Work",
         detail: "Video projects",
         section: "work",
         badge: "work",
-      },
-      {
-        href: studioHref("/booth"),
-        label: "Photobooth",
-        detail: "On-set moments",
-        section: "booth",
-        badge: "booth",
       },
       {
         href: studioHref("/praise"),
@@ -69,13 +72,13 @@ export const studioNavGroups: readonly StudioNavGroup[] = [
         detail: "Career reel",
         section: "experience",
       },
+      { href: studioHref("/resume"), label: "Resume", detail: "PDF & page", section: "resume" },
       {
-        href: studioHref("/process"),
-        label: "Studio Page",
-        detail: "How I work & turnaround",
-        section: "process",
+        href: studioHref("/room"),
+        label: "Drawing Room",
+        detail: "Off-clock world",
+        section: "room",
       },
-      { href: studioHref("/room"), label: "Drawing Room", detail: "Off-clock world", section: "room" },
       {
         href: studioHref("/contact"),
         label: "Contact",
@@ -101,11 +104,11 @@ export const studioSectionLabels: Record<SectionKey, string> = {
   hero: "Hero",
   about: "About",
   impact: "Impact",
+  clients: "Clients",
   work: "Work",
-  booth: "Photobooth",
   praise: "Praise",
   experience: "Experience",
-  process: "Studio Page",
+  resume: "Resume",
   room: "Drawing Room",
   contact: "Contact",
   settings: "Site & Navigation",

@@ -6,7 +6,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const settings = await getSettings();
   const siteUrl = getSiteUrl(settings.domain);
 
-  return ["/", "/process", "/room"].map((path) => ({
+  return ["/", "/resume", "/room"].map((path) => ({
     url: new URL(path, siteUrl).toString(),
   }));
 }

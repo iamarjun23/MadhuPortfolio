@@ -37,7 +37,11 @@ const uploadKeyPattern = /^([A-Za-z]+)\/[0-9a-f-]{36}$/;
 function describeLimits(endpoint: UploadEndpoint) {
   const { accept, maxBytes } = uploadEndpoints[endpoint];
   const kinds =
-    accept === "image/" ? "a JPEG, PNG, WebP, AVIF or GIF image" : "an MP4, WebM or MOV video";
+    accept === "image/"
+      ? "a JPEG, PNG, WebP, AVIF or GIF image"
+      : accept === "video/"
+        ? "an MP4, WebM or MOV video"
+        : "a PDF";
   return `Choose ${kinds} under ${Math.round(maxBytes / (1024 * 1024))}MB.`;
 }
 

@@ -41,13 +41,6 @@ type RootLayoutProps = Readonly<{
   children: React.ReactNode;
 }>;
 
-// Reading the theme cookie on the server would opt every route that renders this layout out of
-// prerendering, which is exactly what left the public site rendering from scratch on every request
-// (`Cache-Control: no-store`) and burning ~0.5-1s of Worker CPU a page. Settling the theme in a
-// blocking inline script instead keeps the pages cacheable and still paints the right theme first
-// time: the script runs before the body renders, so there is no flash.
-const themeScript = `try{var m=document.cookie.match(/(?:^|; )theme=(light|dark)/);if(m)document.documentElement.dataset.theme=m[1]}catch(e){}`;
-
 export default async function RootLayout({ children }: RootLayoutProps) {
   return (
     <html
@@ -55,12 +48,8 @@ export default async function RootLayout({ children }: RootLayoutProps) {
       data-theme="dark"
       data-scroll-behavior="smooth"
       className={`${display.variable} ${body.variable} ${mono.variable} ${serif.variable}`}
-      suppressHydrationWarning
     >
-      <body>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

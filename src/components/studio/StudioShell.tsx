@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ThemeName } from "@/components/public/ThemeToggle";
 import { Rail } from "@/components/studio/Rail";
 import { Toast } from "@/components/studio/Toast";
 import { Topbar } from "@/components/studio/Topbar";
@@ -10,12 +9,11 @@ import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type StudioShellProps = Readonly<{
   children: React.ReactNode;
-  initialTheme: ThemeName;
   shellData: StudioShellData;
   publicSiteUrl: string;
 }>;
 
-export function StudioShell({ children, initialTheme, shellData, publicSiteUrl }: StudioShellProps) {
+export function StudioShell({ children, shellData, publicSiteUrl }: StudioShellProps) {
   const [railOpen, setRailOpen] = useState(false);
   const setHasUnpublishedChanges = useStudioStore((state) => state.setHasUnpublishedChanges);
   const { blocked: uploadBlocked } = useUploadBlock();
@@ -38,7 +36,7 @@ export function StudioShell({ children, initialTheme, shellData, publicSiteUrl }
     <div className="studio-shell">
       <Rail badges={shellData.badges} open={railOpen} onClose={() => setRailOpen(false)} />
       <div className="studio-shell__body">
-        <Topbar initialTheme={initialTheme} onMenu={() => setRailOpen(true)} publicSiteUrl={publicSiteUrl} />
+        <Topbar onMenu={() => setRailOpen(true)} publicSiteUrl={publicSiteUrl} />
         <main className="studio-main">{children}</main>
       </div>
       <button

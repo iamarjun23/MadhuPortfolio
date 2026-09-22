@@ -4,8 +4,6 @@ import { MediaImage } from "@/components/public/MediaImage";
 import { realImage } from "@/lib/placeholders";
 import type { Impact } from "@/schemas";
 
-const SPONSORSHIP_SHOWS = new Set(["Mahanati", "Bigg Boss Kannada", "Sa Re Ga Ma Pa"]);
-
 /* The stand-in on a collaborator tile that has no photo yet: the first letter of
    the first two words, so the grid keeps one shape whether or not a picture has
    been uploaded. */
@@ -54,12 +52,23 @@ function CountUp({ value }: Readonly<{ value: string }>) {
   );
 }
 
-export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
+export function ImpactStrip({
+  data,
+  onSelectCollaborator,
+  onMoveCollaborator,
+}: Readonly<{
+  data: Impact;
+  /* Studio's admin preview: a click opens the collaborator's editor instead of
+     the photo pop-up, and a card can be dragged onto another to reorder.
+     Both work in indexes into `data.worked`. */
+  onSelectCollaborator?: (index: number) => void;
+  onMoveCollaborator?: (from: number, to: number) => void;
+}>) {
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
   const ref = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const campaignsRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
-  const [campaignsVisible, setCampaignsVisible] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -72,16 +81,6 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
       { threshold: 0.4 },
     );
     if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => {
-    // Unlike `visible` above, this one keeps observing so the reveal
-    // replays every time the campaigns list scrolls back into view.
-    const observer = new IntersectionObserver(
-      ([entry]) => setCampaignsVisible(Boolean(entry?.isIntersecting)),
-      { threshold: 0.2 },
-    );
-    if (campaignsRef.current) observer.observe(campaignsRef.current);
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
@@ -107,18 +106,9 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [activeIndex]);
-  const collaborators = data.worked.filter((person) => !SPONSORSHIP_SHOWS.has(person.name));
+  const collaborators = data.worked;
   const activePerson = activeIndex !== null ? collaborators[activeIndex] : undefined;
   const activeImage = activePerson ? realImage(activePerson.image) : null;
-  const campaigns = data.campaigns.length
-    ? data.campaigns
-    : data.worked
-        .filter((person) => SPONSORSHIP_SHOWS.has(person.name))
-        .map((person) => ({
-          name: person.name,
-          context: "Jar sponsorship performance film",
-          href: null,
-        }));
 
   return (
     <section className="impact" ref={ref}>
@@ -146,19 +136,57 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
               {collaborators.map((person, index) => {
                 const isActive = index === activeIndex;
                 const image = realImage(person.image);
+                const workedIndex = data.worked.indexOf(person);
                 return (
                   <button
                     type="button"
                     key={person.name}
                     aria-expanded={isActive}
-                    disabled={!image}
-                    className={isActive ? "is-active" : undefined}
-                    onClick={() => setActiveIndex(isActive ? null : index)}
+                    disabled={!image && !onSelectCollaborator}
+                    className={
+                      [
+                        isActive ? "is-active" : "",
+                        dragFrom === workedIndex ? "is-dragging" : "",
+                        dragOver === workedIndex && dragFrom !== workedIndex ? "is-drop-target" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined
+                    }
+                    onClick={() =>
+                      onSelectCollaborator
+                        ? onSelectCollaborator(workedIndex)
+                        : setActiveIndex(isActive ? null : index)
+                    }
+                    {...(onMoveCollaborator
+                      ? {
+                          draggable: true,
+                          onDragStart: (event: React.DragEvent) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            // Firefox will not start a drag without data set.
+                            event.dataTransfer.setData("text/plain", String(workedIndex));
+                            setDragFrom(workedIndex);
+                          },
+                          onDragOver: (event: React.DragEvent) => {
+                            event.preventDefault();
+                            setDragOver(workedIndex);
+                          },
+                          onDrop: (event: React.DragEvent) => {
+                            event.preventDefault();
+                            if (dragFrom !== null && dragFrom !== workedIndex) {
+                              onMoveCollaborator(dragFrom, workedIndex);
+                            }
+                          },
+                          onDragEnd: () => {
+                            setDragFrom(null);
+                            setDragOver(null);
+                          },
+                        }
+                      : {})}
                   >
                     <span className="impact__worked-thumb" aria-hidden={!image}>
                       {image ? (
                         // eslint-disable-next-line @next/next/no-img-element -- tiny lazy thumb, not LCP
-                        <img src={image.url} alt={image.alt} loading="lazy" />
+                        <img src={image.url} alt={image.alt} loading="lazy" draggable={false} />
                       ) : (
                         <em>{initials(person.name)}</em>
                       )}
@@ -209,44 +237,6 @@ export function ImpactStrip({ data }: Readonly<{ data: Impact }>) {
                 </div>
               </div>
             </>
-          ) : null}
-          {campaigns.length ? (
-            <div
-              className={`impact__campaigns${campaignsVisible ? " is-visible" : ""}`}
-              ref={campaignsRef}
-            >
-              <div>
-                <span className="slate">Campaign credit</span>
-                <h3>{data.campaignsHeading}</h3>
-                <p>{data.campaignsDescription}</p>
-              </div>
-              <ul>
-                {campaigns.map((campaign, index) => {
-                  const content = (
-                    <>
-                      <b>{campaign.name}</b>
-                      <span>{campaign.context}</span>
-                    </>
-                  );
-
-                  return (
-                    <li
-                      key={campaign.name}
-                      className="impact__campaign-row"
-                      style={{ transitionDelay: `${index * 90}ms` }}
-                    >
-                      {campaign.href ? (
-                        <a href={campaign.href} target="_blank" rel="noopener noreferrer">
-                          {content}
-                        </a>
-                      ) : (
-                        content
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
           ) : null}
         </div>
       </div>

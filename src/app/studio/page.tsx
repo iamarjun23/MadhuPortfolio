@@ -21,22 +21,22 @@ const sections = [
     href: studioHref("/impact"),
     number: "03",
     label: "Impact",
-    detail: "Numbers strip, collaborators and campaigns",
+    detail: "Numbers strip and collaborators",
     media: "1 photo per collaborator",
   },
   {
-    href: studioHref("/work"),
+    href: studioHref("/clients"),
     number: "04",
+    label: "Clients",
+    detail: "Marquee of companies you have worked with",
+    media: "Optional logo per company",
+  },
+  {
+    href: studioHref("/work"),
+    number: "05",
     label: "Work",
     detail: "Project cards grouped into filter categories",
     media: "YouTube link per project · no uploads at all",
-  },
-  {
-    href: studioHref("/booth"),
-    number: "05",
-    label: "Photobooth",
-    detail: "On-set photo wall and lightbox captions",
-    media: "1 photo per slot",
   },
   {
     href: studioHref("/praise"),
@@ -53,11 +53,11 @@ const sections = [
     media: "One scene photo per role",
   },
   {
-    href: studioHref("/process"),
+    href: studioHref("/resume"),
     number: "08",
-    label: "Studio Page",
-    detail: "The /process page: five passes, turnaround and its SEO",
-    media: "No uploads · the photo wall comes from Photobooth",
+    label: "Resume",
+    detail: "The /resume page the menu links to",
+    media: "1 PDF",
   },
   {
     href: studioHref("/room"),
@@ -99,13 +99,6 @@ export default async function StudioPage() {
       detail:
         dashboard.workItems > 0 ? `${dashboard.workItems} videos ready` : "Add your first video",
       ready: dashboard.workItems > 0,
-    },
-    {
-      href: studioHref("/booth"),
-      label: "Photobooth",
-      detail:
-        dashboard.photos > 0 ? `${dashboard.photos} photographs ready` : "Add on-set photographs",
-      ready: dashboard.photos > 0,
     },
     {
       href: studioHref("/praise"),
@@ -153,10 +146,6 @@ export default async function StudioPage() {
         <div>
           <dt>Work pieces</dt>
           <dd>{dashboard.workItems}</dd>
-        </div>
-        <div>
-          <dt>Photographs</dt>
-          <dd>{dashboard.photos}</dd>
         </div>
         <div>
           <dt>Testimonials</dt>

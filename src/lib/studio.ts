@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { Status } from "@/generated/prisma/client";
-import { getBooth, getPraise, getWork } from "@/lib/content";
+import { getPraise, getWork } from "@/lib/content";
 import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { sectionKeys } from "@/lib/sections";
 import type { StudioShellData } from "@/lib/studio-nav";
@@ -9,7 +9,6 @@ export type { StudioShellData } from "@/lib/studio-nav";
 
 export type StudioDashboardData = Readonly<{
   hasUnpublishedChanges: boolean;
-  photos: number;
   testimonials: number;
   workItems: number;
   activity: ReadonlyArray<{
@@ -76,13 +75,12 @@ export const hasPendingChanges = cache(async () => {
 });
 
 export async function getStudioShellData(): Promise<StudioShellData> {
-  const [work, booth, praise] = await Promise.all([getWork(), getBooth(), getPraise()]);
+  const [work, praise] = await Promise.all([getWork(), getPraise()]);
 
   if (!isDatabaseConfigured()) {
     return {
       badges: {
         work: work.lanes.length,
-        booth: booth.slots.length,
         praise: praise.quotes.length,
       },
       hasUnpublishedChanges: false,
@@ -92,7 +90,6 @@ export async function getStudioShellData(): Promise<StudioShellData> {
   return {
     badges: {
       work: work.lanes.length,
-      booth: booth.slots.length,
       praise: praise.quotes.length,
     },
     hasUnpublishedChanges: await hasPendingChanges(),
@@ -100,15 +97,13 @@ export async function getStudioShellData(): Promise<StudioShellData> {
 }
 
 export async function getStudioDashboardData(): Promise<StudioDashboardData> {
-  const [shellData, booth, praise, work] = await Promise.all([
+  const [shellData, praise, work] = await Promise.all([
     getStudioShellData(),
-    getBooth(Status.DRAFT),
     getPraise(Status.DRAFT),
     getWork(Status.DRAFT),
   ]);
   const common = {
     hasUnpublishedChanges: shellData.hasUnpublishedChanges,
-    photos: booth.slots.filter((slot) => slot.image !== null).length,
     testimonials: praise.quotes.length,
     workItems: work.lanes.reduce((total, lane) => total + lane.projects.length, 0),
   };

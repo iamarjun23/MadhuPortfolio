@@ -3,15 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { ThemeToggle, type ThemeName } from "@/components/public/ThemeToggle";
 import { defaultSiteSettings } from "@/schemas/settings";
 import type { Contact, Settings } from "@/schemas";
 
 type NavProps = Readonly<{
   contact: Contact | null;
   settings: Settings;
-  initialTheme: ThemeName;
-  showThemeToggle: boolean;
 }>;
 
 function formatAvailabilityTicker(value: string | undefined) {
@@ -22,7 +19,7 @@ function formatAvailabilityTicker(value: string | undefined) {
   return expanded.endsWith("·") ? expanded : `${expanded} ·`;
 }
 
-export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavProps) {
+export function Nav({ contact, settings }: NavProps) {
   const pathname = usePathname();
   const [isScrolled, setIsScrolled] = useState(false);
   const [hasClearedHero, setHasClearedHero] = useState(false);
@@ -30,7 +27,7 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
   // resetting the flag from an effect on every other route.
   const isPastHero = pathname === "/" && hasClearedHero;
   const isDrawingRoom = pathname === "/room";
-  const isProcess = pathname === "/process";
+  const isResume = pathname === "/resume";
   const isPortfolioHome = pathname === "/";
   const site = settings.site ?? defaultSiteSettings;
   const brand = site.brand ?? defaultSiteSettings.brand;
@@ -72,10 +69,12 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
     return () => observer.disconnect();
   }, [pathname]);
 
+
+  const showCaption = isDrawingRoom || isResume || contact?.availableForFreelance;
   const caption = isDrawingRoom
     ? navigation.drawingRoomCaption
-    : isProcess
-      ? navigation.studioCaption
+    : isResume
+      ? navigation.resumeCaption
       : formatAvailabilityTicker(contact?.availabilityLabel);
 
   return (
@@ -84,25 +83,26 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
     >
       <div className="wrap public-nav__inner">
         <div className="public-nav__left nav-stagger">
-          {showThemeToggle ? <ThemeToggle initialTheme={initialTheme} /> : null}
           <Link className="brand" href="/" aria-label={brand.homeLabel}>
             <span className="brand__name">{brand.name}</span>
             <span className="brand__suffix">{brand.suffix}</span>
           </Link>
         </div>
 
-        <span className="brand__caption" aria-label={`${navigation.captionPrefix} ${caption}`}>
-          <span className="brand__caption-track" aria-hidden="true">
-            <span className="brand__caption-item">
-              <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
-              <span>{caption}</span>
-            </span>
-            <span className="brand__caption-item brand__caption-item--clone">
-              <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
-              <span>{caption}</span>
+        {showCaption ? (
+          <span className="brand__caption" aria-label={`${navigation.captionPrefix} ${caption}`}>
+            <span className="brand__caption-track" aria-hidden="true">
+              <span className="brand__caption-item">
+                <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
+                <span>{caption}</span>
+              </span>
+              <span className="brand__caption-item brand__caption-item--clone">
+                <span className="brand__caption-dash">{navigation.captionPrefix}&nbsp;</span>
+                <span>{caption}</span>
+              </span>
             </span>
           </span>
-        </span>
+        ) : null}
 
         <nav className="public-nav__right nav-stagger" aria-label="Primary navigation">
           <Link className="public-nav__link" href={isPortfolioHome ? "#work" : "/#work"}>
@@ -111,8 +111,8 @@ export function Nav({ contact, settings, initialTheme, showThemeToggle }: NavPro
           <Link className="public-nav__link" href="/room">
             <span className="link-underline">{navigation.drawingRoomLabel}</span>
           </Link>
-          <Link className="public-nav__link" href={navigation.studioHref}>
-            <span className="link-underline">{navigation.studioLabel}</span>
+          <Link className="public-nav__link" href="/resume">
+            <span className="link-underline">{navigation.resumeLabel}</span>
           </Link>
           <Link className="public-nav__cta" href={isPortfolioHome ? "#contact" : "/#contact"}>
             {navigation.contactLabel}

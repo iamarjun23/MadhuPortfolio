@@ -24,11 +24,10 @@ export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
             href="/room"
             aria-label="Open the Drawing Room"
           >
-            <div className="drawing-teaser__graphic" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-            </div>
+            {teaser.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="drawing-teaser__image" src={teaser.image.url} alt={teaser.image.alt} />
+            )}
             <span className="drawing-teaser__stamp">{teaser.stamp}</span>
             <span className="drawing-teaser__note">{teaser.note}</span>
             <b>{teaser.invitation}</b>

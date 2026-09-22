@@ -7,20 +7,21 @@
 export const uploadEndpointNames = [
   "heroVideo",
   "portrait",
-  "boothImage",
   "experienceImage",
   "roomImage",
   "collaboratorImage",
+  "clientLogo",
   "testimonialImage",
   "reelVideo",
   "reelCover",
   "ogImage",
   "fallbackImage",
+  "resumeFile",
 ] as const;
 
 export type UploadEndpoint = (typeof uploadEndpointNames)[number];
 
-export type MediaAccept = "image/" | "video/";
+export type MediaAccept = "image/" | "video/" | "application/";
 
 /* A `startsWith("image/")` check let `image/svg+xml` through, and an SVG served
    back from our own origin is a same-origin document rather than a picture - it
@@ -38,6 +39,7 @@ const allowedMimeTypes = new Set([
   "video/mp4",
   "video/webm",
   "video/quicktime",
+  "application/pdf",
 ]);
 
 /* The browser sends the type alongside the bytes and may add parameters to it
@@ -58,6 +60,7 @@ export function isAllowedMimeType(contentType: string, accept: MediaAccept) {
 export const acceptAttribute: Readonly<Record<MediaAccept, string>> = {
   "image/": [...allowedMimeTypes].filter((mime) => mime.startsWith("image/")).join(","),
   "video/": [...allowedMimeTypes].filter((mime) => mime.startsWith("video/")).join(","),
+  "application/": "application/pdf",
 };
 
 const MB = 1024 * 1024;
@@ -72,13 +75,14 @@ const MB = 1024 * 1024;
 export const endpointLimits: Record<UploadEndpoint, { accept: MediaAccept; maxBytes: number }> = {
   heroVideo: { accept: "video/", maxBytes: 64 * MB },
   portrait: { accept: "image/", maxBytes: 4 * MB },
-  boothImage: { accept: "image/", maxBytes: 4 * MB },
   experienceImage: { accept: "image/", maxBytes: 4 * MB },
   roomImage: { accept: "image/", maxBytes: 4 * MB },
   collaboratorImage: { accept: "image/", maxBytes: 4 * MB },
+  clientLogo: { accept: "image/", maxBytes: 4 * MB },
   testimonialImage: { accept: "image/", maxBytes: 4 * MB },
   reelVideo: { accept: "video/", maxBytes: 64 * MB },
   reelCover: { accept: "image/", maxBytes: 4 * MB },
   ogImage: { accept: "image/", maxBytes: 4 * MB },
   fallbackImage: { accept: "image/", maxBytes: 4 * MB },
+  resumeFile: { accept: "application/", maxBytes: 10 * MB },
 };

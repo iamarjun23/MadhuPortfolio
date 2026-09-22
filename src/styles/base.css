@@ -181,46 +181,6 @@ button {
   left: 1rem;
 }
 
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  justify-self: start;
-  gap: 0.55rem;
-  min-height: 44px;
-  padding: 0.55rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
-  color: var(--text-2);
-  cursor: pointer;
-  font-family: var(--f-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  transition:
-    border-color 0.16s var(--e-cut),
-    color 0.16s var(--e-cut),
-    transform 0.12s var(--e-cut);
-}
-
-.theme-toggle:hover {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.theme-toggle:active {
-  transform: translateY(1px);
-}
-
-.theme-toggle__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent);
-}
-
 .public-nav {
   position: sticky;
   z-index: 200;
@@ -258,6 +218,32 @@ button {
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
+}
+
+.whatsapp-fab {
+  position: fixed;
+  z-index: 150;
+  right: clamp(1rem, 4vw, 2rem);
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #25d366;
+  color: #fff;
+  box-shadow: var(--sh-lg, 0 8px 28px -12px rgba(0, 0, 0, 0.5));
+  transition: transform 0.2s var(--e-cut, ease);
+}
+
+.whatsapp-fab:hover {
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.whatsapp-fab svg {
+  width: 28px;
+  height: 28px;
 }
 
 :root {
@@ -559,32 +545,6 @@ button {
 .public-nav__link:hover .link-underline::after {
   transform: scaleX(1);
   transform-origin: left;
-}
-
-.public-nav .theme-toggle {
-  flex: 0 0 auto;
-  min-height: 0;
-  padding: 0;
-  margin-right: 0.7rem;
-  border: none;
-  background: transparent;
-  gap: 0;
-}
-.public-nav .theme-toggle__label {
-  display: none;
-}
-.public-nav .theme-toggle__dot {
-  width: 9px;
-  height: 9px;
-  opacity: 0.85;
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 60%, transparent);
-  transition:
-    opacity 200ms ease,
-    transform 200ms ease;
-}
-.public-nav .theme-toggle:hover .theme-toggle__dot {
-  opacity: 1;
-  transform: scale(1.2);
 }
 
 .public-nav__cta {
@@ -1205,8 +1165,11 @@ button {
   transition: transform 0.7s var(--e-reveal);
 }
 
-/* Entrance: the frame slides in from the left and settles, video eases out of
-   soft focus behind it. Triggered by .portrait--in (IntersectionObserver). */
+/* Entrance: the frame slides in from the left and settles, video eases down
+   from a slight zoom. Triggered by .portrait--in (IntersectionObserver).
+   No filter transition here: animating `filter: blur()` on a <video> forces
+   a full repaint every frame, which fought with scroll compositing and
+   produced visible jank/shake while scrolling into this section. */
 .portrait {
   opacity: 0;
   transform: translateX(-5rem);
@@ -1222,14 +1185,10 @@ button {
   transform: translateX(0);
 }
 .portrait video {
-  filter: blur(18px);
   transform: scale(1.12);
-  transition:
-    filter 1.8s var(--e-scrub) 0.4s,
-    transform 2s var(--e-scrub) 0.4s;
+  transition: transform 2s var(--e-scrub) 0.4s;
 }
 .portrait--in video {
-  filter: none;
   transform: scale(1);
 }
 
@@ -1413,8 +1372,7 @@ button {
   font-size: 0.64rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-.impact__worked-grid {
+}.impact__worked-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
   gap: 0.75rem 0.9rem;
@@ -1425,7 +1383,6 @@ button {
   flex-direction: column;
   gap: 0.7rem;
   padding: 0;
-  overflow: hidden;
   border: none;
   background: none;
   color: var(--text);
@@ -1435,6 +1392,17 @@ button {
 }
 .impact__worked-grid > button:disabled {
   cursor: default;
+}
+/* Studio preview only: cards can be dragged onto each other to reorder. */
+.impact__worked-grid > button[draggable="true"] {
+  cursor: grab;
+}
+.impact__worked-grid > button.is-dragging {
+  opacity: 0.4;
+}
+.impact__worked-grid > button.is-drop-target .impact__worked-thumb {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
 }
 .impact__worked-copy {
   display: block;
@@ -1651,7 +1619,6 @@ button {
 #top .work > .wrap {
   max-width: none;
 }
-#top #photobooth > .wrap,
 #top #testimonials > .wrap,
 #top #experience > .wrap,
 #top #drawing-room > .wrap,
@@ -1854,15 +1821,18 @@ button {
 /* No frame, no grid, no panel: the cards sit straight on the page in a ring,
    and every one of them can be picked up and dropped anywhere on it. */
 .work__board {
-  --board-edge-x: 7%;
+  --board-edge-x: 5%;
   --board-edge-y: 6%;
-  --board-spread-x: 41%;
-  --board-spread-y: 38%;
+  /* --board-step-x/y (one grid cell) are set inline by WorkConsole. */
+  --card-w: clamp(158px, 15vw, 196px);
 
   position: relative;
   isolation: isolate;
   width: 100vw;
-  min-height: clamp(560px, 54vw, 760px);
+  min-height: max(
+    clamp(560px, 54vw, 760px),
+    calc((var(--board-rows, 1) - 1) * var(--board-step-y) + var(--card-w) * 1.6)
+  );
   margin-right: calc(50% - 50vw);
   margin-left: calc(50% - 50vw);
   user-select: none;
@@ -1880,127 +1850,19 @@ button {
   text-align: center;
 }
 
-/* The "All work" view can swap the canvas for a globe: cards ride stacked
-   latitude bands around one Y axis, spun by drag or a slow idle rotation.
-   The sphere is laid out at one size in WorkConsole and scaled to the board
-   from the outside, so the 3D space inside never has to know the viewport. */
-.work__board--globe {
-  min-height: clamp(560px, 64vw, 860px);
-  overflow: hidden;
-}
-.work__globe-fit {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(var(--globe-scale, 1));
-}
-.work__globe-stage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  perspective: var(--globe-perspective, 1900px);
-  cursor: grab;
-  touch-action: none;
-}
-.work__globe-stage:active {
-  cursor: grabbing;
-}
-.work__globe-axis {
-  position: relative;
-  width: 1px;
-  height: 1px;
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-.work__globe-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--globe-card-w);
-  margin: calc(var(--globe-card-h) / -2) 0 0 calc(var(--globe-card-w) / -2);
-  /* Flat, deliberately: a card is a flat thing, and keeping it flat is what
-     lets backface-visibility hide the whole card once it turns away. Under
-     preserve-3d only this element's own (transparent) back would be hidden and
-     its contents would carry on drawing through the near side of the sphere. */
-  transform-style: flat;
-  backface-visibility: hidden;
-}
-/* The sphere already turns. Cards drifting on top of that is one motion too
-   many, and it breaks the spacing the bands were laid out to hold. */
-.work__globe-card .work__card-frame,
 .work__rail-card .work__card-frame {
   animation: none;
 }
-.work__globe-card .work__card-media {
-  aspect-ratio: 2.4 / 1;
-}
-.work__globe-card .work__card-body {
-  gap: 0.12rem;
-  padding: 0.38rem 0.48rem 0.45rem;
-}
-.work__globe-card .work__card-open {
-  margin-top: 0.1rem;
-  padding-top: 0.3rem;
-}
-/* A long list is drawn smaller on the canvas: at full size the cards cover
-   more ground than the board has, and no amount of spreading stops them
-   burying one another. Matched to the id in the rule that sets the card's
-   width in the first place, or that one keeps winning. */
-#work .work__board--dense .work__card {
-  width: clamp(104px, 9.6vw, 132px);
-}
+/* A long list is drawn smaller on the canvas so the pile still fits the
+   board; the cell size follows the card width. */
 .work__board--dense {
-  min-height: clamp(620px, 60vw, 840px);
-}
-.work__globe-card-btn {
-  display: block;
-  width: 100%;
-  backface-visibility: hidden;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-  -webkit-user-drag: none;
-}
-.work__globe-card-btn .work__card-frame {
-  transition:
-    border-color 0.3s var(--e-cut),
-    box-shadow 0.35s var(--e-reveal);
-}
-.work__globe-card-btn:hover .work__card-frame,
-.work__globe-card-btn:focus-visible .work__card-frame {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  box-shadow:
-    0 24px 44px -22px rgba(0, 0, 0, 0.92),
-    0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
-}
-.work__globe-card-btn:hover .work__card-media > img,
-.work__globe-card-btn:focus-visible .work__card-media > img {
-  filter: none;
-  transform: scale(1.06);
-}
-.work__globe-card-btn:hover .work__card-play,
-.work__globe-card-btn:focus-visible .work__card-play {
-  border-color: transparent;
-  background: var(--accent);
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-.work__globe-card-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 4px;
-}
-@media (max-width: 640px) {
-  .work__board--globe {
-    min-height: 460px;
-  }
-}
+  --card-w: clamp(104px, 9.6vw, 132px);
 
+  min-height: max(
+    clamp(620px, 60vw, 840px),
+    calc((var(--board-rows, 1) - 1) * var(--board-step-y) + var(--card-w) * 1.6)
+  );
+}
 /* The rail layout: a horizontal grid, three rows deep, drifting sideways of
    its own accord. The cards are laid twice and the track slides exactly one
    copy's width, so the drift comes back round to where it started with no
@@ -2093,16 +1955,16 @@ button {
   position: absolute;
   top: clamp(
     var(--board-edge-y),
-    calc(50% + var(--card-oy, 0) * var(--board-spread-y)),
+    calc(50% + var(--card-oy, 0) * var(--board-step-y)),
     calc(100% - var(--board-edge-y))
   );
   left: clamp(
     var(--board-edge-x),
-    calc(50% + var(--card-ox, 0) * var(--board-spread-x)),
+    calc(50% + var(--card-ox, 0) * var(--board-step-x)),
     calc(100% - var(--board-edge-x))
   );
   display: block;
-  width: clamp(158px, 15vw, 196px);
+  width: var(--card-w);
   padding: 0;
   border: 0;
   background: none;
@@ -2130,6 +1992,32 @@ button {
   z-index: 40;
   cursor: grabbing;
   transition: none;
+}
+#work .work__board--editing .work__card {
+  transition: none;
+}
+/* Studio preview only: the grid holds still and its cards are dragged onto
+   each other to reorder. */
+.work__board--editing .work__rail-track {
+  animation: none;
+}
+.work__rail-nav {
+  display: flex;
+  gap: 0.4rem;
+}
+.work__rail-nav .work__board-reset {
+  min-width: 34px;
+  font-size: 0.9rem;
+}
+.work__rail-card[draggable="true"] {
+  cursor: grab;
+}
+.work__rail-card.is-dragging {
+  opacity: 0.4;
+}
+.work__rail-card.is-drop-target .work__card-frame {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
 }
 .work__card-frame {
   position: relative;
@@ -2296,8 +2184,6 @@ button {
   font-style: normal;
   transition: transform 0.25s var(--e-reveal);
 }
-.work__globe-card-btn:hover .work__card-open i,
-.work__globe-card-btn:focus-visible .work__card-open i,
 .work__rail-card:hover .work__card-open i,
 .work__rail-card:focus-visible .work__card-open i,
 #work .work__card:hover .work__card-open i,
@@ -2553,149 +2439,9 @@ button {
   font-family: var(--f-mono);
   font-size: 0.72rem;
 }
-
-.booth {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  /* The row height is the picture: the photo now covers the whole tile and the
-     caption sits on top of it, so nothing is spent on padding or a text strip. */
-  grid-auto-rows: clamp(92px, 8vw, 124px);
-  gap: 0.75rem;
-}
-.booth__item {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-  grid-column: span var(--tile-w, 4);
-  grid-row: span var(--tile-h, 2);
-  transition:
-    transform 0.35s var(--e-reveal),
-    box-shadow 0.35s var(--e-reveal),
-    border-color 0.25s var(--e-cut);
-}
-.booth__item:hover {
-  z-index: 1;
-  transform: rotate(1deg) scale(1.02);
-  box-shadow: var(--sh-lg);
-}
 /* The photo is the tile: it fills the whole card and the caption rides on top of
    it in its own black box, rather than the picture sharing the card with a strip
    of text under it. */
-.booth__image {
-  display: grid;
-  position: absolute;
-  z-index: 0;
-  overflow: hidden;
-  inset: 0;
-  place-items: center;
-  border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent) 30%, var(--surface-2)),
-    color-mix(in srgb, var(--link) 22%, var(--surface-2))
-  );
-  color: var(--text-muted);
-  font-family: var(--f-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-}
-.booth__image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: var(--focal-x, 50%) var(--focal-y, 50%);
-  transition: transform 0.5s var(--e-reveal);
-}
-.booth__item > span:last-child {
-  position: relative;
-  z-index: 2;
-  flex: 0 0 auto;
-  align-self: flex-start;
-  max-width: calc(100% - 1rem);
-  margin: 0.5rem;
-  padding: 0.45rem 0.6rem;
-  border-radius: 4px;
-  background: rgba(6, 7, 12, 0.82);
-  backdrop-filter: blur(2px);
-}
-.booth__item b,
-.booth__item small {
-  display: block;
-  color: #f4f4f6;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-}
-.booth__item small {
-  color: rgba(244, 244, 246, 0.72);
-  font-size: 0.68rem;
-}
-.booth__tape {
-  position: absolute;
-  z-index: 2;
-  top: 8px;
-  left: 50%;
-  width: 72px;
-  height: 18px;
-  transform: translateX(-50%) rotate(-4deg);
-  background: rgba(240, 222, 180, 0.55);
-}
-.lightbox {
-  position: fixed;
-  z-index: 400;
-  inset: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  background: rgba(4, 5, 10, 0.94);
-}
-.lightbox > button {
-  min-height: 44px;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--r-md);
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  cursor: pointer;
-}
-.lightbox > button:first-child {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-}
-.lightbox > div {
-  max-width: min(900px, 100%);
-  margin: 0 auto;
-  color: #fff;
-  text-align: center;
-}
-.lightbox img,
-.lightbox > div > span {
-  display: block;
-  width: 100%;
-  max-height: 75vh;
-  object-fit: contain;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-.lightbox > div > span {
-  display: grid;
-  min-height: 45vh;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.55);
-  font-family: var(--f-mono);
-}
-.lightbox p {
-  margin-top: 0.8rem;
-  color: rgba(255, 255, 255, 0.8);
-}
 .testimonials {
   overflow: hidden;
   padding-top: 0.5rem;
@@ -2720,40 +2466,81 @@ button {
   }
 }
 .testimonials figure {
+  position: relative;
   display: flex;
   flex: 0 0 480px;
   flex-direction: column;
   justify-content: space-between;
   min-height: 170px;
-  padding: 1.4rem;
-  border: 1px solid var(--border);
+  padding: 2.4rem 1.7rem 1.4rem;
+  overflow: hidden;
+  /* Gradient hairline border: warm at the top-left, fading to near-invisible. */
+  border: 1px solid transparent;
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(255, 106, 0, 0.09), transparent 55%) padding-box,
+    linear-gradient(180deg, var(--ink-850), color-mix(in srgb, var(--ink-850) 70%, #000)) padding-box,
+    linear-gradient(
+        150deg,
+        rgba(255, 154, 61, 0.45),
+        rgba(255, 255, 255, 0.06) 40%,
+        rgba(255, 255, 255, 0.03) 70%,
+        rgba(255, 154, 61, 0.18)
+      )
+      border-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 24px 48px -28px rgba(0, 0, 0, 0.9);
   transition:
     transform 0.35s var(--e-reveal),
     box-shadow 0.35s var(--e-reveal),
     border-color 0.25s var(--e-cut);
 }
+/* Oversized opening quote mark as a quiet watermark. */
+.testimonials figure::before {
+  content: "\201C";
+  position: absolute;
+  top: -0.9rem;
+  left: 1.2rem;
+  background: linear-gradient(180deg, var(--ember-400), transparent 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 5.5rem;
+  line-height: 1;
+  opacity: 0.55;
+  pointer-events: none;
+}
 .testimonials blockquote {
-  color: var(--text);
+  position: relative;
+  color: var(--paper-200);
   font-family: var(--f-display);
-  font-size: 1.18rem;
-  line-height: 1.45;
+  font-size: 1.12rem;
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: 0.005em;
 }
 .testimonials figcaption {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  margin-top: 1.4rem;
+  gap: 0.8rem;
+  margin-top: 1.6rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(90deg, rgba(255, 154, 61, 0.35), transparent 75%) 1;
 }
 .testimonials figcaption > span {
   display: grid;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border-radius: 50%;
-  background: var(--accent);
+  background: linear-gradient(140deg, var(--ember-400), var(--accent));
+  box-shadow:
+    0 0 0 2px var(--ink-850),
+    0 0 0 3px rgba(255, 154, 61, 0.45);
   color: var(--on-accent);
   font-family: var(--f-mono);
   font-size: 0.7rem;
@@ -2768,9 +2555,19 @@ button {
 .testimonials small {
   display: block;
 }
+.testimonials b {
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 .testimonials small {
-  color: var(--text-muted);
-  font-size: 0.7rem;
+  margin-top: 0.15rem;
+  color: var(--paper-500);
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .experience__intro {
   display: flex;
@@ -2789,9 +2586,7 @@ button {
 .experience__intro span,
 .experience-reel__meta,
 .experience-reel__role p,
-.experience-reel__footer,
-.experience-reel__track button span,
-.experience-reel__track button small {
+.experience-reel__footer {
   color: var(--accent-text);
   font-family: var(--f-mono);
   font-size: 0.66rem;
@@ -2800,7 +2595,6 @@ button {
 }
 .experience__intro span,
 .experience-reel__meta,
-.experience-reel__track button span,
 .experience-reel__footer {
   font-variant-numeric: tabular-nums;
 }
@@ -2821,7 +2615,7 @@ button {
 .experience-reel__frame {
   position: relative;
   display: flex;
-  min-height: clamp(31rem, 45vw, 39rem);
+  height: clamp(31rem, 45vw, 39rem);
   flex-direction: column;
   overflow: hidden;
   padding: clamp(1.5rem, 4vw, 3.5rem);
@@ -2861,10 +2655,12 @@ button {
   );
   content: "";
 }
-.experience-reel__image img {
+.experience-reel__image img,
+.experience-reel__thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: var(--focal-x, 50%) var(--focal-y, 50%);
 }
 .experience-reel__frame::before {
   top: 0;
@@ -2992,61 +2788,146 @@ button {
   border-color: var(--accent);
   color: var(--accent-text);
 }
+/* Filmstrip: equal-width image frames on a dark strip between two sprocket
+   rows, caption printed on the frame. Scrolls sideways past five. */
 .experience-reel__track {
+  --sprockets: repeating-linear-gradient(
+    90deg,
+    transparent 0 0.55rem,
+    color-mix(in srgb, var(--text) 14%, transparent) 0.55rem 1.25rem,
+    transparent 1.25rem 1.8rem
+  );
   display: flex;
-  gap: 0;
-  margin-top: 1.25rem;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 1.3rem 0.5rem;
   overflow-x: auto;
-  border: 1px solid var(--border);
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0.5rem;
+  scrollbar-width: none;
   border-radius: var(--r-lg);
-  background: var(--surface);
+  background:
+    var(--sprockets) 0 0.45rem / 100% 0.4rem repeat-x,
+    var(--sprockets) 0 calc(100% - 0.45rem) / 100% 0.4rem repeat-x,
+    color-mix(in srgb, var(--bg) 55%, #000);
+  background-attachment: local;
+  box-shadow: inset 0 0 0 1px var(--border);
   list-style: none;
 }
 .experience-reel__track li {
-  flex: 1 0 11rem;
+  flex: 0 0 calc((100% - 2rem) / 5);
+  scroll-snap-align: start;
 }
 .experience-reel__track button {
   position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: auto auto;
+  display: block;
   width: 100%;
-  gap: 0.18rem 0.55rem;
-  padding: 1.1rem 1.25rem;
-  border-right: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
+  overflow: hidden;
+  aspect-ratio: 2 / 1;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--surface);
+  color: #fff;
   cursor: pointer;
   text-align: left;
-  transition:
-    background 0.2s var(--e-cut),
-    color 0.2s var(--e-cut);
+  transition: box-shadow 0.25s var(--e-cut);
 }
-.experience-reel__track li:last-child button {
-  border-right: 0;
-}
-.experience-reel__track button:hover,
 .experience-reel__track button.is-active {
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 10px 28px -10px color-mix(in srgb, var(--accent) 70%, transparent);
 }
-.experience-reel__track button.is-active::before {
+.experience-reel__thumb {
   position: absolute;
-  right: 1rem;
-  bottom: 0;
-  left: 1rem;
-  height: 2px;
-  background: var(--accent);
+  inset: 0;
+  filter: grayscale(0.85) brightness(0.55);
+  transition:
+    filter 0.3s var(--e-cut),
+    transform 0.5s var(--e-cut);
+}
+.experience-reel__thumb::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.85), transparent 70%);
   content: "";
 }
+.experience-reel__track button:hover .experience-reel__thumb,
+.experience-reel__track button.is-active .experience-reel__thumb {
+  filter: none;
+}
+.experience-reel__track button:hover .experience-reel__thumb {
+  transform: scale(1.05);
+}
+.experience-reel__track button span,
+.experience-reel__track button small {
+  position: absolute;
+  z-index: 1;
+  top: 0.5rem;
+  font-family: var(--f-mono);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.experience-reel__track button span {
+  left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+}
+.experience-reel__track button.is-active span {
+  background: var(--accent);
+}
+.experience-reel__track button small {
+  right: 0.6rem;
+  color: rgb(255 255 255 / 0.75);
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.8);
+}
 .experience-reel__track b {
-  grid-column: 1 / -1;
+  position: absolute;
+  z-index: 1;
+  right: 0.6rem;
+  bottom: 0.55rem;
+  left: 0.6rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--f-display);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
+}
+.experience-reel__track button.is-active::before {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent);
+  content: "";
+}
+@media (prefers-reduced-motion: no-preference) {
+  .experience-reel__image,
+  .experience-reel__frame h3 {
+    animation: reel-cut 0.6s var(--e-cut) both;
+  }
+  .experience-reel.is-playing .experience-reel__track button.is-active::before {
+    transform-origin: left;
+    animation: reel-progress var(--scene-ms) linear both;
+  }
+}
+@keyframes reel-cut {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes reel-progress {
+  from {
+    transform: scaleX(0);
+  }
 }
 .experience-reel__footer > div > span {
   min-width: 2.8rem;
@@ -3055,9 +2936,6 @@ button {
   font-weight: 700;
   letter-spacing: 0.12em;
   text-align: center;
-}
-.experience-reel__track small {
-  color: var(--text-muted);
 }
 .drawing-teaser {
   position: relative;
@@ -3194,41 +3072,27 @@ button {
     0 28px 56px rgba(0, 0, 0, 0.5);
   transform: rotate(1deg) translateY(-5px);
 }
-.drawing-teaser__graphic {
+/* Photo fills the card; the gradient keeps the white invitation text readable on top. */
+.drawing-teaser__archive {
+  overflow: hidden;
+}
+.drawing-teaser__image {
   position: absolute;
   z-index: 0;
   inset: 0;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
 }
-.drawing-teaser__graphic span {
+.drawing-teaser__archive:has(.drawing-teaser__image)::after {
   position: absolute;
-  display: block;
-  width: 13rem;
-  height: 1px;
-  border: 0;
-  border-radius: 0;
-  background: rgba(255, 154, 92, 0.42);
-  transform: rotate(-40deg);
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 35%, rgba(0, 0, 0, 0.7));
+  content: "";
+  pointer-events: none;
 }
-.drawing-teaser__graphic span:nth-child(1) {
-  top: 19%;
-  right: -3.5rem;
-}
-.drawing-teaser__graphic span:nth-child(2) {
-  top: 45%;
-  right: -1.5rem;
-}
-.drawing-teaser__graphic span:nth-child(3) {
-  top: 71%;
-  right: -3rem;
-  width: 15rem;
-  height: 1px;
-  border: 0;
-  border-radius: 0;
-  background: rgba(255, 154, 92, 0.7);
-}
-.drawing-teaser__archive > :not(.drawing-teaser__graphic) {
+.drawing-teaser__archive > :not(.drawing-teaser__image) {
   position: relative;
   z-index: 1;
 }
@@ -3859,32 +3723,36 @@ button {
 
 .studio-topbar {
   position: sticky;
-  z-index: 20;
+  z-index: 40;
   top: 0;
   display: flex;
   align-items: center;
-  min-height: 72px;
+  min-height: 60px;
   gap: 1rem;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
-  padding: max(0.75rem, env(safe-area-inset-top)) clamp(1.25rem, 4vw, 3rem) 0.75rem;
-  backdrop-filter: blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  padding: max(0.65rem, env(safe-area-inset-top)) clamp(1rem, 3vw, 2.25rem) 0.65rem;
+  backdrop-filter: blur(16px);
 }
 
 .studio-icon-button {
   display: inline-grid;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   place-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 30%, transparent);
   border-radius: var(--r-md);
-  background: var(--surface-2);
-  color: var(--text);
+  background: transparent;
+  color: var(--text-2);
   cursor: pointer;
+  transition:
+    border-color 160ms var(--e-cut),
+    color 160ms var(--e-cut);
 }
 
 .studio-icon-button:hover {
   border-color: var(--accent);
+  color: var(--text);
 }
 
 .studio-topbar__menu {
@@ -3920,9 +3788,9 @@ button {
 }
 
 .studio-topbar__crumb {
-  color: var(--text-2);
+  color: var(--text-muted);
   font-family: var(--f-mono);
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -3931,6 +3799,7 @@ button {
 .studio-topbar__crumb span {
   margin: 0 0.35rem;
   color: var(--text-muted);
+  opacity: 0.6;
 }
 
 .studio-topbar__actions {
@@ -3940,34 +3809,37 @@ button {
   margin-left: auto;
 }
 
-.studio-topbar .theme-toggle {
-  min-height: 40px;
-}
-
 .studio-view-site {
-  color: var(--text-2);
+  color: var(--text-muted);
   font-family: var(--f-mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
+  transition: color 160ms var(--e-cut);
+}
+
+.studio-view-site:hover {
+  color: var(--text);
 }
 
 .studio-publish {
-  min-height: 40px;
-  padding: 0.55rem 0.85rem;
-  font-size: 0.82rem;
+  min-height: 38px;
+  min-width: 126px;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.8rem;
 }
 
 .studio-publish:disabled {
-  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--text-muted) 20%, transparent);
+  background: transparent;
   color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .studio-main {
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 60px);
   padding: clamp(1.6rem, 4vw, 3.5rem);
 }
 
@@ -4655,15 +4527,6 @@ button {
     gap: 0.6rem;
   }
 
-  .theme-toggle {
-    min-width: 44px;
-    padding: 0.55rem;
-  }
-
-  .theme-toggle__label {
-    display: none;
-  }
-
   .public-footer__grid {
     grid-template-columns: 1fr;
     gap: 1.8rem;
@@ -4784,13 +4647,9 @@ button {
   .work__board {
     --board-edge-x: 22%;
     --board-edge-y: 8%;
-    --board-spread-x: 21%;
-    --board-spread-y: 35%;
+    --card-w: clamp(124px, 37vw, 152px);
 
     min-height: 640px;
-  }
-  #work .work__card {
-    width: clamp(124px, 37vw, 152px);
   }
   .work__card-body {
     padding: 0.4rem 0.4rem 0.45rem;
@@ -4822,14 +4681,6 @@ button {
   .work__preview-copy h3 {
     font-size: 1.35rem;
   }
-  .booth {
-    grid-template-columns: repeat(2, 1fr);
-    grid-auto-rows: 160px;
-  }
-  .booth__item {
-    grid-column: auto;
-    grid-row: auto;
-  }
   .experience__intro {
     align-items: flex-start;
     flex-direction: column;
@@ -4839,13 +4690,13 @@ button {
     margin-top: 1.5rem;
   }
   .experience-reel__frame {
-    min-height: 31rem;
+    height: 34rem;
   }
   .experience-reel__frame h3 {
     font-size: clamp(2rem, 10vw, 3.1rem);
   }
   .experience-reel__track li {
-    flex-basis: min(11rem, 62vw);
+    flex-basis: calc((100% - 0.5rem) / 2);
   }
   .drawing-teaser {
     grid-template-columns: 1fr;
@@ -4867,13 +4718,6 @@ button {
   }
   .portrait {
     max-width: 420px;
-  }
-  .lightbox {
-    grid-template-columns: 1fr;
-  }
-  .lightbox > button {
-    width: max-content;
-    justify-self: center;
   }
   .mood-board {
     display: grid;
@@ -4897,28 +4741,17 @@ button {
   }
 
   .studio-topbar {
-    min-height: 64px;
+    min-height: 56px;
     padding-right: 1rem;
     padding-left: 1rem;
   }
 
-  .studio-topbar__menu {
-    display: inline-grid;
-  }
-
-  .studio-topbar .theme-toggle {
-    width: 40px;
-    min-width: 40px;
-    padding: 0.5rem;
-  }
-
-  .studio-topbar .theme-toggle__label,
   .studio-view-site {
     display: none;
   }
 
   .studio-main {
-    min-height: calc(100vh - 64px);
+    min-height: calc(100vh - 56px);
     padding: 1.5rem 1rem 5.5rem;
   }
 
@@ -5019,72 +4852,6 @@ button {
   .studio-save-bar {
     left: 1rem;
   }
-}
-
-/* Large Suite / Sheet switch: text-free in the interface, deliberately clear
-   in its movement and contrast. */
-.theme-toggle,
-.public-nav .theme-toggle,
-.studio-topbar .theme-toggle {
-  width: 66px;
-  min-width: 66px;
-  height: 44px;
-  min-height: 44px;
-  border: 0;
-  background: transparent;
-}
-
-.theme-toggle:hover,
-.public-nav .theme-toggle:hover {
-  border-color: transparent;
-  background: transparent;
-}
-
-.theme-toggle__glyph {
-  display: none;
-}
-
-.theme-toggle__switch {
-  display: flex;
-  width: 56px;
-  height: 28px;
-  align-items: center;
-  padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  background: #17222a;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.38);
-  transition:
-    background 180ms var(--e-cut),
-    border-color 180ms var(--e-cut);
-}
-
-.theme-toggle__thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #f1d2c0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
-  transition:
-    transform 200ms var(--e-cut),
-    background 180ms var(--e-cut);
-}
-
-.theme-toggle--light .theme-toggle__switch {
-  border-color: rgba(74, 67, 57, 0.25);
-  background: #ffd3b2;
-  box-shadow: inset 0 1px 2px rgba(74, 67, 57, 0.12);
-}
-
-.theme-toggle--light .theme-toggle__thumb {
-  background: #fffdf9;
-  transform: translateX(26px);
-  box-shadow: 0 2px 6px rgba(74, 67, 57, 0.18);
-}
-
-.theme-toggle:focus-visible .theme-toggle__switch {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(226, 104, 46, 0.18);
 }
 
 /* Inspector workspace: a compact field index above one focused editing surface. */
@@ -5597,81 +5364,56 @@ button {
   text-transform: uppercase;
 }
 
-.impact__campaigns {
-  display: grid;
-  grid-template-columns: minmax(14rem, 0.7fr) minmax(0, 1.3fr);
-  gap: clamp(1.5rem, 4vw, 3rem);
-  padding: clamp(1.5rem, 3vw, 2.5rem);
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
-}
-
-.impact__campaigns h3 {
-  margin: 0.65rem 0;
-  font-size: clamp(1.5rem, 3vw, 2.35rem);
-}
-
-.impact__campaigns p {
-  max-width: 42ch;
-  color: var(--text-muted);
-}
-
-.impact__campaigns ul {
-  display: grid;
-  margin: 0;
-  border-top: 1px solid var(--border);
-  list-style: none;
-}
-
-.impact__campaigns li {
-  display: grid;
-  grid-template-columns: minmax(10rem, 0.8fr) minmax(0, 1.2fr);
-  align-items: baseline;
-  gap: 1rem;
-  padding: 1.1rem 0;
+.clients {
+  padding: clamp(1.5rem, 3vw, 2.25rem) 0;
   border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
 }
-
-.impact__campaigns li b {
-  color: var(--text);
-  font-family: var(--f-display);
-  font-size: clamp(1.05rem, 1.6vw, 1.3rem);
-  font-weight: 650;
-  letter-spacing: -0.01em;
+.clients h2 {
+  margin: 0 0 1rem;
 }
-
-.impact__campaigns li span {
+.clients__marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.clients__track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: testimonials-marquee linear infinite;
+}
+.clients__track:hover {
+  animation-play-state: paused;
+}
+/* Keep in sync with ITEM_SPAN in ClientsMarquee.tsx. */
+.clients__track li {
+  display: flex;
+  flex: 0 0 240px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0 1rem;
   color: var(--text-muted);
-  font-family: var(--f-mono);
-  font-size: 0.7rem;
+  font-family: var(--f-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+  white-space: nowrap;
 }
-
-.impact__campaigns li > a {
-  display: contents;
-  text-decoration: none;
-  cursor: pointer;
-}
-.impact__campaigns li > a:hover b,
-.impact__campaigns li > a:focus-visible b {
-  color: var(--accent);
-}
-
-.impact__campaign-row {
-  opacity: 0;
-  transform: translateX(2.5rem);
-  transition:
-    opacity 0.5s ease,
-    transform 0.5s ease;
-}
-.impact__campaigns.is-visible .impact__campaign-row {
-  opacity: 1;
-  transform: none;
+.clients__track img {
+  width: auto;
+  max-width: 5rem;
+  height: 2.25rem;
+  object-fit: contain;
 }
 @media (prefers-reduced-motion: reduce) {
-  .impact__campaign-row {
-    opacity: 1;
-    transform: none;
-    transition: none;
+  .clients__marquee {
+    overflow-x: auto;
+  }
+  .clients__track {
+    animation: none;
   }
 }
 
@@ -5738,14 +5480,27 @@ button {
 }
 
 .experience-reel__frame h3 {
-  max-width: 14ch;
+  display: -webkit-box;
+  max-width: 16ch;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: clamp(2.4rem, 5vw, 5rem);
+  line-height: 1;
   overflow-wrap: anywhere;
 }
-
-.experience-reel__track b {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
+.experience-reel__role-title {
+  z-index: 1;
+  margin: -0.3rem 0 0.8rem;
+  color: var(--ember-400);
+  font-weight: 650;
+  font-size: clamp(1rem, 1.6vw, 1.5rem);
+}
+.experience-reel__description {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .contact__callback {
@@ -5770,6 +5525,13 @@ button {
   text-decoration-color: var(--accent);
 }
 
+@media (max-width: 720px) {
+  .about__skill-groups > div {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The /resume page's opening block. */
 .process-hero {
   padding: clamp(6rem, 14vw, 11rem) 0 clamp(4rem, 9vw, 7rem);
   border-bottom: 1px solid var(--border);
@@ -5796,106 +5558,25 @@ button {
   font-size: clamp(1.05rem, 2vw, 1.35rem);
 }
 
-.process-method ol {
-  margin: 0;
-  border-top: 1px solid var(--border);
-  list-style: none;
+.resume-page__actions {
+  margin-top: 2rem;
 }
 
-.process-method li {
-  display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr);
-  gap: clamp(1rem, 4vw, 3rem);
-  padding: clamp(1.4rem, 3vw, 2.2rem) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.process-method li > span,
-.process-turnaround dt {
-  color: var(--accent-text);
-  font-family: var(--f-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.process-method h3 {
-  margin: 0 0 0.45rem;
-  font-size: clamp(1.5rem, 3vw, 2.4rem);
-  text-transform: uppercase;
-}
-
-.process-method p {
-  max-width: 62ch;
-}
-
-.process-turnaround {
+.resume-page__viewer {
+  display: block;
+  width: 100%;
+  height: min(88vh, 1100px);
+  border: 1px solid var(--border);
   background: var(--bg-subtle);
 }
 
-.process-turnaround dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--border);
-}
-
-.process-turnaround dl > div {
-  display: flex;
-  min-height: 8rem;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: clamp(1.2rem, 3vw, 2rem);
-  background: var(--surface);
-}
-
-.process-turnaround dd {
-  max-width: 15ch;
-  margin: 0;
-  color: var(--text);
-  font-family: var(--f-display);
-  font-size: clamp(1.35rem, 3vw, 2.2rem);
-  font-weight: 700;
-  text-align: right;
-}
-
-.process-turnaround__notes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.process-turnaround__notes p {
-  padding: 1rem 1.2rem;
-  border-left: 2px solid var(--accent);
-  background: var(--surface);
+.resume-page__empty {
+  padding: 4rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: 0.88rem;
-}
-
-@media (max-width: 720px) {
-  .about__skill-groups > div,
-  .impact__campaigns,
-  .impact__campaigns li,
-  .process-turnaround__notes {
-    grid-template-columns: 1fr;
-  }
-
-  .process-method li {
-    grid-template-columns: 2.5rem minmax(0, 1fr);
-  }
-
-  .process-turnaround dl {
-    grid-template-columns: 1fr;
-  }
-
-  .process-turnaround dl > div {
-    min-height: 6rem;
-  }
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  text-align: center;
 }
 
 /* The alternate theme stays within the same black-and-orange system while
@@ -5941,10 +5622,6 @@ button {
   z-index: 30;
 }
 
-.studio-topbar {
-  z-index: 40;
-}
-
 /* Save controls now live below the contextual preview, so editing and saving
    stay together instead of forcing a jump to a floating corner prompt. */
 .studio-editor__preview-stack .studio-save-bar {
@@ -5988,98 +5665,6 @@ button {
     align-items: stretch;
     flex-direction: column;
   }
-}
-
-/* Studio shell refresh: a clear release flow and a quieter page map. */
-.theme-toggle {
-  min-height: 36px;
-  gap: 0.42rem;
-  padding: 0.32rem 0.52rem;
-  border-radius: 999px;
-  transition:
-    border-color 160ms var(--e-cut),
-    background 160ms var(--e-cut),
-    color 160ms var(--e-cut),
-    transform 120ms var(--e-cut);
-}
-
-.theme-toggle__track {
-  position: relative;
-  display: inline-flex;
-  width: 24px;
-  height: 14px;
-  align-items: center;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--border-strong);
-  transition: background 160ms var(--e-cut);
-}
-
-.theme-toggle__dot {
-  width: 10px;
-  height: 10px;
-  box-shadow: none;
-  transition:
-    transform 180ms var(--e-cut),
-    background 160ms var(--e-cut);
-}
-
-.theme-toggle--dark {
-  border-color: rgba(234, 127, 74, 0.46);
-  background: rgba(226, 104, 46, 0.13);
-  color: #f6c8af;
-}
-
-.theme-toggle--dark .theme-toggle__track {
-  background: #713518;
-}
-
-.theme-toggle--dark .theme-toggle__dot {
-  background: #ffc09c;
-  transform: translateX(10px);
-}
-
-.theme-toggle--light {
-  border-color: rgba(185, 71, 0, 0.36);
-  background: rgba(255, 106, 0, 0.1);
-  color: #b94700;
-}
-
-.theme-toggle--light .theme-toggle__track {
-  background: #ffb176;
-}
-
-.theme-toggle--light .theme-toggle__dot {
-  background: #f7fbfb;
-}
-
-.public-nav .theme-toggle {
-  gap: 0.32rem;
-  padding: 0.24rem 0.42rem;
-  border: 1px solid transparent;
-  background: transparent;
-}
-
-.public-nav .theme-toggle--dark {
-  border-color: rgba(234, 127, 74, 0.36);
-  background: rgba(226, 104, 46, 0.1);
-}
-
-.public-nav .theme-toggle--light {
-  border-color: rgba(185, 71, 0, 0.32);
-  background: rgba(255, 106, 0, 0.09);
-}
-
-.public-nav .theme-toggle__label {
-  display: inline;
-  font-size: 0.56rem;
-  letter-spacing: 0.09em;
-}
-
-.public-nav .theme-toggle__dot {
-  width: 10px;
-  height: 10px;
-  opacity: 1;
 }
 
 .studio-shell {
@@ -6195,52 +5780,6 @@ button {
   font-style: normal;
 }
 
-.studio-topbar {
-  min-height: 66px;
-  padding-top: max(0.65rem, env(safe-area-inset-top));
-  padding-bottom: 0.65rem;
-}
-
-.studio-release-state {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.38rem;
-  margin-right: 0.3rem;
-  color: #8fa0aa;
-  font-family: var(--f-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.studio-release-state > span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #72d2a0;
-  box-shadow: 0 0 0 3px rgba(114, 210, 160, 0.12);
-}
-
-.studio-release-state.is-drafting > span {
-  background: #f0a66b;
-  box-shadow: 0 0 0 3px rgba(240, 166, 107, 0.13);
-}
-
-.studio-release-state.is-ready > span {
-  background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(226, 104, 46, 0.14);
-}
-
-.studio-publish {
-  min-width: 126px;
-}
-
-.studio-publish:disabled {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: transparent;
-}
-
 .studio-save-bar {
   right: clamp(1rem, 4vw, 3rem);
   bottom: max(1rem, env(safe-area-inset-bottom));
@@ -6321,39 +5860,7 @@ button {
   color: var(--text-2);
 }
 
-[data-theme="light"] .studio-topbar {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-  background: rgba(5, 5, 5, 0.82);
-}
-
-[data-theme="light"] .studio-save-bar {
-  background: rgba(12, 12, 12, 0.96);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.48);
-}
-
-[data-theme="light"] .studio-save-bar__copy p {
-  color: var(--text-2);
-}
-
-@media (max-width: 900px) {
-  .studio-release-state {
-    display: none;
-  }
-}
-
 @media (max-width: 580px) {
-  .public-nav .theme-toggle {
-    width: 30px;
-    min-width: 30px;
-    padding: 0.18rem;
-    border-color: transparent;
-    background: transparent;
-  }
-
-  .public-nav .theme-toggle__label {
-    display: none;
-  }
-
   .studio-save-bar {
     align-items: flex-start;
     flex-direction: column;
@@ -6361,92 +5868,18 @@ button {
   }
 }
 
-/* Icon-only theme button for the public navbar and Studio topbar. */
-.theme-toggle,
-.public-nav .theme-toggle,
-.studio-topbar .theme-toggle {
-  display: inline-grid;
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
-  min-height: 30px;
-  place-items: center;
-  margin: 0;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--text-muted) 32%, transparent);
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-2);
-}
-
-.theme-toggle:hover,
-.public-nav .theme-toggle:hover {
-  border-color: var(--accent);
-  background: transparent;
-  color: var(--text);
-}
-
-.theme-toggle__glyph {
-  display: block;
-  width: 12px;
-  height: 12px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  background: linear-gradient(90deg, currentColor 0 50%, transparent 50%);
-  transition:
-    background 180ms var(--e-cut),
-    color 180ms var(--e-cut),
-    transform 180ms var(--e-cut);
-}
-
-.theme-toggle--light .theme-toggle__glyph {
-  background: linear-gradient(90deg, transparent 0 50%, currentColor 50%);
-  transform: rotate(180deg);
-}
-
-.theme-toggle__option,
-.theme-toggle__rule,
-.theme-toggle__marker,
-.theme-toggle__track,
-.theme-toggle__dot,
-.theme-toggle__label {
-  display: none;
-}
-
-[data-theme="light"] .theme-toggle {
-  border-color: rgba(255, 255, 255, 0.18);
-  color: var(--text-2);
-}
-
-/* Larger touch target and a phone-network style release signal in Studio. */
-.theme-toggle,
-.public-nav .theme-toggle,
-.studio-topbar .theme-toggle {
-  width: 40px;
-  min-width: 40px;
-  height: 40px;
-  min-height: 40px;
-}
-
-.theme-toggle__glyph {
-  width: 16px;
-  height: 16px;
-}
-
-.studio-release-state,
-.studio-release-state.is-drafting,
-.studio-release-state.is-ready {
+/* Phone-network style release signal in Studio. */
+.studio-release-state {
   display: inline-flex;
+  align-items: center;
   gap: 0.5rem;
+  margin-right: 0.3rem;
   color: #72d2a0;
-}
-
-.studio-release-state.is-drafting {
-  color: #f0a66b;
-}
-
-.studio-release-state.is-ready {
-  color: var(--accent);
+  font-family: var(--f-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .studio-release-state.is-offline {
@@ -6457,14 +5890,12 @@ button {
   opacity: 0.22;
 }
 
-.studio-release-state > .studio-release-state__signal {
+.studio-release-state__signal {
   display: inline-flex;
   width: 15px;
   height: 15px;
   align-items: end;
   gap: 2px;
-  background: transparent;
-  box-shadow: none;
 }
 
 .studio-release-state__signal i {
@@ -6490,27 +5921,6 @@ button {
   height: 13px;
 }
 
-.studio-release-state > .studio-release-state__label {
-  width: auto;
-  height: auto;
-  background: transparent;
-  box-shadow: none;
-}
-
-[data-theme="light"] .studio-release-state {
-  color: #2e7d58;
-}
-
-[data-theme="light"] .studio-release-state.is-drafting {
-  color: #ad5b27;
-}
-
-@media (max-width: 900px) {
-  .studio-release-state {
-    display: inline-flex;
-  }
-}
-
 @media (max-width: 640px) {
   .studio-release-state {
     gap: 0;
@@ -6518,113 +5928,6 @@ button {
 
   .studio-release-state__label {
     display: none;
-  }
-}
-
-/* Suite / Sheet is a quiet editorial selector, not a generic app switch. */
-.theme-toggle,
-.public-nav .theme-toggle,
-.studio-topbar .theme-toggle {
-  display: inline-grid;
-  grid-template-columns: auto 24px auto;
-  min-width: 0;
-  min-height: 28px;
-  gap: 0.38rem;
-  padding: 0.18rem 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-family: var(--f-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.theme-toggle:hover,
-.public-nav .theme-toggle:hover {
-  border-color: transparent;
-  background: transparent;
-  color: var(--text);
-}
-
-.theme-toggle:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 4px;
-}
-
-.theme-toggle__option {
-  color: var(--text-muted);
-  transition: color 160ms var(--e-cut);
-}
-
-.theme-toggle__option.is-active {
-  color: var(--text);
-}
-
-.theme-toggle__rule {
-  position: relative;
-  align-self: center;
-  height: 1px;
-  background: color-mix(in srgb, currentColor 38%, transparent);
-}
-
-.theme-toggle__marker {
-  position: absolute;
-  top: -2px;
-  left: 0;
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-  transition:
-    transform 180ms var(--e-cut),
-    background 160ms var(--e-cut);
-}
-
-.theme-toggle--light .theme-toggle__marker {
-  background: var(--signal-700);
-  transform: translateX(19px);
-}
-
-.theme-toggle--dark .theme-toggle__marker {
-  transform: translateX(0);
-}
-
-.public-nav .theme-toggle {
-  flex: 0 0 auto;
-  margin-right: 0.75rem;
-}
-
-.public-nav .theme-toggle__label,
-.public-nav .theme-toggle__track,
-.public-nav .theme-toggle__dot {
-  display: none;
-}
-
-.studio-topbar .theme-toggle {
-  margin: 0 0.15rem;
-}
-
-[data-theme="light"] .theme-toggle__option.is-active {
-  color: var(--text);
-}
-
-@media (max-width: 580px) {
-  .public-nav .theme-toggle {
-    grid-template-columns: auto 18px auto;
-    gap: 0.25rem;
-    margin-right: 0.35rem;
-    font-size: 0.48rem;
-    letter-spacing: 0.06em;
-  }
-
-  .public-nav .theme-toggle__rule {
-    width: 18px;
-  }
-
-  .public-nav .theme-toggle--light .theme-toggle__marker {
-    transform: translateX(13px);
   }
 }
 
@@ -6643,7 +5946,7 @@ button {
     .landing > section:not(:first-of-type) h2,
     .landing > section:not(:first-of-type) h3,
     .landing > section:not(:first-of-type) p,
-    .landing > section:not(:first-of-type) li:not(.impact__campaign-row),
+    .landing > section:not(:first-of-type) li,
     .landing > section:not(:first-of-type) blockquote {
       animation: reveal-up linear both;
       animation-timeline: view();
@@ -6777,12 +6080,14 @@ button {
   @media (prefers-reduced-motion: no-preference) {
     /* Work cards of every layout are excluded: this reveal ends on a bare
        transform, which would wipe out the transform a canvas card is placed
-       and dragged with, fights the globe a card is turned onto, and cannot
+       and dragged with, and cannot
        track a rail card being carried sideways by its track. */
-    .landing > section:not(:first-of-type) a[href],
+    /* The Drawing Room teaser sits too near the page end for the range to finish,
+       leaving its CTA half-faded and its card untilted. */
+    .landing > section:not(:first-of-type) a[href]:not(.drawing-teaser__link, .drawing-teaser__archive),
     .landing
       > section:not(:first-of-type)
-      button:not(.work__card, .work__globe-card-btn, .work__rail-card) {
+      button:not(.work__card, .work__rail-card) {
       animation: reveal-up linear both;
       animation-timeline: view();
       animation-range: entry 25% cover 45%;
@@ -6835,16 +6140,21 @@ button {
     --card-turn: 0deg;
   }
 
-  .booth__item:hover .booth__image img {
-    transform: scale(1.06);
-  }
-
   .testimonials figure:hover,
   .experience-reel__frame:hover,
   .drawing-teaser:hover {
     transform: translateY(-4px);
     border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
     box-shadow: var(--sh-md);
+  }
+
+  /* Keep the gradient hairline; lift with a warm halo instead. */
+  .testimonials figure:hover {
+    border-color: transparent;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 28px 56px -26px rgba(0, 0, 0, 0.95),
+      0 0 0 1px rgba(255, 154, 61, 0.22);
   }
 }
 
@@ -6934,12 +6244,6 @@ button {
 .studio-rail__group a[aria-current="page"] {
   border-color: rgba(226, 104, 46, 0.3);
   background: linear-gradient(100deg, rgba(226, 104, 46, 0.19), rgba(226, 104, 46, 0.04));
-}
-
-.studio-topbar {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-  background: rgba(13, 18, 24, 0.72);
-  backdrop-filter: blur(20px);
 }
 
 .studio-main {
@@ -7568,83 +6872,6 @@ button {
   background: transparent;
 }
 
-/* Final theme-switch cascade: keep this substantial control consistent in the
-   public navigation and Studio topbar. */
-.theme-toggle,
-.public-nav .theme-toggle,
-.studio-topbar .theme-toggle {
-  display: inline-grid;
-  width: 66px;
-  min-width: 66px;
-  height: 44px;
-  min-height: 44px;
-  place-items: center;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.public-nav .theme-toggle {
-  width: 74px;
-  min-width: 74px;
-  margin-left: 0.35rem;
-  padding-inline: 0.35rem;
-}
-
-.theme-toggle__glyph {
-  display: none;
-}
-
-.theme-toggle__switch {
-  display: flex;
-  width: 56px;
-  height: 28px;
-  align-items: center;
-  padding: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-  background: #17222a;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.38);
-  transition:
-    background 180ms var(--e-cut),
-    border-color 180ms var(--e-cut);
-}
-
-.theme-toggle__thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #f1d2c0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.32);
-  transition:
-    transform 200ms var(--e-cut),
-    background 180ms var(--e-cut);
-}
-
-.theme-toggle--light .theme-toggle__switch {
-  border-color: rgba(74, 67, 57, 0.25);
-  background: #ffd3b2;
-  box-shadow: inset 0 1px 2px rgba(74, 67, 57, 0.12);
-}
-
-.theme-toggle--light .theme-toggle__thumb {
-  background: #fffdf9;
-  transform: translateX(26px);
-  box-shadow: 0 2px 6px rgba(74, 67, 57, 0.18);
-}
-
-.theme-toggle:hover,
-.public-nav .theme-toggle:hover {
-  border-color: transparent;
-  background: transparent;
-}
-
-.theme-toggle:focus-visible .theme-toggle__switch {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(226, 104, 46, 0.18);
-}
-
 /* ==========================================================================
    Studio field guidance
    The editor renders raw draft JSON, so every control carries a plain-English
@@ -7989,13 +7216,6 @@ button {
   max-width: 18ch;
   margin-bottom: 1.1rem;
   text-wrap: balance;
-}
-.experience-reel__track button span {
-  color: var(--ember-400);
-  font-family: var(--f-display);
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
 }
 
 .about .slate {

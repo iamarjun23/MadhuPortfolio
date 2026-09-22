@@ -6,7 +6,7 @@ import type { SectionKey } from "@/lib/sections";
    it shows up on the live page, and - for uploads - whether it wants a photo or
    a video. */
 
-export type MediaKindLabel = "photo" | "video";
+export type MediaKindLabel = "photo" | "video" | "document";
 
 export type FieldDoc = Readonly<{
   label: string;
@@ -30,6 +30,11 @@ export const mediaSpecs: Record<
     accepts: "Video file - MP4 or WebM, up to 64 MB",
     action: "Upload video",
   },
+  document: {
+    badge: "PDF",
+    accepts: "PDF file, up to 10 MB",
+    action: "Upload PDF",
+  },
 };
 
 export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: string }>> = {
@@ -44,20 +49,19 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
   },
   impact: {
     summary:
-      "The numbers strip and the list of people and brands you have worked with, plus sponsorship campaigns.",
+      "The numbers strip and the list of people and brands you have worked with.",
     media: "No uploads - collaborators are listed by name.",
+  },
+  clients: {
+    summary:
+      "The scrolling strip of companies you have worked with, right under the numbers strip. It stays hidden while the list is empty.",
+    media: "One optional logo per company. Without one, the name is shown on its own.",
   },
   work: {
     summary:
       "Your selected work board. Cards are grouped into categories, and visitors drag them around and click to play the video.",
     media:
       "Usually nothing is uploaded here. Paste each project's YouTube, Instagram or LinkedIn link and it supplies the card thumbnail and the pop-up player on its own. For a reel that is not on any of those, upload the video file to the project instead.",
-  },
-  booth: {
-    summary:
-      "The photobooth wall of on-set moments. Clicking a photo opens it full size in a lightbox.",
-    media:
-      "One photo per slot - this section is entirely photos. A slot with none is left off the wall, and the whole section stays hidden until at least one photograph is up.",
   },
   praise: {
     summary:
@@ -75,10 +79,10 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
     media:
       "Polaroid cards hold photos. Video cards hold a YouTube or LinkedIn link and play in a pop-up. Notes, quotes and tag cards are text only.",
   },
-  process: {
+  resume: {
     summary:
-      "The Studio page - the separate /process page the menu's Studio link opens: its opening lines, the five passes of how you work, the turnaround table, and the page's own search listing. The photo wall at the bottom of that page is the Photobooth section.",
-    media: "No uploads here.",
+      "The /resume page the menu's Resume link opens: a heading, a short intro, and your resume shown right on the page with a download button.",
+    media: "One PDF - your resume. Upload a new one any time to replace it.",
   },
   contact: {
     summary: "The closing invitation plus your real contact details, social links and footer line.",
@@ -143,16 +147,7 @@ const fieldRules: readonly FieldRule[] = [
     doc: {
       label: "Stand-in photo",
       media: "photo",
-      hint: "Shown anywhere a picture has not been uploaded yet - an empty photobooth slot, a polaroid on the pinboard, your portrait, a career scene. Leave it empty and those places show nothing at all instead.",
-    },
-  },
-  {
-    key: "image",
-    within: ["slots"],
-    doc: {
-      label: "Photobooth photo",
-      media: "photo",
-      hint: "The on-set photograph for this slot. It opens full size when a visitor clicks it. A slot with no photograph is not shown on the wall at all, so upload one here to put this slot up.",
+      hint: "Shown anywhere a picture has not been uploaded yet - a polaroid on the pinboard, your portrait, a career scene. Leave it empty and those places show nothing at all instead.",
     },
   },
   {
@@ -182,87 +177,28 @@ const fieldRules: readonly FieldRule[] = [
       hint: "The still shown on the card. A YouTube link fills this in on its own, so leave it empty there. An Instagram reel publishes no still anyone can look up and a LinkedIn post's has to be fetched, so upload a frame from the reel here and the card always looks right. A cover set here beats whatever the link supplies - with neither, the card falls back to its gradient and a badge saying where the reel lives.",
     },
   },
+  {
+    key: "image",
+    within: ["teaser"],
+    doc: {
+      label: "Invitation photo",
+      media: "photo",
+      hint: "Fills the tilted invitation card on the home page. Leave empty for a plain card.",
+    },
+  },
   { key: "image", doc: { label: "Photo", media: "photo", hint: "Image shown in this section." } },
-
-  /* ---------- Studio page (/process) ---------- */
   {
-    key: "method",
+    key: "pdf",
     doc: {
-      label: "How I work",
-      hint: "The numbered passes down the middle of the Studio page.",
+      label: "Resume PDF",
+      media: "document",
+      hint: "Shown on the Resume page and offered as a download. Until one is uploaded the page shows the waiting message below.",
     },
   },
+  { key: "downloadLabel", doc: { label: "Download button text" } },
   {
-    key: "eyebrow",
-    within: ["method"],
-    doc: { label: "Eyebrow line", hint: "The small line above this block's heading." },
-  },
-  {
-    key: "heading",
-    within: ["method"],
-    doc: { label: "Heading", hint: "The large title over the numbered passes." },
-  },
-  {
-    key: "steps",
-    doc: {
-      label: "Passes",
-      itemLabel: "Pass",
-      hint: "One entry per stage of the edit. Drag to reorder.",
-    },
-  },
-  {
-    key: "number",
-    within: ["steps"],
-    doc: { label: "Pass number", hint: 'Two digits, e.g. "01". Shown large beside the pass.' },
-  },
-  { key: "title", within: ["steps"], doc: { label: "Pass name" } },
-  {
-    key: "description",
-    within: ["steps"],
-    doc: { label: "What happens in this pass", hint: "Up to 320 characters." },
-  },
-  {
-    key: "turnaround",
-    doc: {
-      label: "Turnaround",
-      hint: "The table of how long each kind of edit takes, and the notes under it.",
-    },
-  },
-  {
-    key: "eyebrow",
-    within: ["turnaround"],
-    doc: { label: "Eyebrow line", hint: "The small line above this block's heading." },
-  },
-  {
-    key: "heading",
-    within: ["turnaround"],
-    doc: { label: "Heading", hint: "The large title over the turnaround table." },
-  },
-  {
-    key: "rows",
-    doc: {
-      label: "Turnaround table",
-      itemLabel: "Row",
-      hint: "One row per kind of edit. Drag to reorder.",
-    },
-  },
-  { key: "format", doc: { label: "Kind of edit", hint: 'For example "Short-form reel".' } },
-  { key: "timing", doc: { label: "How long it takes", hint: 'For example "1 day".' } },
-  {
-    key: "notes",
-    doc: {
-      label: "Notes under the table",
-      itemLabel: "Note",
-      hint: "Short lines of small print below the turnaround table.",
-    },
-  },
-  { key: "text", within: ["notes"], doc: { label: "Note" } },
-  {
-    key: "showPhotobooth",
-    doc: {
-      label: "Show the photo wall on this page",
-      hint: "Repeats the Photobooth section at the bottom of the Studio page. Its photos are edited in Photobooth.",
-    },
+    key: "emptyMessage",
+    doc: { label: "Waiting message", hint: "Shown on the Resume page while no PDF is uploaded." },
   },
 
   /* ---------- Hero ---------- */
@@ -453,26 +389,24 @@ const fieldRules: readonly FieldRule[] = [
     },
   },
   {
-    key: "campaigns",
+    key: "clients",
     doc: {
-      label: "Campaigns",
-      itemLabel: "Campaign",
-      hint: "Sponsorship campaigns, listed as text.",
+      label: "Companies",
+      itemLabel: "Company",
+      hint: "Each one scrolls past in the marquee. Drag to reorder.",
     },
   },
-  { key: "name", within: ["campaigns"], doc: { label: "Campaign name" } },
-  { key: "context", within: ["campaigns"], doc: { label: "Campaign detail" } },
+  { key: "name", within: ["clients"], doc: { label: "Company name" } },
   {
-    key: "href",
-    within: ["campaigns"],
+    key: "logo",
+    within: ["clients"],
     doc: {
-      label: "Watch link",
-      hint: "Where this campaign's row links out to - a full https:// address. Leave it as None to keep the row as plain text.",
+      label: "Company logo",
+      media: "photo",
+      hint: "Shown beside the name. A PNG or WebP with a transparent background looks best. Leave empty to show the name alone.",
     },
   },
   { key: "collaboratorsLabel", doc: { label: "Collaborators caption" } },
-  { key: "campaignsHeading", doc: { label: "Campaigns heading" } },
-  { key: "campaignsDescription", doc: { label: "Campaigns description" } },
 
   /* ---------- Work ---------- */
   {
@@ -487,6 +421,14 @@ const fieldRules: readonly FieldRule[] = [
     key: "label",
     within: ["lanes"],
     doc: { label: "Category name", hint: "Text on the filter chip above the cards." },
+  },
+  {
+    key: "layout",
+    within: ["lanes"],
+    doc: {
+      label: "Layout",
+      hint: 'How this category\'s cards are shown when its chip is picked. Canvas scatters them on a board - drag cards in the preview to arrange them, and the arrangement is saved with the draft ("Reset layout" puts them back). Grid is the drifting three-row wall. "All work" always uses the grid; phones always get the grid.',
+    },
   },
   {
     key: "projects",
@@ -544,62 +486,12 @@ const fieldRules: readonly FieldRule[] = [
     },
   },
   {
-    key: "allLayout",
-    doc: {
-      label: '"All work" layout',
-      hint: 'How the cards are arranged when no category is picked. Globe turns them on a slowly spinning sphere you can also spin by hand, canvas is the draggable scatter board, grid is a three-row wall that drifts sideways on its own and stops while you are pointing at it. Picking a category always shows the canvas, whichever is set here.',
-    },
-  },
-  {
     key: "previewUnavailableLabel",
     doc: {
       label: "No-preview message",
       hint: "Shown inside the pop-up when a project has no YouTube video or LinkedIn post to play yet.",
     },
   },
-
-  /* ---------- Photobooth ---------- */
-  {
-    key: "slots",
-    doc: {
-      label: "Photo slots",
-      itemLabel: "Photo",
-      hint: "One entry per photograph on the wall. Drag to reorder.",
-    },
-  },
-  {
-    key: "title",
-    within: ["slots"],
-    doc: { label: "Photo title", hint: "Caption printed on the photo card." },
-  },
-  { key: "subtitle", within: ["slots"], doc: { label: "Photo subtitle" } },
-  {
-    key: "lightboxCaption",
-    doc: { label: "Full-size caption", hint: "Shown under the photo when it is opened full size." },
-  },
-  {
-    key: "hasTape",
-    doc: { label: "Show tape", hint: "Draws a strip of tape across the corner of this photo." },
-  },
-  {
-    key: "width",
-    within: ["slots"],
-    doc: {
-      label: "Width on the wall",
-      hint: "How many of the wall's 12 columns this photo spans. Bigger number, bigger photo.",
-    },
-  },
-  {
-    key: "height",
-    within: ["slots"],
-    doc: {
-      label: "Height on the wall",
-      hint: "How many rows tall this photo sits. Bigger number, taller photo.",
-    },
-  },
-  { key: "lightboxCloseLabel", doc: { label: '"Close" button text' } },
-  { key: "lightboxPreviousLabel", doc: { label: '"Previous" button text' } },
-  { key: "lightboxNextLabel", doc: { label: '"Next" button text' } },
 
   /* ---------- Praise ---------- */
   {
@@ -837,13 +729,6 @@ const fieldRules: readonly FieldRule[] = [
   { key: "youtube", doc: { label: "YouTube URL" } },
   { key: "footerStatus", doc: { label: "Footer status line" } },
   { key: "footerTagline", doc: { label: "Footer tagline" } },
-  {
-    key: "studioCaption",
-    doc: {
-      label: "Studio page ticker",
-      hint: "The line that runs beside the wordmark while the Studio page is open.",
-    },
-  },
 
   /* ---------- Site & navigation ---------- */
   {
@@ -871,18 +756,7 @@ const fieldRules: readonly FieldRule[] = [
   },
   {
     key: "appearance",
-    doc: { label: "Appearance", hint: "Theme and motion defaults for visitors." },
-  },
-  {
-    key: "defaultTheme",
-    doc: {
-      label: "Default theme",
-      hint: "suite = dark, sheet = light, system = follow the visitor's device.",
-    },
-  },
-  {
-    key: "showThemeToggle",
-    doc: { label: "Show the theme toggle", hint: "Lets visitors switch between the two themes." },
+    doc: { label: "Appearance", hint: "Motion defaults for visitors." },
   },
   {
     key: "motion",
@@ -931,10 +805,13 @@ const fieldRules: readonly FieldRule[] = [
   { key: "drawingRoomCaption", doc: { label: "Drawing Room caption" } },
   { key: "workLabel", doc: { label: '"Work" menu item' } },
   { key: "drawingRoomLabel", doc: { label: '"Drawing Room" menu item' } },
-  { key: "studioLabel", doc: { label: '"Studio" menu item' } },
+  { key: "resumeLabel", doc: { label: '"Resume" menu item' } },
   {
-    key: "studioHref",
-    doc: { label: '"Studio" menu link', hint: "Where the Studio menu item points, e.g. /process." },
+    key: "resumeCaption",
+    doc: {
+      label: "Resume page ticker",
+      hint: "The line that runs beside the wordmark while the Resume page is open.",
+    },
   },
   { key: "contactLabel", doc: { label: '"Get in touch" menu item' } },
   { key: "portfolioLabel", doc: { label: '"Portfolio" menu item' } },
@@ -960,7 +837,6 @@ const fieldRules: readonly FieldRule[] = [
   },
   { key: "exploreHeading", doc: { label: '"Explore" heading' } },
   { key: "selectedWorkLabel", doc: { label: '"Selected work" footer link' } },
-  { key: "photoboothLabel", doc: { label: '"Photobooth" footer link' } },
   { key: "experienceLabel", doc: { label: '"Experience" footer link' } },
   { key: "contactHeading", doc: { label: '"Get in touch" footer heading' } },
   { key: "copyrightPrefix", doc: { label: "Copyright symbol" } },

@@ -39,8 +39,8 @@ const nextConfig = {
       `img-src 'self' data: blob: https://madhu.edit https://images.pexels.com https://i.ytimg.com ${mediaUrl}`,
       `media-src 'self' blob: https://videos.pexels.com ${mediaUrl}`,
       // A reel card plays a YouTube video, an Instagram reel or a LinkedIn post
-      // in place, on both the work board and the Drawing Room pinboard.
-      "frame-src 'self' https://www.youtube-nocookie.com https://www.linkedin.com https://www.instagram.com",
+      // in place, on both the work board and the Drawing Room pinboard. The resume PDF is framed from R2.
+      `frame-src 'self' https://www.youtube-nocookie.com https://www.linkedin.com https://www.instagram.com ${mediaUrl}`,
       // The studio PUTs uploads straight to R2 through a signed URL (actions/media.ts).
       "connect-src 'self' https://cloudflareinsights.com https://*.r2.cloudflarestorage.com",
     ].join("; ");

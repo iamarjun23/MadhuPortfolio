@@ -14,15 +14,17 @@ export const WorkSchema = z.object({
   briefPrompt: z.string().max(50).default("Have a story?"),
   briefCta: z.string().max(40).default("Hire me"),
   canvasHint: z.string().max(120).default("Drag any card to rearrange · click to preview"),
-  // Only the "All work" view honours this. Filtering to one category always
-  // draws the canvas, whose rings are what a short list reads best as.
-  allLayout: z.enum(["globe", "canvas", "grid"]).default("globe"),
   previewUnavailableLabel: z.string().max(60).default("Preview coming soon"),
+  // Project ids in the order the "All work" grid shows them, set by dragging
+  // in the studio. Projects missing from it follow in category order.
+  allOrder: z.array(z.string()).max(200).default([]),
   lanes: z
     .array(
       z.object({
         id: z.string(),
         label: z.string().max(40),
+        // "All work" is always the grid; each category picks its own.
+        layout: z.enum(["canvas", "grid"]).default("canvas"),
         projects: z
           .array(
             z.object({
@@ -46,6 +48,12 @@ export const WorkSchema = z.object({
               // a bare gradient. Set, it outranks whatever was worked out.
               image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
               thumbHint: z.enum(["bd-1", "bd-2", "bd-3", "bd-4"]),
+              // Where the card was dropped on the category canvas in the studio,
+              // in grid cells from the board's centre. Null = the computed spot.
+              position: z
+                .object({ x: z.number().min(-20).max(20), y: z.number().min(-20).max(20) })
+                .nullable()
+                .default(null),
             }),
           )
           .max(20),

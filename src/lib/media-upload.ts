@@ -19,10 +19,10 @@ type EndpointConfig = Readonly<{
 export const uploadEndpoints: Record<UploadEndpoint, EndpointConfig> = {
   heroVideo: { kind: MediaKind.VIDEO, ...endpointLimits.heroVideo },
   portrait: { kind: MediaKind.IMAGE, ...endpointLimits.portrait },
-  boothImage: { kind: MediaKind.IMAGE, ...endpointLimits.boothImage },
   experienceImage: { kind: MediaKind.IMAGE, ...endpointLimits.experienceImage },
   roomImage: { kind: MediaKind.IMAGE, ...endpointLimits.roomImage },
   collaboratorImage: { kind: MediaKind.IMAGE, ...endpointLimits.collaboratorImage },
+  clientLogo: { kind: MediaKind.IMAGE, ...endpointLimits.clientLogo },
   testimonialImage: { kind: MediaKind.IMAGE, ...endpointLimits.testimonialImage },
   // A reel uploaded to a work project or a pinboard card, rather than linked.
   reelVideo: { kind: MediaKind.VIDEO, ...endpointLimits.reelVideo },
@@ -31,6 +31,7 @@ export const uploadEndpoints: Record<UploadEndpoint, EndpointConfig> = {
   ogImage: { kind: MediaKind.IMAGE, ...endpointLimits.ogImage },
   // The owner's stand-in picture, shown wherever a photo has not been set.
   fallbackImage: { kind: MediaKind.IMAGE, ...endpointLimits.fallbackImage },
+  resumeFile: { kind: MediaKind.DOCUMENT, ...endpointLimits.resumeFile },
 };
 
 export function isUploadEndpoint(value: string): value is UploadEndpoint {

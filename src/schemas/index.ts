@@ -1,11 +1,11 @@
 export { AboutSchema, type About } from "./about";
-export { BoothSchema, type Booth } from "./booth";
+export { ClientsSchema, type Clients } from "./clients";
 export { ContactSchema, type Contact } from "./contact";
 export { ExperienceSchema, type Experience } from "./experience";
 export { HeroSchema, type Hero } from "./hero";
 export { ImpactSchema, type Impact } from "./impact";
 export { PraiseSchema, type Praise } from "./praise";
-export { ProcessSchema, type Process } from "./process";
+export { ResumeSchema, type Resume } from "./resume";
 export { RoomSchema, type Room } from "./room";
 export { SettingsSchema, type Settings } from "./settings";
 export { WorkSchema, type Work } from "./work";

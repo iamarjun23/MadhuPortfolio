@@ -82,6 +82,7 @@ export const RoomSchema = z.object({
       note: z.string().max(60),
       invitation: z.string().max(40),
       invitationNote: z.string().max(40),
+      image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
     })
     .default({
       eyebrow: "Off the clock",
@@ -95,6 +96,7 @@ export const RoomSchema = z.object({
       note: "01 / The reel between reels",
       invitation: "YOU'RE INVITED",
       invitationNote: "Open when curious",
+      image: null,
     }),
   eyebrow: z.string().max(40).default("Off the clock"),
   title: z.string().max(80).default("The Drawing Room"),

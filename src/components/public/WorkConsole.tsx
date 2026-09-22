@@ -17,13 +17,21 @@ type CardOffset = {
   y: number;
 };
 
+/* In the studio a dropped card's offset is saved into the draft as a new
+   position; until that draft comes back round, the offset keeps the card
+   where it was dropped. `base` is the position it was measured from, so it
+   stops applying the moment the card's position changes underneath it. */
+type LocalOffset = CardOffset & { base?: string };
+
+type BoardPosition = WorkProject["position"];
+
 type BoardCardStyle = React.CSSProperties & {
   "--card-ox": string;
   "--card-oy": string;
   "--card-x": string;
   "--card-y": string;
-  "--card-tilt": string;
   "--card-delay": string;
+  "--card-tilt": string;
 };
 
 type DragState = {
@@ -52,103 +60,26 @@ const BOARD_SLACK = 16;
 /* Keyboard equivalent of a drag, so the board is not pointer-only. */
 const NUDGE_STEP = 18;
 
-/* Cards are dealt one to a cell of a notional grid and then jogged out of it,
-   which spreads them over the whole board while still reading as a scatter.
-   Filling fixed rings in turn tipped every card left over into the innermost
-   one and built a heap in the middle of the board; a spiral cures the heap but
-   draws a circle, which leaves the corners of a wide board bare. */
+/* Cards are dealt one to a cell of a grid, each cell a little bigger than a
+   card, then jogged out of it - so the board reads as a loose scatter with a
+   sliver of space between neighbours. */
 const BOARD_ASPECT = 1.7;
+/* One cell, in card widths. A card is about 1.05x as tall as it is wide.
+   Saved positions are in cells too, so they scale with the card size. */
+const BOARD_STEP_X = 1.2;
+const BOARD_STEP_Y = 1.3;
 /* How far out of its cell a card may be jogged, as a share of the cell. Enough
-   that the grid behind the scatter cannot be read, not so much that cards
-   wander back into each other. */
-const BOARD_JOG = 0.5;
+   that the grid behind the scatter can't be read; two neighbours jogged
+   towards each other may tuck under an edge, never cover one another. */
+const BOARD_JOG = 0.4;
+/* Every other row slides half-way across by this share of a cell, brick
+   fashion, so the columns don't line up. */
+const BOARD_STAGGER = 0.25;
+/* Largest tilt either way, in degrees. */
+const BOARD_TILT = 4;
 /* Past this many cards the board is being asked to hold more than it has room
    for, and they are drawn smaller rather than left to bury one another. */
 const BOARD_DENSE_FROM = 28;
-
-/* The "All work" view can swap the canvas for a globe: cards sit in a plain
-   grid of rows and columns, that grid wrapped around a vertical cylinder so
-   only its left and right edges bend away from the viewer - the rows
-   themselves stay level, same as the flat grid layout. Every measurement here
-   is in the globe's own space; the whole thing is scaled once to the room the
-   board has, so none of it has to know the viewport. */
-const GLOBE_CARD_W = 150;
-const GLOBE_CARD_H = 118;
-/* Clear space between two neighbours in the same row, and between one row
-   and the next. Both are what keep cards from touching. */
-const GLOBE_CARD_GAP = 80;
-const GLOBE_ROW_GAP = 72;
-/* Depth is set as a multiple of the cylinder's own radius, so a card at the
-   front is always the same fraction larger than one out at the side however
-   big the globe ends up. */
-/* A deeper viewing distance keeps front cards from ballooning into their
-   neighbours while preserving the gentle left/right bend. */
-const GLOBE_DEPTH_RATIO = 16;
-/* The cards are photographs, so blowing the globe up much past its laid-out
-   size starts to show. */
-const GLOBE_MAX_SCALE = 1.8;
-const GLOBE_SPIN_DEG_PER_MS = 360 / 80000;
-const GLOBE_DRAG_DEG_PER_PX = 0.35;
-/* Keep the shared middle of both rows level. The cards' own Y rotation creates
-   the curve at the left and right edges without bending the centre section. */
-const GLOBE_TILT_DEG = 0;
-
-type GlobePlacement = { y: number; radius: number; angle: number };
-
-/* Keep the globe broad rather than tall. A large project list spread over
-   three or four rows collapses into a narrow tower on wide screens because
-   height becomes the limiting dimension when the globe is fitted to the
-   board. Two rows let the cards use the full horizontal canvas. */
-function getGlobeRowCount(total: number) {
-  return total <= 12 ? 1 : 2;
-}
-
-/* Where every card sits on the cylinder, plus the depth the stage has to be
-   viewed from for the columns to line up as one round body. Cards fill row by
-   row, same reading order a flat grid uses, then wrap: every `columns`-th
-   card starts the next row down. */
-function getGlobeLayout(total: number) {
-  const rows = getGlobeRowCount(total);
-  const columns = Math.max(1, Math.ceil(total / rows));
-  /* The radius that lets `columns` cards ring the cylinder without touching:
-     each card claims a slice of the circle whose chord has to clear the
-     card's own width. */
-  const radius =
-    columns > 1
-      ? (GLOBE_CARD_W + GLOBE_CARD_GAP) / (2 * Math.sin(Math.PI / columns))
-      : GLOBE_CARD_W;
-  const rowStep = GLOBE_CARD_H + GLOBE_ROW_GAP;
-
-  const placements: GlobePlacement[] = Array.from({ length: total }, (_, index) => {
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    return {
-      y: (row - (rows - 1) / 2) * rowStep,
-      radius,
-      /* Both rows use the same angles, making their centre cards line up while
-         the outer cards naturally turn away around the cylinder. */
-      angle: (360 * column) / columns,
-    };
-  });
-
-  return { placements, perspective: radius * GLOBE_DEPTH_RATIO };
-}
-
-/* How much room the finished globe needs, measured on screen rather than in
-   its own space: a card grows as it swings towards the viewer, and the front
-   row is what decides where the cylinder's edge falls. */
-function getGlobeSize(placements: readonly GlobePlacement[], perspective: number) {
-  let halfWidth = 0;
-  let halfHeight = 0;
-
-  placements.forEach(({ y, radius }) => {
-    const magnify = perspective / (perspective - radius);
-    halfWidth = Math.max(halfWidth, radius + GLOBE_CARD_W / 2);
-    halfHeight = Math.max(halfHeight, (Math.abs(y) + GLOBE_CARD_H / 2) * magnify);
-  });
-
-  return { width: Math.round(halfWidth * 2), height: Math.round(halfHeight * 2) };
-}
 
 const NUDGE_KEYS: Readonly<Record<string, CardOffset>> = {
   ArrowLeft: { x: -1, y: 0 },
@@ -157,12 +88,10 @@ const NUDGE_KEYS: Readonly<Record<string, CardOffset>> = {
   ArrowDown: { x: 0, y: 1 },
 };
 
-/* Where every card sits before anyone touches it, as a pair of offsets from
-   the middle of the board between -1 and 1. How far that actually is stays in
-   CSS, so a narrow screen can pull the whole scatter in without this having to
-   know the board's width. The numbers are rounded because `Math.sin` can
-   differ in its last digit between the server's runtime and the browser's,
-   which is enough on its own to fail hydration. */
+/* Where every card sits before anyone touches it, as offsets from the middle
+   of the board in cells. The numbers are rounded because `Math.sin` can differ in its last
+   digit between the server's runtime and the browser's, which is enough on
+   its own to fail hydration. */
 /* Stands in for a random number without being one: the same card is jogged the
    same way on the server and in the browser, which a real random would not be. */
 function boardNoise(seed: number) {
@@ -170,29 +99,44 @@ function boardNoise(seed: number) {
   return value - Math.floor(value);
 }
 
+function boardColumns(total: number) {
+  return Math.max(1, Math.round(Math.sqrt(total * BOARD_ASPECT)));
+}
+
 function getBoardLayout(total: number) {
-  const columns = Math.max(1, Math.round(Math.sqrt(total * BOARD_ASPECT)));
+  const columns = boardColumns(total);
   const rows = Math.ceil(total / columns);
-  /* Cells run -1 to 1 either way, the same range the board's CSS spreads a
-     card across, so a card in the last column lands against the right edge
-     rather than somewhere short of it. */
-  const across = (place: number, count: number) => (count > 1 ? (place / (count - 1)) * 2 - 1 : 0);
+  const jog = (seed: number) => (boardNoise(seed) - 0.5) * BOARD_JOG;
 
   return Array.from({ length: total }, (_, index) => {
     const row = Math.floor(index / columns);
-    /* The last row is usually short, and spreading whatever it holds over the
-       full width keeps the scatter from ending on a ragged edge. */
+    /* The last row is usually short; centring it keeps the pile compact. */
     const inRow = Math.min(columns, total - row * columns);
-    const jog = (seed: number, count: number) =>
-      (boardNoise(seed) - 0.5) * BOARD_JOG * (2 / Math.max(count - 1, 1));
 
     return {
-      ox: (across(index % columns, inRow) + jog(index + 1, inRow)).toFixed(4),
-      oy: (across(row, rows) + jog(index + 91, rows)).toFixed(4),
-      tilt: `${(Math.sin(index * 12.9898) * 3.2).toFixed(2)}deg`,
+      ox: (
+        (index % columns) -
+        (inRow - 1) / 2 +
+        (row % 2 ? BOARD_STAGGER : -BOARD_STAGGER) +
+        jog(index + 1)
+      ).toFixed(4),
+      oy: (row - (rows - 1) / 2 + jog(index + 91)).toFixed(4),
+      tilt: `${(jog(index + 37) * (2 / BOARD_JOG) * BOARD_TILT).toFixed(2)}deg`,
       delay: `${(-((index * 0.61) % 4.2)).toFixed(2)}s`,
     };
   });
+}
+
+/* Every project across the categories, in the order "All work" shows them:
+   the studio's saved order first, then anything not in it (new projects) in
+   category order. The studio reorders with this too, so both agree. */
+export function orderAllProjects(data: Pick<Work, "lanes" | "allOrder">) {
+  const rank = new Map(data.allOrder.map((id, index) => [id, index]));
+  return data.lanes
+    .flatMap((lane) => lane.projects.map((project) => ({ project, laneLabel: lane.label })))
+    .map((entry, index) => ({ entry, index, rank: rank.get(entry.project.id) ?? Infinity }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ entry }) => entry);
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -223,6 +167,8 @@ export function WorkConsole({
   contactEmail,
   interactive = true,
   onSelectProject,
+  onMoveProject,
+  onReorderProjects,
 }: Readonly<{
   data: Work;
   contactEmail: string;
@@ -231,37 +177,30 @@ export function WorkConsole({
      project's own editor instead of the video, so onSelectProject stands in
      for setPreview. */
   onSelectProject?: (laneLabel: string, projectId: string) => void;
+  /* Studio only: a card dropped on the canvas saves its position (in cells)
+     into the draft, and null puts it back on its computed spot. */
+  onMoveProject?: (laneLabel: string, projectId: string, position: BoardPosition) => void;
+  /* Studio only: a grid card dropped on another takes its place. `laneLabel`
+     is null on "All work", whose order is kept apart from the categories. */
+  onReorderProjects?: (laneLabel: string | null, fromId: string, toId: string) => void;
 }>) {
   const [activeLane, setActiveLane] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
-  // The globe and freeform canvas are desktop flourishes; a phone gets the
-  // grid regardless of what's picked in the studio, so the board never reads
-  // differently on the two surfaces.
+  // The freeform canvas is a desktop flourish; a phone always gets the grid.
   const [isMobile, setIsMobile] = useState(false);
-  const [cardOffsets, setCardOffsets] = useState<Record<string, CardOffset>>({});
+  const [cardOffsets, setCardOffsets] = useState<Record<string, LocalOffset>>({});
   const [cardStack, setCardStack] = useState<Record<string, number>>({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [railDrag, setRailDrag] = useState<{ from: string; over: string | null } | null>(null);
   // A LinkedIn thumbnail is fetched, not computed, so it can fail where a
   // YouTube one never does. Cards that fail here fall back to their gradient.
   const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
   const boardRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
   const stackTop = useRef(0);
   const drag = useRef<DragState | null>(null);
   const boardHintId = useId();
-  const globeAxisRef = useRef<HTMLDivElement>(null);
-  const globeFitRef = useRef<HTMLDivElement>(null);
-  const globeRotation = useRef(0);
-  const globeDrag = useRef<{
-    active: boolean;
-    moved: boolean;
-    pointerId: number;
-    startX: number;
-    startRotation: number;
-  } | null>(null);
-
-  const allProjects = data.lanes.flatMap((lane) =>
-    lane.projects.map((project) => ({ project, laneLabel: lane.label })),
-  );
+  const allProjects = orderAllProjects(data);
   /* Renaming a category in the studio would otherwise leave the filter pointing
      at a label that no longer exists, and the board would read as empty. */
   const selectedLane =
@@ -269,16 +208,74 @@ export function WorkConsole({
   const projects = selectedLane
     ? allProjects.filter(({ laneLabel }) => laneLabel === selectedLane)
     : allProjects;
-  const hasMoved = Object.keys(cardOffsets).length > 0;
   const layout = getBoardLayout(projects.length);
-  /* Only the unfiltered view honours the chosen layout; picking a category
-     always falls back to the canvas. */
-  const isGlobeView = selectedLane === null && !isMobile && data.allLayout === "globe";
-  const isRailView = selectedLane === null && (isMobile || data.allLayout === "grid");
-  const globe = isGlobeView ? getGlobeLayout(projects.length) : null;
-  const globeSize = globe ? getGlobeSize(globe.placements, globe.perspective) : null;
-  const globeWidth = globeSize?.width ?? 0;
-  const globeHeight = globeSize?.height ?? 0;
+  /* A saved position replaces the computed one outright, so adding a project
+     to the category never shifts a card that was placed by hand. */
+  const places = projects.map(({ project }, index) => {
+    const place = layout[index]!;
+    const ox = project.position ? project.position.x.toFixed(4) : place.ox;
+    const oy = project.position ? project.position.y.toFixed(4) : place.oy;
+    return { ...place, ox, oy, key: `${ox},${oy}` };
+  });
+  const placeById = new Map(
+    projects.map(({ project, laneLabel }, index) => [
+      `${laneLabel}-${project.id}`,
+      { project, laneLabel, place: places[index]! },
+    ]),
+  );
+  const placeKeys = places.map((place) => place.key).join("|");
+  function offsetFor(id: string): LocalOffset | undefined {
+    const offset = cardOffsets[id];
+    if (!offset) return undefined;
+    return !offset.base || offset.base === placeById.get(id)?.place.key ? offset : undefined;
+  }
+  const hasMoved =
+    Object.keys(cardOffsets).some((id) => offsetFor(id)) ||
+    (!!onMoveProject && projects.some(({ project }) => project.position));
+  /* "All work" is always the drifting grid; a category shows whichever
+     layout the studio picked for it. Phones get the grid either way. */
+  const lane = data.lanes.find((entry) => entry.label === selectedLane);
+  const isRailView = isMobile || !lane || lane.layout === "grid";
+
+  /* Once any position changes, drop offsets whose saved position has landed,
+     so a later Discard doesn't bring them back. */
+  const [seenPlaceKeys, setSeenPlaceKeys] = useState(placeKeys);
+  if (seenPlaceKeys !== placeKeys) {
+    setSeenPlaceKeys(placeKeys);
+    setCardOffsets((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([id, offset]) => !offset.base || offset.base === placeById.get(id)?.place.key,
+        ),
+      ),
+    );
+  }
+
+  /* Visitors' moves stay on their screen; in the studio the move is turned
+     into cells and written into the draft. */
+  function placeCard(id: string, offset: CardOffset, card: HTMLElement) {
+    const entry = placeById.get(id);
+    if (!onMoveProject || !entry) {
+      setCardOffsets((current) => ({ ...current, [id]: offset }));
+      return;
+    }
+    const width = card.offsetWidth || 1;
+    const round = (value: number) => Math.round(value * 1000) / 1000;
+    setCardOffsets((current) => ({ ...current, [id]: { ...offset, base: entry.place.key } }));
+    onMoveProject(entry.laneLabel, entry.project.id, {
+      x: round(Number(entry.place.ox) + offset.x / (width * BOARD_STEP_X)),
+      y: round(Number(entry.place.oy) + offset.y / (width * BOARD_STEP_Y)),
+    });
+  }
+
+  function resetLayout() {
+    if (onMoveProject) {
+      projects.forEach(({ project, laneLabel }) => {
+        if (project.position) onMoveProject(laneLabel, project.id, null);
+      });
+    }
+    resetBoard();
+  }
 
   function resetBoard() {
     setCardOffsets({});
@@ -301,7 +298,7 @@ export function WorkConsole({
   }
 
   function startDrag(card: HTMLButtonElement, id: string, event: React.PointerEvent) {
-    const base = cardOffsets[id] ?? { x: 0, y: 0 };
+    const base = offsetFor(id) ?? { x: 0, y: 0 };
     const bounds = getBoardBounds(card, base);
 
     drag.current = {
@@ -366,9 +363,7 @@ export function WorkConsole({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     setDraggingId(null);
-    if (state.moved) {
-      setCardOffsets((current) => ({ ...current, [state.id]: { x: state.x, y: state.y } }));
-    }
+    if (state.moved) placeCard(state.id, { x: state.x, y: state.y }, event.currentTarget);
   }
 
   function cardClick(project: WorkProject, laneLabel: string) {
@@ -390,18 +385,19 @@ export function WorkConsole({
     event.preventDefault();
 
     const step = NUDGE_STEP * (event.shiftKey ? 3 : 1);
-    const base = cardOffsets[id] ?? { x: 0, y: 0 };
+    const base = offsetFor(id) ?? { x: 0, y: 0 };
     const bounds = getBoardBounds(event.currentTarget, base);
     const nextX = base.x + direction.x * step;
     const nextY = base.y + direction.y * step;
 
-    setCardOffsets((current) => ({
-      ...current,
-      [id]: {
+    placeCard(
+      id,
+      {
         x: bounds ? clamp(nextX, bounds.minX, bounds.maxX) : nextX,
         y: bounds ? clamp(nextY, bounds.minY, bounds.maxY) : nextY,
       },
-    }));
+      event.currentTarget,
+    );
     liftCard(id);
   }
 
@@ -419,98 +415,6 @@ export function WorkConsole({
       window.removeEventListener("orientationchange", updateIsMobile);
     };
   }, []);
-
-  /* The globe idles at a constant spin unless a drag is in progress, driven
-     straight through the ref rather than state so the rotate loop doesn't
-     re-render the whole card list every frame. */
-  useEffect(() => {
-    if (!isGlobeView) return;
-    if (typeof window === "undefined") return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    let frame = 0;
-    let last = performance.now();
-    const tick = (now: number) => {
-      const elapsed = now - last;
-      last = now;
-      if (!globeDrag.current?.active && !preview) {
-        globeRotation.current = (globeRotation.current + elapsed * GLOBE_SPIN_DEG_PER_MS) % 360;
-        if (globeAxisRef.current) {
-          globeAxisRef.current.style.transform = `rotateX(${GLOBE_TILT_DEG}deg) rotateY(${globeRotation.current}deg)`;
-        }
-      }
-      frame = window.requestAnimationFrame(tick);
-    };
-    frame = window.requestAnimationFrame(tick);
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [isGlobeView, preview]);
-
-  /* The globe is laid out once at a size of its own choosing, then scaled to
-     whatever the board actually has room for - so a wide screen gets a bigger
-     sphere rather than the same sphere adrift in empty space. */
-  useEffect(() => {
-    const board = boardRef.current;
-    const fit = globeFitRef.current;
-    if (!board || !fit || !globeWidth || !globeHeight) return;
-
-    const apply = () => {
-      /* A board with no size to report - a hidden tab, a print, a pane
-         collapsed to nothing - would otherwise scale the globe to zero and
-         leave it scaled to zero, since nothing resizes afterwards to put it
-         right. Better to keep the last size that made sense. */
-      if (!board.clientWidth || !board.clientHeight) return;
-
-      const scale = Math.min(
-        board.clientWidth / globeWidth,
-        board.clientHeight / globeHeight,
-        GLOBE_MAX_SCALE,
-      );
-      fit.style.setProperty("--globe-scale", scale.toFixed(4));
-    };
-
-    apply();
-    const observer = new ResizeObserver(apply);
-    observer.observe(board);
-
-    return () => observer.disconnect();
-  }, [globeWidth, globeHeight]);
-
-  function globePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
-    globeDrag.current = {
-      active: true,
-      moved: false,
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startRotation: globeRotation.current,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function globePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    const state = globeDrag.current;
-    if (!state?.active || state.pointerId !== event.pointerId) return;
-
-    const deltaX = event.clientX - state.startX;
-    if (!state.moved && Math.abs(deltaX) > DRAG_THRESHOLD) state.moved = true;
-    if (!state.moved) return;
-
-    globeRotation.current = state.startRotation + deltaX * GLOBE_DRAG_DEG_PER_PX;
-    if (globeAxisRef.current) {
-      globeAxisRef.current.style.transform = `rotateX(${GLOBE_TILT_DEG}deg) rotateY(${globeRotation.current}deg)`;
-    }
-  }
-
-  function globePointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    const state = globeDrag.current;
-    if (!state?.active || state.pointerId !== event.pointerId) return;
-
-    state.active = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-  }
 
   /* The face of a card - still, badge and caption - is the same whichever
      layout is holding it, so every layout draws it from here. */
@@ -559,18 +463,6 @@ export function WorkConsole({
         </span>
       </span>
     );
-  }
-
-  function globeCardClick(project: WorkProject, laneLabel: string) {
-    if (globeDrag.current?.moved) {
-      globeDrag.current.moved = false;
-      return;
-    }
-    if (!interactive) {
-      onSelectProject?.(laneLabel, project.id);
-      return;
-    }
-    setPreview({ project, laneLabel });
   }
 
   useEffect(() => {
@@ -646,13 +538,35 @@ export function WorkConsole({
           </div>
           <div className="work__board-bar">
             <span className="work__board-hint">{data.canvasHint}</span>
-            {/* Nothing on the globe or the rail can be moved out of place, so
-                there is nothing there to put back. */}
-            {isGlobeView || isRailView ? null : (
+            {/* Nothing on the rail can be moved out of place, so there is
+                nothing there to put back. In the studio the rail stands
+                still, so it gets buttons to page through instead. */}
+            {isRailView ? (
+              onReorderProjects ? (
+                <span className="work__rail-nav">
+                  {[-1, 1].map((direction) => (
+                    <button
+                      type="button"
+                      className="work__board-reset"
+                      key={direction}
+                      aria-label={direction < 0 ? "Scroll cards left" : "Scroll cards right"}
+                      onClick={() =>
+                        railRef.current?.scrollBy({
+                          left: direction * railRef.current.clientWidth * 0.8,
+                          behavior: "smooth",
+                        })
+                      }
+                    >
+                      {direction < 0 ? "‹" : "›"}
+                    </button>
+                  ))}
+                </span>
+              ) : null
+            ) : (
               <button
                 type="button"
                 className="work__board-reset"
-                onClick={resetBoard}
+                onClick={resetLayout}
                 disabled={!hasMoved}
               >
                 Reset layout
@@ -666,82 +580,42 @@ export function WorkConsole({
           <div
             className={[
               "work__board",
-              isGlobeView ? "work__board--globe" : "",
               isRailView ? "work__board--rail" : "",
               /* A long list on the canvas is drawn smaller: at full size the
                  cards cover more than the board has room for and bury one
                  another however evenly they are spread. */
-              !isGlobeView && !isRailView && projects.length > BOARD_DENSE_FROM
-                ? "work__board--dense"
-                : "",
+              !isRailView && projects.length > BOARD_DENSE_FROM ? "work__board--dense" : "",
+              /* In the studio a drop is saved and re-rendered from the draft;
+                 an easing transform would slide the card through its old spot. */
+              onMoveProject || onReorderProjects ? "work__board--editing" : "",
             ]
               .filter(Boolean)
               .join(" ")}
             ref={boardRef}
+            /* The board grows with the rows so the spacing never gets
+               squeezed by the edge clamp. */
+            style={
+              {
+                "--board-rows": Math.ceil(projects.length / boardColumns(projects.length)),
+                "--board-step-x": `calc(var(--card-w) * ${BOARD_STEP_X})`,
+                "--board-step-y": `calc(var(--card-w) * ${BOARD_STEP_Y})`,
+              } as React.CSSProperties
+            }
             role="group"
             aria-label="Board of video projects"
             aria-describedby={boardHintId}
           >
             {projects.length === 0 ? (
               <p className="work__board-empty">Nothing pinned to this category yet.</p>
-            ) : isGlobeView ? (
-              <div
-                className="work__globe-fit"
-                ref={globeFitRef}
-                style={
-                  {
-                    width: `${globeWidth}px`,
-                    height: `${globeHeight}px`,
-                    "--globe-card-w": `${GLOBE_CARD_W}px`,
-                    "--globe-card-h": `${GLOBE_CARD_H}px`,
-                    "--globe-perspective": `${Math.round(globe!.perspective)}px`,
-                  } as React.CSSProperties
-                }
-              >
-                <div
-                  className="work__globe-stage"
-                  onPointerDown={globePointerDown}
-                  onPointerMove={globePointerMove}
-                  onPointerUp={globePointerUp}
-                  onPointerCancel={globePointerUp}
-                >
-                  <div
-                    className="work__globe-axis"
-                    ref={globeAxisRef}
-                    style={{ transform: `rotateX(${GLOBE_TILT_DEG}deg)` }}
-                  >
-                    {projects.map(({ project, laneLabel }, index) => {
-                      const cardId = `${laneLabel}-${project.id}`;
-                      const place = globe!.placements[index]!;
-                      const cardStyle: React.CSSProperties = {
-                        transform: `translateY(${Math.round(place.y)}px) rotateY(${place.angle.toFixed(3)}deg) translateZ(${Math.round(place.radius)}px)`,
-                      };
-
-                      return (
-                        <div className="work__globe-card" style={cardStyle} key={cardId}>
-                          <button
-                            type="button"
-                            className="work__globe-card-btn"
-                            onPointerDown={(event) => event.stopPropagation()}
-                            onClick={() => globeCardClick(project, laneLabel)}
-                            aria-label={`Preview ${project.title}`}
-                          >
-                            {cardFace(project, laneLabel, cardId, "220px")}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
             ) : isRailView ? (
               /* A horizontal grid that drifts sideways on its own. The cards
                  are laid twice so the drift can loop without a seam; the
                  second pass is scenery, hidden from anything that reads or
                  tabs through the page. */
-              <div className="work__rail">
+              <div className="work__rail" ref={railRef}>
                 <div className="work__rail-track">
-                  {[false, true].map((echo) => (
+                  {/* The echo only exists for the drift loop, which the studio stops. */}
+                  {(onReorderProjects ? [false] : [false, true]).map((echo) => (
                     <div
                       className="work__rail-grid"
                       key={echo ? "echo" : "cards"}
@@ -750,14 +624,50 @@ export function WorkConsole({
                       {projects.map(({ project, laneLabel }) => {
                         const cardId = `${laneLabel}-${project.id}`;
 
+                        const canReorder = !!onReorderProjects && !echo;
+
                         return (
                           <button
                             type="button"
-                            className="work__rail-card"
+                            className={[
+                              "work__rail-card",
+                              canReorder && railDrag?.from === project.id ? "is-dragging" : "",
+                              canReorder &&
+                              railDrag?.over === project.id &&
+                              railDrag.from !== project.id
+                                ? "is-drop-target"
+                                : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
                             key={cardId}
                             tabIndex={echo ? -1 : undefined}
                             onClick={() => cardClick(project, laneLabel)}
                             aria-label={`Preview ${project.title}`}
+                            {...(canReorder
+                              ? {
+                                  draggable: true,
+                                  onDragStart: (event: React.DragEvent) => {
+                                    event.dataTransfer.effectAllowed = "move";
+                                    // Firefox will not start a drag without data set.
+                                    event.dataTransfer.setData("text/plain", project.id);
+                                    setRailDrag({ from: project.id, over: null });
+                                  },
+                                  onDragOver: (event: React.DragEvent) => {
+                                    event.preventDefault();
+                                    if (railDrag && railDrag.over !== project.id) {
+                                      setRailDrag({ ...railDrag, over: project.id });
+                                    }
+                                  },
+                                  onDrop: (event: React.DragEvent) => {
+                                    event.preventDefault();
+                                    if (railDrag && railDrag.from !== project.id) {
+                                      onReorderProjects(selectedLane, railDrag.from, project.id);
+                                    }
+                                  },
+                                  onDragEnd: () => setRailDrag(null),
+                                }
+                              : {})}
                           >
                             {cardFace(project, laneLabel, cardId, "200px")}
                           </button>
@@ -770,16 +680,16 @@ export function WorkConsole({
             ) : (
               projects.map(({ project, laneLabel }, index) => {
                 const cardId = `${laneLabel}-${project.id}`;
-                const place = layout[index]!;
-                const offset = cardOffsets[cardId];
+                const place = places[index]!;
+                const offset = offsetFor(cardId);
                 const lifted = cardStack[cardId];
                 const cardStyle: BoardCardStyle = {
                   "--card-ox": place.ox,
                   "--card-oy": place.oy,
                   "--card-x": `${offset?.x ?? 0}px`,
                   "--card-y": `${offset?.y ?? 0}px`,
-                  "--card-tilt": place.tilt,
                   "--card-delay": place.delay,
+                  "--card-tilt": place.tilt,
                   ...(lifted ? { zIndex: lifted } : {}),
                 };
                 const className = [

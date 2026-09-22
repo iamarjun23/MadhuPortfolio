@@ -3,12 +3,10 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { publishAll } from "@/actions/publish";
-import { ThemeToggle, type ThemeName } from "@/components/public/ThemeToggle";
 import { STUDIO_BASE, studioSectionLabels } from "@/lib/studio-nav";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type TopbarProps = Readonly<{
-  initialTheme: ThemeName;
   onMenu: () => void;
   publicSiteUrl: string;
 }>;
@@ -21,7 +19,7 @@ function getCrumb(pathname: string) {
     : "Dashboard";
 }
 
-export function Topbar({ initialTheme, onMenu, publicSiteUrl }: TopbarProps) {
+export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const pushToast = useStudioStore((state) => state.pushToast);
@@ -108,7 +106,6 @@ export function Topbar({ initialTheme, onMenu, publicSiteUrl }: TopbarProps) {
             </span>
           </p>
         ) : null}
-        <ThemeToggle initialTheme={initialTheme} />
         <a className="studio-view-site" href={publicSiteUrl} target="_blank" rel="noreferrer">
           View site
         </a>
