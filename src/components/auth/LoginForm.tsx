@@ -21,6 +21,8 @@ export function LoginForm() {
   const params = useSearchParams();
   const [error, setError] = useState(() => {
     const authError = params.get("error");
+    if (params.get("code") === "rate_limited")
+      return "Too many failed attempts. Wait a few minutes, then try again.";
     if (authError === "CredentialsSignin") return "Email or password is incorrect.";
     return authError ? "Sign-in could not be completed. Please try again." : "";
   });

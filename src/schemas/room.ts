@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
+import { ItemIdSchema, uniqueIds } from "./item-id";
+import { ExternalLinkSchema } from "./links";
+import { ImageUrlSchema, VideoUrlSchema } from "./media";
 
 const CardBase = z.object({
-  id: z.string(),
+  id: ItemIdSchema,
   fx: z.number().min(0).max(1),
   fy: z.number().min(0).max(1),
   rot: z.number().min(-8).max(8),
@@ -11,24 +13,25 @@ const CardBase = z.object({
 
 const PolaroidSchema = CardBase.extend({
   type: z.literal("polaroid"),
-  image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable(),
+  image: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable(),
   tint: z.enum(["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"]),
   tag: z.string().max(20),
   caption: z.string().max(60),
   subCaption: z.string().max(40),
 });
 
-/* A reel on the pinboard. The video itself lives on YouTube or LinkedIn, never in
-   our own storage - the same arrangement the work board uses - so the card holds
-   a link, borrows that link's still for its face, and plays in a pop-up. */
+/* A reel on the pinboard, set up the same way as a work board project: usually a
+   YouTube, Instagram or LinkedIn link that supplies the card's still and plays in a
+   pop-up, or an uploaded video for a reel that lives nowhere public. An uploaded
+   cover outranks the link's still. */
 const VideoCardSchema = CardBase.extend({
   type: z.literal("video"),
-  href: z.string().nullable().default(null),
+  href: ExternalLinkSchema.nullable().default(null),
   video: z
-    .object({ url: MediaUrlSchema, poster: MediaUrlSchema.optional() })
+    .object({ url: VideoUrlSchema, poster: ImageUrlSchema.optional() })
     .nullable()
     .default(null),
-  image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
+  image: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable().default(null),
   tint: z.enum(["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"]).default("rg1"),
   tag: z.string().max(20).default("Reel"),
   caption: z.string().max(60),
@@ -53,7 +56,7 @@ const InstagramCardSchema = CardBase.extend({
   handle: z.string().max(30),
   tiles: z.array(z.enum(["rg1", "rg2", "rg3", "rg4", "rg5", "rg6"])).length(6),
   ctaLabel: z.string().max(40),
-  ctaHref: z.url(),
+  ctaHref: ExternalLinkSchema,
 });
 
 const TagClusterCardSchema = CardBase.extend({
@@ -82,7 +85,7 @@ export const RoomSchema = z.object({
       note: z.string().max(60),
       invitation: z.string().max(40),
       invitationNote: z.string().max(40),
-      image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
+      image: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable().default(null),
     })
     .default({
       eyebrow: "Off the clock",
@@ -119,7 +122,8 @@ export const RoomSchema = z.object({
         TagClusterCardSchema,
       ]),
     )
-    .max(30),
+    .max(30)
+    .superRefine(uniqueIds),
 });
 
 export type Room = z.infer<typeof RoomSchema>;

@@ -1,3 +1,4 @@
+import { fetchAllowed, readCappedBody, readHtmlPrefix, withThumbLimits } from "@/lib/thumb-proxy";
 import { getInstagramShortcode } from "@/lib/instagram";
 
 /* The same arrangement as `/api/linkedin-thumb`, for the same reason: an
@@ -46,13 +47,17 @@ function withTimeout(ms: number) {
    is normally trustworthy, but nothing stops a malformed or tampered response
    from pointing this request somewhere we would rather our server not reach on a
    stranger's behalf. */
-function isInstagramMediaHost(hostname: string) {
+function isInstagramMediaHost({ hostname }: URL) {
   return (
     hostname === "cdninstagram.com" ||
     hostname.endsWith(".cdninstagram.com") ||
     hostname === "fbcdn.net" ||
     hostname.endsWith(".fbcdn.net")
   );
+}
+
+function isInstagramPageHost({ hostname }: URL) {
+  return hostname === "instagram.com" || hostname.endsWith(".instagram.com");
 }
 
 // Instagram's signed media URLs carry their query params HTML-escaped in the
@@ -67,14 +72,17 @@ function decodeHtmlEntities(value: string) {
     .replace(/&gt;/g, ">");
 }
 
-function unavailable(message: string) {
+/* Every failure is logged: the card quietly falls back to its cover, so the log (Workers Logs)
+   is the only place a change on Instagram's side that breaks every thumbnail shows up. */
+function unavailable(shortcode: string, message: string, cause?: unknown) {
+  console.warn(`Instagram thumbnail for ${shortcode}: ${message}`, cause ?? "");
   return new Response(message, {
     status: 404,
     headers: { "cache-control": "public, max-age=300" },
   });
 }
 
-export async function GET(request: Request) {
+async function lookupThumbnail(request: Request) {
   const target = new URL(request.url).searchParams.get("url");
   const shortcode = target ? getInstagramShortcode(target) : null;
   if (!target || !shortcode) {
@@ -88,62 +96,72 @@ export async function GET(request: Request) {
   const page = withTimeout(PAGE_FETCH_TIMEOUT_MS);
   let html: string;
   try {
-    const pageResponse = await fetch(embedUrl, {
+    const pageResponse = await fetchAllowed(new URL(embedUrl), isInstagramPageHost, {
       signal: page.signal,
-      redirect: "follow",
       headers: {
-        "user-agent": "Mozilla/5.0 (compatible; MadhuEditLinkPreview/1.0; +https://madhu.edit)",
+        "user-agent":
+          "Mozilla/5.0 (compatible; MadhuEditLinkPreview/1.0; +https://nmadhukumar.com)",
         accept: "text/html",
       },
     });
-    if (!pageResponse.ok) return unavailable("Reel page unavailable.");
-    html = await pageResponse.text();
-  } catch {
-    return unavailable("Reel page unavailable.");
+    if (!pageResponse?.ok) {
+      const cause = pageResponse
+        ? `HTTP ${pageResponse.status}`
+        : "redirect refused or too many hops";
+      return unavailable(shortcode, "Reel page unavailable.", cause);
+    }
+    html = await readHtmlPrefix(pageResponse);
+  } catch (error) {
+    return unavailable(shortcode, "Reel page unavailable.", error);
   } finally {
     page.cancel();
   }
 
   const ogMatch = OG_IMAGE_PATTERN.exec(html);
   const rawImageUrl = findEmbeddedMediaImage(html) ?? ogMatch?.[1] ?? ogMatch?.[2];
-  if (!rawImageUrl) return unavailable("No preview image found.");
+  if (!rawImageUrl) return unavailable(shortcode, "No preview image found.");
 
   let parsedImageUrl: URL;
   try {
     parsedImageUrl = new URL(decodeHtmlEntities(rawImageUrl));
-  } catch {
-    return unavailable("No preview image found.");
+  } catch (error) {
+    return unavailable(shortcode, "No preview image found.", error);
   }
-  if (parsedImageUrl.protocol !== "https:" || !isInstagramMediaHost(parsedImageUrl.hostname)) {
-    return unavailable("No preview image found.");
-  }
-
   const image = withTimeout(IMAGE_FETCH_TIMEOUT_MS);
-  let imageResponse: Response;
+  let contentType: string;
+  let imageBody: Uint8Array<ArrayBuffer> | null;
   try {
-    imageResponse = await fetch(parsedImageUrl, { signal: image.signal, redirect: "follow" });
-  } catch {
-    return unavailable("Preview image unavailable.");
+    const imageResponse = await fetchAllowed(parsedImageUrl, isInstagramMediaHost, {
+      signal: image.signal,
+    });
+    if (!imageResponse?.ok) {
+      const cause = imageResponse
+        ? `HTTP ${imageResponse.status}`
+        : "redirect refused or too many hops";
+      return unavailable(shortcode, "Preview image unavailable.", cause);
+    }
+    contentType = imageResponse.headers.get("content-type") ?? "";
+    if (!contentType.startsWith("image/")) {
+      await imageResponse.body?.cancel();
+      return unavailable(shortcode, "Preview image unavailable.");
+    }
+    imageBody = await readCappedBody(imageResponse, MAX_IMAGE_BYTES);
+  } catch (error) {
+    return unavailable(shortcode, "Preview image unavailable.", error);
   } finally {
     image.cancel();
   }
-  if (!imageResponse.ok || !imageResponse.body) {
-    return unavailable("Preview image unavailable.");
-  }
+  if (!imageBody) return unavailable(shortcode, "Preview image too large.");
 
-  const contentType = imageResponse.headers.get("content-type") ?? "";
-  if (!contentType.startsWith("image/")) {
-    return unavailable("Preview image unavailable.");
-  }
-  if (Number(imageResponse.headers.get("content-length") ?? "0") > MAX_IMAGE_BYTES) {
-    return unavailable("Preview image too large.");
-  }
-
-  return new Response(imageResponse.body, {
+  return new Response(imageBody, {
     status: 200,
     headers: {
       "content-type": contentType,
       "cache-control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800",
     },
   });
+}
+
+export function GET(request: Request) {
+  return withThumbLimits(request, () => lookupThumbnail(request));
 }

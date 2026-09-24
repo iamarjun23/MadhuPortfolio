@@ -1,3 +1,4 @@
+import { MediaImage } from "@/components/public/MediaImage";
 import { realImage } from "@/lib/placeholders";
 import type { Clients } from "@/schemas";
 
@@ -25,8 +26,8 @@ export function ClientsMarquee({ data }: Readonly<{ data: Clients }>) {
               // Only the first copy is read out; the rest exist for the loop.
               <li key={`${client.name}-${i}`} aria-hidden={i >= data.clients.length || undefined}>
                 {logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- small lazy logo, not LCP
-                  <img src={logo.url} alt="" loading="lazy" />
+                  // Nominal size only: the CSS sets the height and keeps the logo's own shape.
+                  <MediaImage src={logo.url} alt="" width={160} height={72} sizes="80px" />
                 ) : null}
                 <span>{client.name}</span>
               </li>

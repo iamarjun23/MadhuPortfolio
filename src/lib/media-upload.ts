@@ -28,6 +28,8 @@ export const uploadEndpoints: Record<UploadEndpoint, EndpointConfig> = {
   reelVideo: { kind: MediaKind.VIDEO, ...endpointLimits.reelVideo },
   // The still shown on a reel card when its link brings none of its own.
   reelCover: { kind: MediaKind.IMAGE, ...endpointLimits.reelCover },
+  // The still a background or reel video shows until its first frame is ready.
+  videoPoster: { kind: MediaKind.IMAGE, ...endpointLimits.videoPoster },
   ogImage: { kind: MediaKind.IMAGE, ...endpointLimits.ogImage },
   // The owner's stand-in picture, shown wherever a photo has not been set.
   fallbackImage: { kind: MediaKind.IMAGE, ...endpointLimits.fallbackImage },

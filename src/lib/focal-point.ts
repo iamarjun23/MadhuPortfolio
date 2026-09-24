@@ -10,7 +10,12 @@ export async function estimateFocalPoint(imageUrl: string): Promise<{ x: number;
     image.onload = () => resolve();
     image.onerror = () => reject(new Error("Could not load image for focal point analysis"));
   });
-  image.src = imageUrl;
+  /* A separate address for this read (the bucket ignores the query): the Studio has
+     usually just shown the same file as a plain background image, and a cached copy
+     of that non-CORS response carries no CORS header, which would fail the read. */
+  const corsUrl = new URL(imageUrl, window.location.href);
+  corsUrl.searchParams.set("focal", "1");
+  image.src = corsUrl.toString();
   await loaded;
 
   const size = 64;

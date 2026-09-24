@@ -10,7 +10,7 @@
 
 | Route group | Platform | Why |
 |---|---|---|
-| `(public)` — homepage, `/process`, `/room` | Cloudflare (opennextjs-cloudflare) | Already cached, cheap, unaffected |
+| `(public)` — homepage, `/room`, `/resume` | Cloudflare (opennextjs-cloudflare) | Already cached, cheap, unaffected |
 | `/studio`, `/studio/[section]`, `/login` | Vercel | CPU-heavy, no Workers CPU ceiling on Vercel |
 | `/api/upload/[endpoint]` | Vercel | Writes to R2, needs to run alongside studio auth |
 | `/api/auth` (NextAuth) | Vercel | Session/auth logic lives with studio |

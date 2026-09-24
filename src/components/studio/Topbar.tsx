@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { publishAll } from "@/actions/publish";
+import { publishAll, retryLiveRefresh } from "@/actions/publish";
 import { STUDIO_BASE, studioSectionLabels } from "@/lib/studio-nav";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
@@ -29,7 +29,10 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
   const setHasUnpublishedChanges = useStudioStore((state) => state.setHasUnpublishedChanges);
   const [isPublishing, startTransition] = useTransition();
   const [networkAvailable, setNetworkAvailable] = useState(true);
+  // Published, but the live site's cache did not clear: the button offers to retry that step.
+  const [liveStale, setLiveStale] = useState(false);
   const crumb = getCrumb(pathname);
+  const offerRefresh = liveStale && !hasUnpublishedChanges;
 
   useEffect(() => {
     let active = true;
@@ -71,8 +74,27 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
         return;
       }
       setHasUnpublishedChanges(false);
-      pushToast("Site published", "success");
+      setLiveStale(!result.liveRefreshed);
+      if (result.liveRefreshed) {
+        pushToast("Site published", "success");
+      } else {
+        pushToast(
+          "Published, but the live site did not refresh. Use Refresh live site to retry.",
+          "error",
+        );
+      }
       router.refresh();
+    });
+  };
+
+  const refreshLive = () => {
+    startTransition(async () => {
+      if (await retryLiveRefresh()) {
+        setLiveStale(false);
+        pushToast("Live site refreshed", "success");
+      } else {
+        pushToast("The live site still did not refresh. Try again in a moment.", "error");
+      }
     });
   };
 
@@ -90,7 +112,7 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
         Site <span aria-hidden="true">/</span> {crumb}
       </p>
       <div className="studio-topbar__actions">
-        {!dirtySection && !hasUnpublishedChanges && !isPublishing ? (
+        {!dirtySection && !hasUnpublishedChanges && !isPublishing && !offerRefresh ? (
           <p
             className={`studio-release-state${networkAvailable ? "" : " is-offline"}`}
             aria-live="polite"
@@ -109,15 +131,28 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
         <a className="studio-view-site" href={publicSiteUrl} target="_blank" rel="noreferrer">
           View site
         </a>
-        <button
-          className="button button--primary studio-publish"
-          type="button"
-          disabled={!hasUnpublishedChanges || Boolean(dirtySection) || isPublishing || uploadBlocked}
-          title={uploadBlocked ? `${uploadLabel} is still uploading.` : undefined}
-          onClick={publish}
-        >
-          {isPublishing ? "Publishing..." : uploadBlocked ? "Uploading..." : "Publish updates"}
-        </button>
+        {offerRefresh ? (
+          <button
+            className="button button--primary studio-publish"
+            type="button"
+            disabled={isPublishing}
+            onClick={refreshLive}
+          >
+            {isPublishing ? "Refreshing..." : "Refresh live site"}
+          </button>
+        ) : (
+          <button
+            className="button button--primary studio-publish"
+            type="button"
+            disabled={
+              !hasUnpublishedChanges || Boolean(dirtySection) || isPublishing || uploadBlocked
+            }
+            title={uploadBlocked ? `${uploadLabel} is still uploading.` : undefined}
+            onClick={publish}
+          >
+            {isPublishing ? "Publishing..." : uploadBlocked ? "Uploading..." : "Publish updates"}
+          </button>
+        )}
       </div>
     </header>
   );

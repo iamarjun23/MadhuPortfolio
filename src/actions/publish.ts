@@ -80,13 +80,22 @@ export async function publishAll(): Promise<PublishResult> {
 
     revalidatePublishedContent();
     // Reverting only rewrites drafts, so publishing is the one action the live site has to hear about.
-    if (!(await refreshLiveSite())) {
-      return { ok: false, error: "Published, but the live site did not refresh. Publish again to retry." };
-    }
-    return { ok: true, publishedSections };
+    return { ok: true, publishedSections, liveRefreshed: await refreshLiveSite() };
   } catch {
     return { ok: false, error: "Could not publish the site. Please try again." };
   }
+}
+
+/* The publish itself went through but the live site's cache did not clear. Retrying just that
+   step leaves the content and the activity log alone, and still works once the drafts match
+   the published rows (when the Publish button has nothing left to publish). */
+export async function retryLiveRefresh(): Promise<boolean> {
+  try {
+    await requireOwner();
+  } catch {
+    return false;
+  }
+  return refreshLiveSite();
 }
 
 export async function revertDraftsToPublished(): Promise<RevertResult> {

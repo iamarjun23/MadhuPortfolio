@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
+import { ItemIdSchema, uniqueIds } from "./item-id";
+import { ImageUrlSchema } from "./media";
 
 const defaultBrand = {
   name: "madhu",
@@ -51,7 +52,7 @@ export const SettingsSchema = z.object({
   seo: z.object({
     title: z.string().max(60),
     description: z.string().max(160),
-    ogImage: z.object({ url: MediaUrlSchema }).nullable(),
+    ogImage: z.object({ url: ImageUrlSchema }).nullable(),
   }),
   appearance: z.object({
     motion: z.boolean().default(true),
@@ -59,7 +60,7 @@ export const SettingsSchema = z.object({
   /* One picture of the owner's own choosing to stand in wherever a photo has
      not been uploaded yet. Nothing is bundled with the site any more, so with
      this empty each section simply shows its own empty state. */
-  fallbackImage: z.object({ url: MediaUrlSchema }).nullable().default(null),
+  fallbackImage: z.object({ url: ImageUrlSchema }).nullable().default(null),
   domain: z.string().max(60),
   site: z
     .object({
@@ -92,9 +93,10 @@ export const SettingsSchema = z.object({
           craftDescription: z.string().max(160).default(defaultFooter.craftDescription),
           skills: z
             .array(
-              z.object({ id: z.string(), number: z.string().max(8), label: z.string().max(40) }),
+              z.object({ id: ItemIdSchema, number: z.string().max(8), label: z.string().max(40) }),
             )
             .max(10)
+            .superRefine(uniqueIds)
             .default(defaultFooter.skills),
           exploreHeading: z.string().max(40).default(defaultFooter.exploreHeading),
           selectedWorkLabel: z.string().max(40).default(defaultFooter.selectedWorkLabel),

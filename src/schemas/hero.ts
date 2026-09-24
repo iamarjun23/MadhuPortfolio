@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
+import { LinkSchema } from "./links";
+import { ImageUrlSchema, VideoUrlSchema } from "./media";
 
 export const HeroSchema = z.object({
   eyebrow: z.string().max(140),
@@ -7,8 +8,8 @@ export const HeroSchema = z.object({
   line2: z.string().max(60),
   cutWords: z.array(z.string().min(1).max(24)).min(1).max(10),
   sub: z.string().max(220),
-  primaryCta: z.object({ label: z.string(), href: z.string() }),
-  secondaryCta: z.object({ label: z.string(), href: z.string() }),
+  primaryCta: z.object({ label: z.string(), href: LinkSchema }),
+  secondaryCta: z.object({ label: z.string(), href: LinkSchema }),
   reelLabel: z.string().max(80).default("REEL 01 - N MADHU KUMAR"),
   aspectRatioLabel: z.string().max(20).default("2.39 : 1"),
   creditLine1: z.string().max(80).default("CUT BY N MADHU KUMAR"),
@@ -16,8 +17,8 @@ export const HeroSchema = z.object({
   footerLeftLabel: z.string().max(40).default("EST. 2023"),
   footerRightLabel: z.string().max(40).default("FRAME BY FRAME"),
   bgVideo: z.object({
-    url: MediaUrlSchema,
-    poster: MediaUrlSchema.optional(),
+    url: VideoUrlSchema,
+    poster: ImageUrlSchema.optional(),
     duotone: z.boolean().default(true),
   }),
 });

@@ -4,6 +4,6 @@ export function getSiteUrl(domain: string) {
   try {
     return new URL(candidate);
   } catch {
-    return new URL("https://madhu.edit");
+    return new URL("https://nmadhukumar.com");
   }
 }

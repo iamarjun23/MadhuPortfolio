@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
-import { reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
+import { EMBED_SANDBOX, reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Work } from "@/schemas";
 
 type WorkProject = Work["lanes"][number]["projects"][number];
@@ -208,6 +209,16 @@ export function WorkConsole({
   const projects = selectedLane
     ? allProjects.filter(({ laneLabel }) => laneLabel === selectedLane)
     : allProjects;
+  const boardId = useId();
+  const filterTabs = [
+    { id: `${boardId}-all`, lane: null, label: data.allFilterLabel },
+    ...data.lanes.map((lane) => ({
+      id: `${boardId}-${lane.id}`,
+      lane: lane.label,
+      label: lane.label,
+    })),
+  ];
+  const selectedTabId = filterTabs.find((tab) => tab.lane === selectedLane)?.id;
   const layout = getBoardLayout(projects.length);
   /* A saved position replaces the computed one outright, so adding a project
      to the category never shifts a card that was placed by hand. */
@@ -289,6 +300,23 @@ export function WorkConsole({
     setActiveLane(laneLabel);
     setPreview(null);
     resetBoard();
+  }
+
+  // Selection follows focus: filtering is instant, so there is nothing to wait for.
+  function moveBetweenFilters(event: React.KeyboardEvent<HTMLDivElement>) {
+    const count = filterTabs.length;
+    const current = filterTabs.findIndex((tab) => tab.lane === selectedLane);
+    const next: Record<string, number> = {
+      ArrowRight: (current + 1) % count,
+      ArrowLeft: (current - 1 + count) % count,
+      Home: 0,
+      End: count - 1,
+    };
+    const tab = filterTabs[next[event.key] ?? -1];
+    if (!tab) return;
+    event.preventDefault();
+    filterProjects(tab.lane);
+    document.getElementById(tab.id)?.focus();
   }
 
   function liftCard(id: string) {
@@ -491,6 +519,8 @@ export function WorkConsole({
 
   const brief = `mailto:${contactEmail}?subject=${encodeURIComponent("Brief: Selected work")}`;
   const previewReel = preview ? resolveReel(preview.project) : null;
+  const previewRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(previewRef, preview !== null);
 
   return (
     <section className="work section" id="work" data-studio-hooks={interactive ? undefined : ""}>
@@ -508,26 +538,30 @@ export function WorkConsole({
                 {projects.length} {data.videoCountLabel}
               </span>
             </div>
-            <div className="work__filters" role="tablist" aria-label="Filter projects">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selectedLane === null}
-                onClick={() => filterProjects(null)}
-              >
-                {data.allFilterLabel}
-              </button>
-              {data.lanes.map((lane) => (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedLane === lane.label}
-                  onClick={() => filterProjects(lane.label)}
-                  key={lane.id}
-                >
-                  {lane.label}
-                </button>
-              ))}
+            <div
+              className="work__filters"
+              role="tablist"
+              aria-label="Filter projects"
+              onKeyDown={moveBetweenFilters}
+            >
+              {filterTabs.map((tab) => {
+                const isSelected = selectedLane === tab.lane;
+                return (
+                  <button
+                    type="button"
+                    role="tab"
+                    id={tab.id}
+                    aria-selected={isSelected}
+                    aria-controls={boardId}
+                    // One tab stop for the whole row; the arrow keys move between them.
+                    tabIndex={isSelected ? 0 : -1}
+                    onClick={() => filterProjects(tab.lane)}
+                    key={tab.id}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
             <a className="work__brief" href={brief}>
               <span>{data.briefPrompt}</span>
@@ -601,8 +635,9 @@ export function WorkConsole({
                 "--board-step-y": `calc(var(--card-w) * ${BOARD_STEP_Y})`,
               } as React.CSSProperties
             }
-            role="group"
-            aria-label="Board of video projects"
+            id={boardId}
+            role="tabpanel"
+            aria-labelledby={selectedTabId}
             aria-describedby={boardHintId}
           >
             {projects.length === 0 ? (
@@ -751,6 +786,8 @@ export function WorkConsole({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${preview.project.title} preview`}
+                ref={previewRef}
+                tabIndex={-1}
               >
                 <button
                   type="button"
@@ -780,6 +817,7 @@ export function WorkConsole({
                       src={previewReel.embed}
                       title={`${preview.project.title} video`}
                       allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      sandbox={EMBED_SANDBOX}
                       referrerPolicy="strict-origin-when-cross-origin"
                       allowFullScreen
                     />

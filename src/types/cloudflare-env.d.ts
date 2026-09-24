@@ -9,5 +9,6 @@ export {};
 declare global {
   interface CloudflareEnv {
     HYPERDRIVE: Hyperdrive;
+    THUMB_RATE_LIMITER?: RateLimit;
   }
 }

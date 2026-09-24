@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AboutBlock } from "@/components/public/AboutBlock";
 import { ClientsMarquee } from "@/components/public/ClientsMarquee";
 import { ContactBlock } from "@/components/public/ContactBlock";
@@ -20,6 +21,12 @@ import {
   getSettings,
   getWork,
 } from "@/lib/content";
+
+/* Set per page, not in the layout: the child pages would inherit a layout canonical and point
+   search engines at the homepage. Resolved against the layout's metadataBase (Settings → domain). */
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 export default async function PortfolioPage() {
   const [hero, about, impact, clients, work, praise, experience, room, contact, settings] =

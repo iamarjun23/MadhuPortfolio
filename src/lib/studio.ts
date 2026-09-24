@@ -74,38 +74,30 @@ export const hasPendingChanges = cache(async () => {
   return hasChangedDraft(sections);
 });
 
+// Counts come from the drafts, so they match what the owner is editing rather than
+// lagging until the next publish.
 export async function getStudioShellData(): Promise<StudioShellData> {
-  const [work, praise] = await Promise.all([getWork(), getPraise()]);
-
-  if (!isDatabaseConfigured()) {
-    return {
-      badges: {
-        work: work.lanes.length,
-        praise: praise.quotes.length,
-      },
-      hasUnpublishedChanges: false,
-    };
-  }
+  const [work, praise, hasUnpublishedChanges] = await Promise.all([
+    getWork(Status.DRAFT),
+    getPraise(Status.DRAFT),
+    hasPendingChanges(),
+  ]);
 
   return {
     badges: {
-      work: work.lanes.length,
+      work: work.lanes.reduce((total, lane) => total + lane.projects.length, 0),
       praise: praise.quotes.length,
     },
-    hasUnpublishedChanges: await hasPendingChanges(),
+    hasUnpublishedChanges,
   };
 }
 
 export async function getStudioDashboardData(): Promise<StudioDashboardData> {
-  const [shellData, praise, work] = await Promise.all([
-    getStudioShellData(),
-    getPraise(Status.DRAFT),
-    getWork(Status.DRAFT),
-  ]);
+  const shellData = await getStudioShellData();
   const common = {
     hasUnpublishedChanges: shellData.hasUnpublishedChanges,
-    testimonials: praise.quotes.length,
-    workItems: work.lanes.reduce((total, lane) => total + lane.projects.length, 0),
+    testimonials: shellData.badges.praise,
+    workItems: shellData.badges.work,
   };
 
   if (!isDatabaseConfigured()) return { ...common, activity: [] };

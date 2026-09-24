@@ -3,6 +3,7 @@
 import { Prisma, Status } from "@/generated/prisma/client";
 import { requireOwner } from "@/auth";
 import { getDb } from "@/lib/db";
+import { shareMediaReferenceLock } from "@/lib/media-usage";
 import { updateContent } from "@/lib/revalidate";
 import { sectionSchemas } from "@/lib/studio-drafts";
 import type { SectionKey } from "@/lib/sections";
@@ -95,6 +96,7 @@ export async function saveDraft(
     }
 
     const saved = await getDb().$transaction(async (tx) => {
+      await shareMediaReferenceLock(tx);
       const sectionData = toInputJson(parsed.data);
       let row: { updatedAt: Date };
 

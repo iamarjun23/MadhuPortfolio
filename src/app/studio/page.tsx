@@ -8,7 +8,7 @@ const sections = [
     number: "01",
     label: "Hero",
     detail: "Headline, buttons and film-frame labels",
-    media: "1 background video",
+    media: "1 background video + poster",
   },
   {
     href: studioHref("/about"),
@@ -36,7 +36,7 @@ const sections = [
     number: "05",
     label: "Work",
     detail: "Project cards grouped into filter categories",
-    media: "YouTube link per project · no uploads at all",
+    media: "Link per project · optional cover or video",
   },
   {
     href: studioHref("/praise"),
@@ -64,7 +64,7 @@ const sections = [
     number: "09",
     label: "Drawing Room",
     detail: "Pinboard of polaroids, notes and quotes",
-    media: "1 photo per polaroid card",
+    media: "Polaroid photos · reel cover or video",
   },
   {
     href: studioHref("/contact"),

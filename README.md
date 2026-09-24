@@ -2,9 +2,8 @@
 
 Next.js foundation for N Madhu Kumar's portfolio, Drawing Room, and Studio CMS.
 
-The public navigation label “Studio” opens `/process`, which presents the editing workflow,
-turnaround guidance, and Photobooth. The protected content-management workspace remains at
-`/studio`.
+The public pages are `/` (the portfolio), `/room` (the Drawing Room) and `/resume`. The protected
+content-management workspace is at `/studio`.
 
 ## Phase
 
@@ -14,17 +13,23 @@ Current implementation: Phase 12 deployment hardening from the PRD.
 
 - Node 20 LTS or newer for the target deployment environment.
 - pnpm.
-- PostgreSQL database URL in `.env.local` before running Prisma migrations.
+- PostgreSQL database URL in `.env` before running Prisma migrations (the Prisma CLI and the
+  scripts read `.env`, not `.env.local`).
 
 ## Setup
 
 ```bash
 pnpm install
-cp .env.example .env.local
+cp .env.example .env
 pnpm prisma:migrate
 pnpm db:seed
 pnpm dev
 ```
+
+Builds and CI must never rewrite `pnpm-lock.yaml`. pnpm refuses an out-of-date lockfile by itself
+whenever `CI` is set (Vercel sets it), but any install command written for a build or CI job should
+say so explicitly: `pnpm install --frozen-lockfile`. If the lockfile really needs to change, run
+`pnpm install` locally and commit the result.
 
 For a local Docker PostgreSQL database, run this first:
 
@@ -37,11 +42,27 @@ docker compose --env-file .env.postgres.local -f docker-compose.dev.yml up -d
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm prisma:validate
 pnpm build
 ```
 
 `pnpm check` runs the supported local checks together.
+
+`pnpm test` runs `tests/*.test.ts` with Node's built-in test runner through `tsx` (already a dev
+dependency, so it resolves the `@/` paths). The tests cover pure logic only and need no database or
+R2: link and media URL validation, section schemas and duplicate IDs, upload file signatures, the
+R2 list parser, thumbnail redirect/size/concurrency guards, login lockout timing and the live-site
+refresh's failure reporting.
+
+`pnpm test:browser [url]` is a read-only browser smoke test of the public site (headless Chrome over
+the DevTools Protocol, no extra dependency; set `CHROME_PATH` if Chrome is elsewhere). It defaults to
+`http://localhost:3100`, so run `pnpm build && pnpm start -p 3100` first, or pass the live URL after
+a deploy. At desktop, phone and phone-landscape sizes it checks that `/`, `/room`, `/resume` and a
+missing page load without console errors (CSP violations included) or sideways scroll, that the
+Impact, Work and Drawing Room pop-ups open on screen with their close button visible, close on Escape
+and hand focus back, and that `/studio` sends a signed-out visitor to sign in. It never signs in, so
+Studio flows (upload, save, publish) are still checked by hand.
 
 `pnpm db:seed` upserts the complete initial content set into both the `DRAFT` and
 `PUBLISHED` rows for all 10 sections. It requires a reachable `DATABASE_URL`.
@@ -65,13 +86,20 @@ See `.env.example` for required variables.
 Production configuration, database migration, release, and smoke-check steps are in
 [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-For UploadThing v7, create an app in the UploadThing dashboard and add its V7
-`UPLOADTHING_TOKEN` to `.env.local`. The upload controls deliberately remain disabled until that
-token is configured; URL fields continue to work without it. Upload endpoints require an
-authenticated Studio owner.
+Uploads go straight to Cloudflare R2: a Studio server action (owner only) signs a short-lived PUT
+URL, the browser sends the file to the bucket, and `finishUpload` records it. Files are served from
+the bucket's custom domain (`NEXT_PUBLIC_MEDIA_URL`), never through the app. To enable uploads,
+set the `R2_*` variables in `.env` (see `.env.example` and the R2 steps in `DEPLOYMENT.md`); until
+then the Studio's upload controls stay disabled and URL fields still work.
 
-Hero video uploads are limited to 64 MB. The upload route verifies the limit on both the declared
-content length and the received payload before storing a file.
+Each upload slot has its own type and size limit (videos 64 MB, the resume PDF 10 MB, images
+4 MB; see `src/lib/upload-endpoints.ts`). `createUpload` checks the type and size the browser
+declares before signing the upload URL. That is only the browser's word, and the signed URL does
+not cap the size, so `finishUpload` checks the object R2 actually stored: its real size and type,
+and its first bytes against the known file signatures (`src/lib/file-signature.ts`), so HTML or
+SVG renamed to `.jpg` is refused. An upload that fails any check is deleted from the bucket (if
+that delete fails, it is logged and Settings → unused uploads cleans it up later), and the
+recorded type is the one the bytes prove.
 
 ## Source References
 

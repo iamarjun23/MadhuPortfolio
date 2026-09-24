@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
+import { flagRepeatedIds, ItemIdSchema, uniqueIds } from "./item-id";
+import { ExternalLinkSchema } from "./links";
+import { ImageUrlSchema, VideoUrlSchema } from "./media";
 
 export const WorkSchema = z.object({
   eyebrow: z.string().max(40).default("Selected work"),
@@ -21,14 +23,14 @@ export const WorkSchema = z.object({
   lanes: z
     .array(
       z.object({
-        id: z.string(),
+        id: ItemIdSchema,
         label: z.string().max(40),
         // "All work" is always the grid; each category picks its own.
         layout: z.enum(["canvas", "grid"]).default("canvas"),
         projects: z
           .array(
             z.object({
-              id: z.string(),
+              id: ItemIdSchema,
               title: z.string().max(80),
               subtitle: z.string().max(60),
               // A project's video usually lives somewhere else - YouTube, LinkedIn or
@@ -36,17 +38,17 @@ export const WorkSchema = z.object({
               // player and the link out. A reel that lives nowhere public can be
               // uploaded instead, and then plays from our own storage. With neither,
               // the thumbHint gradient covers the gap.
-              href: z.url().nullable(),
+              href: ExternalLinkSchema.nullable(),
               hrefLabel: z.string().max(16).nullable(),
               video: z
-                .object({ url: MediaUrlSchema, poster: MediaUrlSchema.optional() })
+                .object({ url: VideoUrlSchema, poster: ImageUrlSchema.optional() })
                 .nullable()
                 .default(null),
               // YouTube hands over a still from the link alone. Instagram does not
               // publish one at any address, and LinkedIn's has to be fetched, so a
               // cover uploaded here is what keeps those cards from falling back to
               // a bare gradient. Set, it outranks whatever was worked out.
-              image: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable().default(null),
+              image: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable().default(null),
               thumbHint: z.enum(["bd-1", "bd-2", "bd-3", "bd-4"]),
               // Where the card was dropped on the category canvas in the studio,
               // in grid cells from the board's centre. Null = the computed spot.
@@ -60,7 +62,20 @@ export const WorkSchema = z.object({
       }),
     )
     .min(1)
-    .max(6),
+    .max(6)
+    .superRefine((lanes, ctx) => {
+      uniqueIds(lanes, ctx);
+      // Across every lane, not per lane: `allOrder` names projects by ID alone.
+      flagRepeatedIds(
+        lanes.flatMap((lane, laneIndex) =>
+          lane.projects.map((project, index) => ({
+            id: project.id,
+            path: [laneIndex, "projects", index, "id"],
+          })),
+        ),
+        ctx,
+      );
+    }),
 });
 
 export type Work = z.infer<typeof WorkSchema>;

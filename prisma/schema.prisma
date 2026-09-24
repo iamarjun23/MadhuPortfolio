@@ -39,6 +39,15 @@ model Session {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Failed Studio sign-ins, counted per email and per client IP (`email:…` / `ip:…`) so the
+// lockout holds across every Vercel function instance.
+model LoginAttempt {
+  key         String    @id
+  failures    Int       @default(0)
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
 model Section {
   id        String   @id @default(cuid())
   key       String
@@ -56,16 +65,17 @@ enum Status {
 }
 
 model Media {
-  id        String    @id @default(cuid())
-  url       String
-  key       String
-  kind      MediaKind
-  width     Int?
-  height    Int?
-  bytes     Int?
-  mime      String?
-  alt       String?
-  createdAt DateTime  @default(now())
+  id         String    @id @default(cuid())
+  url        String
+  key        String    @unique
+  kind       MediaKind
+  width      Int?
+  height     Int?
+  bytes      Int?
+  mime       String?
+  alt        String?
+  createdAt  DateTime  @default(now())
+  deletingAt DateTime?
 }
 
 enum MediaKind {

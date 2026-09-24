@@ -616,7 +616,7 @@ export const sectionData = {
       motion: true,
     },
     fallbackImage: null,
-    domain: "madhu.edit",
+    domain: "nmadhukumar.com",
   }),
 } satisfies Record<SectionKey, Prisma.InputJsonObject>;
 

@@ -14,6 +14,7 @@ export const uploadEndpointNames = [
   "testimonialImage",
   "reelVideo",
   "reelCover",
+  "videoPoster",
   "ogImage",
   "fallbackImage",
   "resumeFile",
@@ -45,7 +46,10 @@ const allowedMimeTypes = new Set([
 /* The browser sends the type alongside the bytes and may add parameters to it
    ("video/mp4; codecs=..."), so compare on the type itself. The value is still
    only the client's word - it decides how the file is served back, not what it
-   contains - which is why the media route is served with `nosniff`. */
+   contains - which is why `finishUpload` checks the file's leading bytes, and why
+   the media hostname must send `nosniff` (a Cloudflare Transform Rule, see
+   DEPLOYMENT.md - R2 serves those files directly, so next.config.mjs headers never
+   reach them). */
 export function normalizeMimeType(contentType: string) {
   return contentType.split(";")[0]?.trim().toLowerCase() ?? "";
 }
@@ -82,6 +86,7 @@ export const endpointLimits: Record<UploadEndpoint, { accept: MediaAccept; maxBy
   testimonialImage: { accept: "image/", maxBytes: 4 * MB },
   reelVideo: { accept: "video/", maxBytes: 64 * MB },
   reelCover: { accept: "image/", maxBytes: 4 * MB },
+  videoPoster: { accept: "image/", maxBytes: 4 * MB },
   ogImage: { accept: "image/", maxBytes: 4 * MB },
   fallbackImage: { accept: "image/", maxBytes: 4 * MB },
   resumeFile: { accept: "application/", maxBytes: 10 * MB },

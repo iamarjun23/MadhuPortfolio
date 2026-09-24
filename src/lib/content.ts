@@ -85,7 +85,17 @@ async function getSection<TSchema extends z.ZodType>(
     return schema.parse(await sectionDefaults(key));
   }
 
-  return schema.parse(entry.data);
+  /* A stored row the schema rejects fails the page (app/error.tsx). Zod's own error does not
+     say which section it was, so name it and each failing field before rethrowing. */
+  const parsed = schema.safeParse(entry.data);
+  if (!parsed.success) {
+    const fields = parsed.error.issues.map(
+      (issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`,
+    );
+    console.error(`Stored ${status} "${key}" section failed validation`, fields);
+    throw parsed.error;
+  }
+  return parsed.data;
 }
 
 /* The draft row's version, taken from the same cached read the draft content

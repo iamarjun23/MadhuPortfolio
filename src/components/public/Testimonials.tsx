@@ -1,3 +1,4 @@
+import { MediaImage } from "@/components/public/MediaImage";
 import { realImage } from "@/lib/placeholders";
 import type { Praise } from "@/schemas";
 
@@ -26,16 +27,18 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
             {[...set, ...set].map((quote, i) => {
               const image = realImage(quote.image);
               return (
+                // Only the first copy is read out; the rest exist for the loop.
                 <figure
                   className={quote.isSample ? "is-sample" : undefined}
                   key={`${quote.id}-${i}`}
+                  aria-hidden={i >= data.quotes.length || undefined}
                 >
                   <blockquote>{quote.quote}</blockquote>
                   <figcaption>
                     <span className="testimonials__avatar">
                       {image ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- tiny lazy avatar, not LCP
-                        <img src={image.url} alt={image.alt} loading="lazy" />
+                        // Decorative: the name is printed right beside it.
+                        <MediaImage src={image.url} alt="" width={128} height={128} sizes="40px" />
                       ) : (
                         quote.initials
                       )}

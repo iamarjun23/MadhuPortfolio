@@ -65,7 +65,7 @@ export function AboutBlock({
                 poster={portraitVideo.poster}
                 aria-label="Madhu editing"
               >
-                <source src={portraitVideo.url} type="video/mp4" />
+                <source src={portraitVideo.url} />
               </video>
             ) : null}
             {portraitImage && portraitVideo ? (
@@ -79,7 +79,7 @@ export function AboutBlock({
                   poster={portraitVideo.poster}
                   aria-label="Madhu at the edit desk"
                 >
-                  <source src={portraitVideo.url} type="video/mp4" />
+                  <source src={portraitVideo.url} />
                 </video>
               </div>
             ) : null}

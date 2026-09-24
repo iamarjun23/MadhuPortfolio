@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MediaImage } from "@/components/public/MediaImage";
 import type { Room } from "@/schemas";
 
 export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
@@ -25,8 +26,13 @@ export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
             aria-label="Open the Drawing Room"
           >
             {teaser.image && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img className="drawing-teaser__image" src={teaser.image.url} alt={teaser.image.alt} />
+              <MediaImage
+                className="drawing-teaser__image"
+                src={teaser.image.url}
+                alt={teaser.image.alt}
+                fill
+                sizes="(max-width: 560px) 20rem, 32vw"
+              />
             )}
             <span className="drawing-teaser__stamp">{teaser.stamp}</span>
             <span className="drawing-teaser__note">{teaser.note}</span>

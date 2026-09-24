@@ -5,6 +5,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 
 /* The studio's photo and video cards behave like the cards on the public work
    board: the preview grows under the pointer, and clicking it opens the thing
@@ -33,10 +34,10 @@ function Lightbox({
   label,
   onClose,
 }: Readonly<{ source: PreviewSource; label: string; onClose: () => void }>) {
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, true);
 
   useEffect(() => {
-    closeRef.current?.focus();
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -58,11 +59,12 @@ function Lightbox({
         role="dialog"
         aria-modal="true"
         aria-label={`${label} at full size`}
+        ref={dialogRef}
+        tabIndex={-1}
       >
         <button
           className="studio-lightbox__close"
           type="button"
-          ref={closeRef}
           onClick={onClose}
           aria-label="Close preview"
         >

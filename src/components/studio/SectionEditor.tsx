@@ -806,6 +806,7 @@ function MediaEditor({
   showBreadcrumb,
   parent,
 }: ValueEditorProps & { showBreadcrumb?: boolean; parent?: EditorObject }) {
+  const pushToast = useStudioStore((state) => state.pushToast);
   const config = getMediaConfig(value, path);
   if (!config) return null;
 
@@ -857,7 +858,8 @@ function MediaEditor({
       const point = await estimateFocalPoint(imageUrl);
       setFocal(point.x, point.y);
     } catch {
-      // Leave whatever focal point is already set - the picker still works by hand.
+      // The focal point already set is left alone - the picker still works by hand.
+      pushToast("Couldn't auto-detect the crop focus. Click the photo to set it by hand.", "error");
     }
   };
 
@@ -959,6 +961,14 @@ function MediaEditor({
       ) : null}
       {config.isVideo && !config.isUrlOnly ? (
         <>
+          <Dropzone
+            endpoint="videoPoster"
+            label="Upload poster"
+            value={poster || undefined}
+            enabled={uploadEnabled}
+            onUploaded={(upload) => onChange(path, setOptionalString(object, "poster", upload.url))}
+            onDeleted={() => onChange(path, setOptionalString(object, "poster", ""))}
+          />
           <label className="studio-field" htmlFor={`studio-${path.join("-")}-poster`}>
             <span>Poster photo address</span>
             <input
@@ -973,7 +983,7 @@ function MediaEditor({
             />
             <FieldHint
               id={`studio-${path.join("-")}-poster-hint`}
-              hint="A still image shown while the video loads, or if it cannot play. Optional but recommended."
+              hint="A still shown while the video loads, or if it cannot play - ideally the video's first frame, so the switch is seamless. Keep it small (a WebP or AVIF around 100KB): it is the first thing visitors see."
             />
           </label>
           <div className="studio-switch-field">

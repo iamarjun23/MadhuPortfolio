@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
+import { ImageUrlSchema, VideoUrlSchema } from "./media";
 
 export const AboutSchema = z.object({
   eyebrow: z.string().max(40).default("About me"),
-  portrait: z.object({ url: MediaUrlSchema, alt: z.string() }).nullable(),
+  portrait: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable(),
   portraitVideo: z
     .object({
-      url: MediaUrlSchema,
-      poster: MediaUrlSchema.optional(),
+      url: VideoUrlSchema,
+      poster: ImageUrlSchema.optional(),
     })
     .nullable()
     .default(null),

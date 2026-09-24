@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { MediaUrlSchema } from "./media";
+import { ItemIdSchema, uniqueIds } from "./item-id";
+import { ImageUrlSchema } from "./media";
 
 export const ExperienceSchema = z.object({
   eyebrow: z.string().max(40).default("Experience"),
@@ -19,11 +20,11 @@ export const ExperienceSchema = z.object({
   roles: z
     .array(
       z.object({
-        id: z.string(),
+        id: ItemIdSchema,
         company: z.string().max(60),
         role: z.string().max(60),
         image: z
-          .object({ url: MediaUrlSchema, alt: z.string().default("") })
+          .object({ url: ImageUrlSchema, alt: z.string().default("") })
           .nullable()
           .default(null),
         // Where the scene and thumbnail crops centre - 0.5/0.5 is the middle.
@@ -38,7 +39,8 @@ export const ExperienceSchema = z.object({
         description: z.string().max(400),
       }),
     )
-    .max(20),
+    .max(20)
+    .superRefine(uniqueIds),
 });
 
 export type Experience = z.infer<typeof ExperienceSchema>;

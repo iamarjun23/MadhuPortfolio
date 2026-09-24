@@ -2,6 +2,11 @@ import type { Resume } from "@/schemas";
 
 export function ResumePage({ data }: Readonly<{ data: Resume }>) {
   const url = data.pdf?.url;
+  /* `download` is ignored on a link to another origin, and the PDF lives on the
+     media domain. A Cloudflare Transform Rule adds `Content-Disposition: attachment`
+     to responses for this query only (DEPLOYMENT.md), so the viewer below still
+     shows the same file inline. */
+  const downloadUrl = url ? `${url}${url.includes("?") ? "&" : "?"}download=1` : undefined;
 
   return (
     <main className="resume-page">
@@ -12,7 +17,13 @@ export function ResumePage({ data }: Readonly<{ data: Resume }>) {
           {data.intro ? <p>{data.intro}</p> : null}
           {url ? (
             <div className="resume-page__actions">
-              <a className="button button--primary" href={url} download target="_blank" rel="noreferrer">
+              <a
+                className="button button--primary"
+                href={downloadUrl}
+                download
+                target="_blank"
+                rel="noreferrer"
+              >
                 {data.downloadLabel}
               </a>
             </div>

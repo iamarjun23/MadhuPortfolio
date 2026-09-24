@@ -1,7 +1,7 @@
 import { getDb } from "@/lib/db";
 import { studioSectionLabels } from "@/lib/studio-nav";
 import { uploadEndpointNames } from "@/lib/upload-endpoints";
-import { Status } from "@/generated/prisma/client";
+import { type Prisma, Status } from "@/generated/prisma/client";
 
 /* Nothing joins an upload to the section using it: media rows carry a key and
    sections carry free-form JSON, with no foreign key between them. Working out
@@ -59,8 +59,11 @@ export async function getMediaUsage(): Promise<Map<string, string[]>> {
 /* Same lookup as getMediaUsage, narrowed to one upload: a `LIKE` filter at the database
    lets Postgres skip sections whose JSON text can't contain the key at all, instead
    of pulling and deep-walking every section's JSON just to check one file. */
-export async function getMediaUsageForKey(mediaKey: string): Promise<string[]> {
-  const sections = await getDb().$queryRaw<{ key: string; status: Status; data: unknown }[]>`
+export async function getMediaUsageForKey(
+  mediaKey: string,
+  db: Prisma.TransactionClient = getDb(),
+): Promise<string[]> {
+  const sections = await db.$queryRaw<{ key: string; status: Status; data: unknown }[]>`
     SELECT key, status, data FROM "Section" WHERE data::text LIKE ${`%${mediaKey}%`}
   `;
   const places: string[] = [];
@@ -70,6 +73,23 @@ export async function getMediaUsageForKey(mediaKey: string): Promise<string[]> {
     if (keys.has(mediaKey)) places.push(placeLabel(section.key, section.status));
   }
   return places;
+}
+
+/* Saving a draft is the only write that can add a reference to an upload; publish
+   and revert copy between rows the usage check already reads. So a save holds the
+   shared side of this Postgres advisory lock and a file delete holds the exclusive
+   side from its last usage check until the file is gone: no save can slip a
+   reference in between. Both are released when their transaction ends. */
+const MEDIA_REFERENCE_LOCK = 7_318_402;
+
+/** For a draft save. Any number of saves hold it at once; each waits only for a delete in progress. */
+export async function shareMediaReferenceLock(tx: Prisma.TransactionClient) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(${MEDIA_REFERENCE_LOCK}::bigint)`;
+}
+
+/** For a file delete. Waits for saves in flight, then holds new ones off until it commits. */
+export async function takeMediaReferenceLock(tx: Prisma.TransactionClient) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${MEDIA_REFERENCE_LOCK}::bigint)`;
 }
 
 export function describePlaces(places: readonly string[]) {

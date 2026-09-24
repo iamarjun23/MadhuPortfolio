@@ -49,7 +49,9 @@ export function ContactBlock({ contact }: Readonly<{ contact: Contact }>) {
                   LinkedIn <span aria-hidden="true">↗</span>
                 </a>
               ) : null}
-              {contact.phone ? <a href={`tel:${contact.phone}`}>{contact.phone}</a> : null}
+              {contact.phone ? (
+                <a href={`tel:${contact.phone.replace(/[^\d+]/g, "")}`}>{contact.phone}</a>
+              ) : null}
               <span ref={timecodeRef}>{initialTimecode}</span>
             </div>
           </aside>

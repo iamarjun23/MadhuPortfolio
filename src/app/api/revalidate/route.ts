@@ -24,3 +24,11 @@ export async function POST(request: Request) {
   for (const path of publicPaths) revalidatePath(path, "layout");
   return Response.json({ ok: true });
 }
+
+// Used by the studio's /api/health: confirms the secret matches without clearing anything.
+export function GET(request: Request) {
+  return new Response(null, {
+    status: isAuthorised(request) ? 204 : 401,
+    headers: { "cache-control": "no-store" },
+  });
+}

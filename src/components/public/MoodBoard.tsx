@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { HOME_SCROLL_KEY, RESTORE_HOME_SCROLL_KEY } from "@/components/public/Nav";
 import { MediaImage } from "@/components/public/MediaImage";
 import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
-import { reelBadge, reelSourceLabel, resolveReel } from "@/lib/reel";
+import { EMBED_SANDBOX, reelBadge, reelSourceLabel, resolveReel } from "@/lib/reel";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Contact, Room } from "@/schemas";
 
 type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage; contact: Contact }>;
@@ -39,14 +40,13 @@ function getCardLabel(card: Room["cards"][number]) {
 function videoCardFace(card: VideoCard, fallbackImage: FallbackImage) {
   const reel = resolveReel(card);
   if (!reel.thumbnail) {
-    return fallbackImage
-      ? { url: fallbackImage.url, alt: `Still from ${card.caption}`, remote: false }
-      : null;
+    // The stand-in is not a still from this video, so it is decorative.
+    return fallbackImage ? { url: fallbackImage.url, alt: "", remote: false } : null;
   }
 
   return {
     url: reel.thumbnail,
-    alt: card.image?.alt || `Still from ${card.caption}`,
+    alt: card.image?.alt || (card.caption.trim() ? `Still from ${card.caption.trim()}` : ""),
     remote: reel.thumbnail !== reel.cover,
   };
 }
@@ -153,11 +153,15 @@ function CardViewer({
   const kind = reel ? reel.kind : "photo";
   const source = reel ? reelSourceLabel(reel.kind) : "Photograph";
   const outbound = card.type === "video" ? card.href : null;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(dialogRef, true);
 
   return (
     <>
       <div className="mood-player__scrim" aria-hidden="true" onClick={onClose} />
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         className={`mood-player mood-player--${kind}`}
         role="dialog"
         aria-modal="true"
@@ -168,8 +172,14 @@ function CardViewer({
         </button>
         <div className={`mood-player__media mood-player__media--${kind}`}>
           {photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo.url} alt={photo.alt} />
+            // Nominal size only: the CSS lets the photo take its own natural shape.
+            <MediaImage
+              src={photo.url}
+              alt={photo.alt}
+              width={1600}
+              height={1200}
+              sizes="(max-width: 820px) 92vw, min(64vw, 820px)"
+            />
           ) : reel?.file ? (
             <video src={reel.file} poster={reel.poster ?? undefined} controls autoPlay playsInline />
           ) : reel?.embed ? (
@@ -178,6 +188,7 @@ function CardViewer({
               title={`${card.caption} video`}
               scrolling="no"
               allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
+              sandbox={EMBED_SANDBOX}
               referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
             />
@@ -287,6 +298,8 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
   // Deals a fresh layout every time the room is opened, instead of reusing
   // whatever fx/fy the cards were last saved with.
   useEffect(() => {
+    // Random positions can only be drawn after hydration, or server and client markup disagree.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     shuffle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

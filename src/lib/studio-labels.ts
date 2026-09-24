@@ -41,7 +41,8 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
   hero: {
     summary:
       "The full-screen opening scene: the headline, the two buttons, and the film-strip labels around the frame.",
-    media: "One background video that loops silently behind the headline.",
+    media:
+      "One background video that loops silently behind the headline, plus a poster photo shown until it starts.",
   },
   about: {
     summary: "Your story panel: portrait, paragraphs, current status and the tools you work in.",
@@ -50,7 +51,7 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
   impact: {
     summary:
       "The numbers strip and the list of people and brands you have worked with.",
-    media: "No uploads - collaborators are listed by name.",
+    media: "One optional photo per collaborator. Without one, the tile shows their initials.",
   },
   clients: {
     summary:
@@ -61,12 +62,12 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
     summary:
       "Your selected work board. Cards are grouped into categories, and visitors drag them around and click to play the video.",
     media:
-      "Usually nothing is uploaded here. Paste each project's YouTube, Instagram or LinkedIn link and it supplies the card thumbnail and the pop-up player on its own. For a reel that is not on any of those, upload the video file to the project instead.",
+      "Usually just a link. Paste each project's YouTube, Instagram or LinkedIn link and it supplies the card thumbnail and the pop-up player on its own. Optionally upload a cover photo to replace that thumbnail, or, for a reel that is not on any of those, the video file itself.",
   },
   praise: {
     summary:
       "Client and collaborator testimonials. The whole section stays hidden until you switch it on.",
-    media: "No uploads - each person is shown by their initials.",
+    media: "One optional photo per person. Without one, their initials are shown.",
   },
   experience: {
     summary:
@@ -77,7 +78,7 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
     summary:
       "The Drawing Room pinboard - polaroids, reels, sticky notes, quotes and an Instagram card scattered on a wall.",
     media:
-      "Polaroid cards hold photos. Video cards hold a YouTube or LinkedIn link and play in a pop-up. Notes, quotes and tag cards are text only.",
+      "Polaroid cards hold photos. Video cards hold a YouTube, Instagram or LinkedIn link, or an uploaded video, plus an optional cover photo, and play in a pop-up. Notes, quotes and tag cards are text only.",
   },
   resume: {
     summary:
@@ -767,7 +768,7 @@ const fieldRules: readonly FieldRule[] = [
     key: "domain",
     doc: {
       label: "Site domain",
-      hint: "Your live address, used to build share links and the sitemap.",
+      hint: 'The web address the site is live at, like "nmadhukumar.com", not the brand name. Share links, search-engine canonical links and the sitemap are built from it.',
     },
   },
   { key: "site", doc: { label: "Brand, menu & footer" } },

@@ -33,6 +33,13 @@ export type Reel = Readonly<{
   thumbnailCanFail: boolean;
 }>;
 
+/* Sandbox for the YouTube, Instagram and LinkedIn players. They need their own
+   scripts and cookies to play, and popups so "Watch on YouTube" and the post
+   links still open a normal tab. Left out: navigating this page, forms,
+   downloads and modal dialogs. */
+export const EMBED_SANDBOX =
+  "allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox";
+
 const empty: Reel = {
   kind: "none",
   thumbnail: null,

@@ -11,9 +11,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: "The Drawing Room",
     description,
+    alternates: { canonical: "/room" },
     openGraph: {
       title: `The Drawing Room | ${settings.seo.title}`,
       description,
+      url: "/room",
       ...(shareImage ? { images: [shareImage] } : {}),
     },
   };

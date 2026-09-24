@@ -1,6 +1,8 @@
 # dependencies
 node_modules/
 .pnpm-store/
+# pnpm only (pnpm-lock.yaml); a stray `npm install` must not reintroduce npm's lockfile
+package-lock.json
 .yarn/
 .pnp.*
 
@@ -19,6 +21,8 @@ dist/
 # env — never commit real secrets
 .env
 .env.*
+# the template has placeholders only, and is the documented list of variables
+!.env.example
 
 # logs
 *.log

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
 import { realImage } from "@/lib/placeholders";
+import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Impact } from "@/schemas";
 
 /* The stand-in on a collaborator tile that has no photo yet: the first letter of
@@ -109,6 +110,8 @@ export function ImpactStrip({
   const collaborators = data.worked;
   const activePerson = activeIndex !== null ? collaborators[activeIndex] : undefined;
   const activeImage = activePerson ? realImage(activePerson.image) : null;
+  const previewRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(previewRef, Boolean(activePerson && activeImage));
 
   return (
     <section className="impact" ref={ref}>
@@ -189,8 +192,17 @@ export function ImpactStrip({
                   >
                     <span className="impact__worked-thumb" aria-hidden={!image}>
                       {image ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- tiny lazy thumb, not LCP
-                        <img src={image.url} alt={image.alt} loading="lazy" draggable={false} />
+                        /* Square tiles, about 8-10rem wide; two to a row under 900px.
+                           Decorative here: the button already reads the name. The
+                           preview dialog below carries the photo's own alt. */
+                        <MediaImage
+                          src={image.url}
+                          alt=""
+                          width={384}
+                          height={384}
+                          sizes="(max-width: 900px) 45vw, 160px"
+                          draggable={false}
+                        />
                       ) : (
                         <em>{initials(person.name)}</em>
                       )}
@@ -216,6 +228,8 @@ export function ImpactStrip({
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${activePerson.name} preview`}
+                ref={previewRef}
+                tabIndex={-1}
               >
                 <button
                   type="button"

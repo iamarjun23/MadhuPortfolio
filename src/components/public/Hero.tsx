@@ -1,7 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { isUploadedMediaSrc } from "@/lib/media-src";
 import { initialTimecode, useTimecode } from "@/lib/use-timecode";
 import type { Hero as HeroData } from "@/schemas";
 
@@ -16,20 +18,50 @@ export function Hero({ data }: HeroProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const timecodeRef = useTimecode();
   const parallaxRef = useRef({ allowed: false, frame: 0, x: 0, y: 0 });
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
 
-  // The autoPlay attribute alone is unreliable under browser autoplay policies;
-  // a muted play() call is permitted. Falls back to the poster if it still refuses.
-  // Paused once scrolled past so it stops decoding under the rest of the page.
+  /* The background video runs to tens of megabytes, and an autoplaying <video> starts
+     downloading the moment it is parsed, whatever `preload` says - competing with the
+     headline, fonts and images for the first paint. So the page first paints over the
+     poster and the video's source is only attached once the page has finished loading
+     and the browser is idle. Visitors who ask for reduced motion keep the still. */
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let cancelPending = () => {};
+    const attach = () => setVideoSrc(data.bgVideo.url);
+    // Safari has no requestIdleCallback; a short timeout after `load` is close enough there.
+    const whenIdle = () => {
+      if (typeof window.requestIdleCallback === "function") {
+        const handle = window.requestIdleCallback(attach, { timeout: 2000 });
+        cancelPending = () => window.cancelIdleCallback(handle);
+      } else {
+        const handle = window.setTimeout(attach, 200);
+        cancelPending = () => window.clearTimeout(handle);
+      }
+    };
+
+    if (document.readyState === "complete") whenIdle();
+    else window.addEventListener("load", whenIdle, { once: true });
+    return () => {
+      window.removeEventListener("load", whenIdle);
+      cancelPending();
+    };
+  }, [data.bgVideo.url]);
+
+  // A muted play() is what autoplay policies allow; if it is still refused the poster stays.
+  // Paused once scrolled past so it stops decoding under the rest of the page. Re-run when the
+  // source arrives: observing fires straight away, which starts playback if the hero is in view.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !videoSrc) return;
     const observer = new IntersectionObserver(([entry]) => {
       if (entry?.isIntersecting) video.play().catch(() => {});
       else video.pause();
     });
     observer.observe(video);
     return () => observer.disconnect();
-  }, []);
+  }, [videoSrc]);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -89,18 +121,29 @@ export function Hero({ data }: HeroProps) {
     >
       <div className="hero__background" ref={backgroundRef} aria-hidden="true">
         <div className="hero__fallback" />
+        {/* The first thing a visitor sees, so it is preloaded from <head> at high priority and
+            becomes the LCP element; the video, attached after load, covers it from its first frame. */}
+        {data.bgVideo.poster ? (
+          <Image
+            className="hero__poster"
+            src={data.bgVideo.poster}
+            alt=""
+            fill
+            sizes="100vw"
+            preload
+            fetchPriority="high"
+            unoptimized={!isUploadedMediaSrc(data.bgVideo.poster)}
+          />
+        ) : null}
         <video
           className="hero__video"
           ref={videoRef}
-          autoPlay
           muted
           loop
           playsInline
-          preload="auto"
-          poster={data.bgVideo.poster}
-        >
-          <source src={data.bgVideo.url} type="video/mp4" />
-        </video>
+          preload="none"
+          src={videoSrc ?? undefined}
+        />
         {data.bgVideo.duotone ? <div className="hero__tint" /> : null}
         <div className="hero__scrim" />
       </div>

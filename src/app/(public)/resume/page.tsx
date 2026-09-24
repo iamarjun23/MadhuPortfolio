@@ -11,9 +11,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: resume.seo.title,
     description,
+    alternates: { canonical: "/resume" },
     openGraph: {
       title: `${resume.seo.title} | ${settings.seo.title}`,
       description,
+      url: "/resume",
       ...(shareImage ? { images: [shareImage] } : {}),
     },
   };

@@ -23,6 +23,16 @@
       "localConnectionString": "postgresql://user:password@localhost:5432/postgres",
     },
   ],
+  // Per-client-IP cap on /api/linkedin-thumb and /api/instagram-thumb (src/lib/thumb-proxy.ts).
+  // A page shows at most a few dozen thumbnails and the browser caches each for a day, so 60 a
+  // minute only ever trips on scripted traffic. `namespace_id` is any account-unique integer.
+  "ratelimits": [
+    {
+      "name": "THUMB_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 },
+    },
+  ],
   // Uploads (bucket `images`) are no longer bound here: they are served from R2's custom domain
   // and written by the studio on Vercel through R2's S3 API — see DEPLOYMENT.md.
   "r2_buckets": [

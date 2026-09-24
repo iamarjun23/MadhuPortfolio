@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { isUploadedMediaSrc } from "@/lib/media-src";
 
 type MediaImageProps = Readonly<{
   src: string;
@@ -18,17 +19,16 @@ type MediaImageProps = Readonly<{
   // reasonably-sized image with its own long cache lifetime, so there is
   // nothing left for the optimizer to usefully do anyway.
   unoptimized?: boolean;
+  // For an image inside a draggable card, so dragging moves the card, not the picture.
+  draggable?: boolean;
+  className?: string;
 }>;
 
-// Uploaded photos are served straight from R2's custom domain, off the Worker entirely.
-// Sending them through next/image's optimizer would put every resize back on the Worker's
-// CPU budget, and the objects already carry an immutable year-long cache lifetime. A
-// not-yet-rewritten `/api/media/` path reaches the same file through the redirect in next.config.
-function isUploadedMediaSrc(url: string) {
-  const mediaUrl = process.env.NEXT_PUBLIC_MEDIA_URL;
-  return url.startsWith("/api/media/") || (Boolean(mediaUrl) && url.startsWith(`${mediaUrl}/`));
-}
-
+/* Uploads go through the Cloudflare loader (src/lib/image-loader.ts), which asks for each
+   one at the width the layout needs instead of shipping the multi-megabyte original. Any
+   other source - a YouTube still, our own LinkedIn/Instagram thumbnail route - is served as
+   it is: those are already small, and next/image's built-in optimizer would resize them on
+   the Worker's CPU budget. */
 export function MediaImage({
   src,
   alt,
@@ -38,26 +38,32 @@ export function MediaImage({
   height,
   onError,
   unoptimized,
+  draggable,
+  className,
 }: MediaImageProps) {
-  if (unoptimized || isUploadedMediaSrc(src)) {
-    return fill ? (
-      <Image src={src} alt={alt} fill sizes={sizes} unoptimized onError={onError} />
-    ) : (
-      <Image
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        sizes={sizes}
-        unoptimized
-        onError={onError}
-      />
-    );
-  }
-
+  const skipLoader = unoptimized || !isUploadedMediaSrc(src);
   return fill ? (
-    <Image src={src} alt={alt} fill sizes={sizes} onError={onError} />
+    <Image
+      src={src}
+      alt={alt}
+      fill
+      sizes={sizes}
+      unoptimized={skipLoader}
+      onError={onError}
+      draggable={draggable}
+      className={className}
+    />
   ) : (
-    <Image src={src} alt={alt} width={width} height={height} sizes={sizes} onError={onError} />
+    <Image
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      sizes={sizes}
+      unoptimized={skipLoader}
+      onError={onError}
+      draggable={draggable}
+      className={className}
+    />
   );
 }

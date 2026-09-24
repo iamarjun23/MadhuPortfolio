@@ -268,7 +268,8 @@ button {
   width: min(100%, 900px);
   min-height: 48px;
   margin: 1rem auto;
-  padding: 0.38rem 0.8rem;
+  /* Right inset matches the vertical one so the CTA pill nests concentrically. */
+  padding: 0.38rem 0.38rem 0.38rem 0.8rem;
   border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
   border-radius: 999px;
   background:
@@ -300,7 +301,6 @@ button {
   .public-nav.is-past-hero .public-nav__inner {
     width: calc(100% - 1rem);
     margin: 0.75rem auto;
-    padding-right: 0.65rem;
     padding-left: 0.65rem;
   }
 }
@@ -318,6 +318,9 @@ button {
 }
 
 .public-nav__right {
+  /* Pinned to the last column so an absent caption doesn't leave an empty
+     trailing column (plus its column-gap) after the links. */
+  grid-column: -2;
   justify-content: flex-end;
   gap: 1.4rem;
 }
@@ -931,6 +934,36 @@ button {
   background: transparent;
 }
 
+/* The 404 and error pages (app/not-found.tsx, app/error.tsx). */
+.status-page {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 44rem;
+  margin-inline: auto;
+}
+.status-page h1 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 3.7rem);
+}
+.status-page p {
+  margin: 0 0 0.5rem;
+  color: var(--text-2);
+}
+.status-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.status-page small {
+  color: var(--text-muted);
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+}
+
 .hero {
   position: relative;
   display: flex;
@@ -955,6 +988,9 @@ button {
     radial-gradient(circle at 20% 30%, rgba(255, 106, 0, 0.56), transparent 40%),
     radial-gradient(circle at 80% 20%, rgba(255, 138, 51, 0.24), transparent 44%), #030303;
 }
+/* The poster is a real <img> under the video rather than the video's `poster`
+   attribute, so it can be preloaded as the page's LCP image; both share one look. */
+.hero__poster,
 .hero__video {
   position: absolute;
   inset: 0;
@@ -5431,12 +5467,34 @@ button {
   height: 2.25rem;
   object-fit: contain;
 }
+/* With motion off, a marquee would freeze at its start with the rest clipped.
+   Show each item once instead, wrapped onto as many rows as it needs. Kept after
+   the base .testimonials and .clients rules, which have the same specificity. */
+.motion-disabled :is(.testimonials, .clients__marquee) {
+  mask-image: none;
+}
+.motion-disabled :is(.testimonials__track, .clients__track) {
+  width: auto;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.motion-disabled :is(.testimonials__track, .clients__track) > [aria-hidden="true"] {
+  display: none;
+}
 @media (prefers-reduced-motion: reduce) {
+  .testimonials,
   .clients__marquee {
-    overflow-x: auto;
+    mask-image: none;
   }
+  .testimonials__track,
   .clients__track {
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: center;
     animation: none;
+  }
+  :is(.testimonials__track, .clients__track) > [aria-hidden="true"] {
+    display: none;
   }
 }
 
@@ -6023,6 +6081,13 @@ button {
     .landing > section:nth-of-type(9) {
       animation-name: story-rise;
     } /* Contact */
+    /* The entrance leaves a transform on the section, which would pin its
+       position: fixed pop-ups (Impact, Work) to the section instead of the
+       screen and push them off a short viewport. Same specificity as the
+       rules above, so this must stay after them. */
+    .landing > section:has([aria-modal="true"]) {
+      animation-name: none;
+    }
 
     .landing > section img,
     .landing > section video {
@@ -6182,6 +6247,7 @@ button {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .hero__poster,
   .hero__video {
     animation: hero-push 24s var(--e-reveal) infinite alternate;
     transform: scale(1.05);
@@ -7525,7 +7591,9 @@ button {
 .mood-player--photo {
   grid-template-columns: auto minmax(15rem, 19rem);
   align-items: stretch;
-  width: auto;
+  /* Not `auto`: a fixed box at left: 50% would shrink to the half-viewport right of
+     it, squeezing the media column until `overflow: hidden` crops the photo. */
+  width: max-content;
   max-width: 94vw;
 }
 

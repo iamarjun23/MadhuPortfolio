@@ -26,9 +26,9 @@ export function realImage<TImage extends { url: string }>(
 export type FallbackImage = Readonly<{ url: string }> | null;
 
 /* The picture to hang in one slot: the slot's own, or the stand-in when it has
-   none and one has been uploaded. `alt` describes the slot, not the stand-in -
-   what the visitor is looking at is this collaborator, this polaroid, this
-   scene, whichever picture ends up filling it. */
+   none and one has been uploaded. `alt` is only the default for the slot's own
+   picture. The stand-in is a generic image, not this person, polaroid or scene,
+   so it is decorative (empty alt) rather than described as one. */
 export function imageOrFallback(
   image: Readonly<{ url: string; alt?: string }> | null | undefined,
   fallback: FallbackImage,
@@ -36,5 +36,5 @@ export function imageOrFallback(
 ): Readonly<{ url: string; alt: string }> | null {
   const own = realImage(image);
   if (own) return { url: own.url, alt: own.alt ?? alt };
-  return fallback ? { url: fallback.url, alt } : null;
+  return fallback ? { url: fallback.url, alt: "" } : null;
 }

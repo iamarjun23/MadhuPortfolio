@@ -45,6 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "/",
       ...(shareImage ? { images: [shareImage] } : {}),
     },
+    /* Only the card type: X reads the title, description and image from each page's og: tags
+       when the twitter: ones are absent, so the pages need nothing extra and cannot drift. */
+    twitter: { card: shareImage ? "summary_large_image" : "summary" },
   };
 }
 
