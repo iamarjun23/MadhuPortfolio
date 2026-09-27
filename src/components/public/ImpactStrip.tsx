@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
 import { realImage } from "@/lib/placeholders";
+import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Impact } from "@/schemas";
 
@@ -154,7 +155,9 @@ export function ImpactStrip({
                       [
                         isActive ? "is-active" : "",
                         dragFrom === workedIndex ? "is-dragging" : "",
-                        dragOver === workedIndex && dragFrom !== workedIndex ? "is-drop-target" : "",
+                        dragOver === workedIndex && dragFrom !== workedIndex
+                          ? "is-drop-target"
+                          : "",
                       ]
                         .filter(Boolean)
                         .join(" ") || undefined
@@ -164,6 +167,9 @@ export function ImpactStrip({
                         ? onSelectCollaborator(workedIndex)
                         : setActiveIndex(isActive ? null : index)
                     }
+                    // Fires on hover, and on a touch before its click.
+                    onPointerEnter={image ? () => preloadViewerPhoto(image.url) : undefined}
+                    onFocus={image ? () => preloadViewerPhoto(image.url) : undefined}
                     {...(onMoveCollaborator
                       ? {
                           draggable: true,
@@ -218,13 +224,14 @@ export function ImpactStrip({
           </div>
           {activePerson && activeImage ? (
             <>
+              {/* Same pop-up as the Drawing Room's photo viewer (the mood-player styles). */}
               <div
-                className="impact__preview-scrim"
+                className="mood-player__scrim"
                 aria-hidden="true"
                 onClick={() => setActiveIndex(null)}
               />
               <div
-                className="impact__preview"
+                className="mood-player mood-player--photo"
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${activePerson.name} preview`}
@@ -233,25 +240,33 @@ export function ImpactStrip({
               >
                 <button
                   type="button"
-                  className="impact__preview-close"
+                  className="mood-player__close"
                   onClick={() => setActiveIndex(null)}
                   aria-label="Close"
                 >
                   &times;
                 </button>
-                <span className="impact__preview-photo">
+                <div className="mood-player__media mood-player__media--photo">
+                  {/* Nominal size only: the CSS lets the photo take its own natural shape. */}
                   <MediaImage
                     src={activeImage.url}
                     alt={activeImage.alt}
-                    width={760}
-                    height={760}
-                    sizes="(max-width: 900px) 60vw, 380px"
+                    width={1600}
+                    height={1200}
+                    sizes={PHOTO_VIEWER_SIZES}
                   />
-                </span>
-                <div className="impact__preview-copy">
-                  <em>{data.detailLabel}</em>
-                  <b>{activePerson.name}</b>
-                  <span>{activePerson.context}</span>
+                </div>
+                <div className="mood-player__copy">
+                  <span className="mood-player__source">
+                    <i aria-hidden="true" />
+                    Photograph
+                  </span>
+                  <small>{data.detailLabel}</small>
+                  <h3>{activePerson.name}</h3>
+                  {activePerson.context ? <p>{activePerson.context}</p> : null}
+                  <span className="mood-player__hint" aria-hidden="true">
+                    Esc to close
+                  </span>
                 </div>
               </div>
             </>

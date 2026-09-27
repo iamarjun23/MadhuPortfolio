@@ -27,9 +27,16 @@ export function ClientsMarquee({ data }: Readonly<{ data: Clients }>) {
               <li key={`${client.name}-${i}`} aria-hidden={i >= data.clients.length || undefined}>
                 {logo ? (
                   // Nominal size only: the CSS sets the height and keeps the logo's own shape.
-                  <MediaImage src={logo.url} alt="" width={160} height={72} sizes="80px" />
+                  // Named clients read out via the span; a logo-only client needs its own alt.
+                  <MediaImage
+                    src={logo.url}
+                    alt={client.name ? "" : "Client logo"}
+                    width={160}
+                    height={72}
+                    sizes="160px"
+                  />
                 ) : null}
-                <span>{client.name}</span>
+                {client.name ? <span>{client.name}</span> : null}
               </li>
             );
           })}

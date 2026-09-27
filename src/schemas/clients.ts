@@ -6,7 +6,8 @@ export const ClientsSchema = z.object({
   clients: z
     .array(
       z.object({
-        name: z.string().min(1).max(60),
+        // Optional: wordmark logos already carry the name.
+        name: z.string().trim().max(60).default(""),
         logo: z.object({ url: ImageUrlSchema }),
       }),
     )

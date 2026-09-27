@@ -53,7 +53,9 @@ export function AboutBlock({
                 src={portraitImage.url}
                 alt={portraitImage.alt}
                 fill
-                sizes="(max-width: 900px) min(100vw, 420px), 40vw"
+                // The 3:4 frame crops a 16:9 photo to its middle, which needs ~2.4x the
+                // frame's width to stay sharp; the frame is min(100vw, 420px) / max 520px.
+                sizes="(max-width: 900px) min(240vw, 1000px), 1240px"
               />
             ) : portraitVideo ? (
               <video

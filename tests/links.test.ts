@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 // media.ts reads the upload domain when it loads, so set it before importing.
 process.env.NEXT_PUBLIC_MEDIA_URL = "https://media.example.com";
+process.env.NEXT_PUBLIC_SITE_URL = "https://site.example.com";
 const { ExternalLinkSchema, InternalLinkSchema, LinkSchema } = await import("@/schemas/links");
 const { DocumentUrlSchema, ImageUrlSchema, VideoUrlSchema } = await import("@/schemas/media");
 const { ContactSchema } = await import("@/schemas");
@@ -72,4 +73,37 @@ test("contact phone is empty or international with 8-15 digits", () => {
   ]) {
     assert.equal(phone(bad), false, bad);
   }
+});
+
+test("footer WhatsApp number shares the phone rules and has a placeholder", () => {
+  const whatsapp = ContactSchema.shape.socials.shape.whatsapp;
+  // Missing becomes the placeholder, so the Studio form always has the field to render.
+  assert.equal(whatsapp.parse(undefined), "+91 98765 43210");
+  assert.equal(whatsapp.parse(""), "");
+  assert.equal(whatsapp.safeParse("98765 43210").success, false);
+});
+
+test("only uploaded videos get a Cloudflare media transformation address", async () => {
+  const { transformedVideoSrc } = await import("@/lib/media-src");
+  assert.equal(
+    transformedVideoSrc("https://media.example.com/heroVideo/abc", "mode=frame,time=0s"),
+    "https://media.example.com/cdn-cgi/media/mode=frame,time=0s/heroVideo/abc",
+  );
+  assert.equal(transformedVideoSrc("https://videos.pexels.com/x.mp4", "mode=video"), null);
+});
+
+test("the image loader resizes uploads and our thumbnail routes, nothing else", async () => {
+  const { default: loader } = await import("@/lib/image-loader");
+  const thumb = "/api/linkedin-thumb?url=https%3A%2F%2Fwww.linkedin.com%2Fposts%2Fx";
+  assert.equal(
+    loader({ src: thumb, width: 384 }),
+    `https://media.example.com/cdn-cgi/image/width=384,quality=90,format=auto/https://site.example.com${thumb}`,
+  );
+  assert.equal(
+    loader({ src: "https://media.example.com/reelCover/a", width: 256 }),
+    "https://media.example.com/cdn-cgi/image/width=256,quality=90,format=auto/reelCover/a",
+  );
+  const youtube = "https://i.ytimg.com/vi/x/hqdefault.jpg";
+  assert.equal(loader({ src: youtube, width: 384 }), youtube);
+  assert.equal(loader({ src: "/api/other?x=1", width: 384 }), "/api/other?x=1");
 });

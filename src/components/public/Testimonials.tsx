@@ -26,6 +26,8 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
           <div className="testimonials__track" style={{ animationDuration: `${duration}s` }}>
             {[...set, ...set].map((quote, i) => {
               const image = realImage(quote.image);
+              // Repeated copies of a quote keep its scene number.
+              const scene = String((i % data.quotes.length) + 1).padStart(2, "0");
               return (
                 // Only the first copy is read out; the rest exist for the loop.
                 <figure
@@ -33,8 +35,25 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
                   key={`${quote.id}-${i}`}
                   aria-hidden={i >= data.quotes.length || undefined}
                 >
-                  <blockquote>{quote.quote}</blockquote>
+                  <div className="testimonials__slate" aria-hidden="true">
+                    <div>
+                      <span>Roll</span>A01
+                    </div>
+                    <div>
+                      <span>Scene</span>
+                      {scene}
+                    </div>
+                    <div>
+                      <span>Take</span>01
+                    </div>
+                  </div>
+                  <blockquote>
+                    <span>{quote.quote}</span>
+                  </blockquote>
                   <figcaption>
+                    <span className="testimonials__dir" aria-hidden="true">
+                      Dir.
+                    </span>
                     <span className="testimonials__avatar">
                       {image ? (
                         // Decorative: the name is printed right beside it.

@@ -723,12 +723,19 @@ const fieldRules: readonly FieldRule[] = [
     key: "socials",
     doc: {
       label: "Social links",
-      hint: "Full https:// addresses. Leave one empty to hide that icon.",
+      hint: "The icons in the footer. Full https:// addresses, plus your WhatsApp number. Leave one empty to hide that icon.",
     },
   },
   { key: "linkedin", doc: { label: "LinkedIn URL" } },
   { key: "instagram", doc: { label: "Instagram URL" } },
   { key: "youtube", doc: { label: "YouTube URL" } },
+  {
+    key: "whatsapp",
+    doc: {
+      label: "WhatsApp number",
+      hint: "Start with + and the country code, e.g. +91 98765 43210. The footer icon opens a chat with this number.",
+    },
+  },
   { key: "footerStatus", doc: { label: "Footer status line" } },
   { key: "footerTagline", doc: { label: "Footer tagline" } },
 

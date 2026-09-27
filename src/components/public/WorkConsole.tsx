@@ -2,7 +2,8 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
-import { EMBED_SANDBOX, reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
+import { preconnectReelHosts, ReelEmbed } from "@/components/public/ReelEmbed";
+import { reelBadge, reelSourceLabel, reelThumbnail, resolveReel } from "@/lib/reel";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Work } from "@/schemas";
 
@@ -185,6 +186,7 @@ export function WorkConsole({
      is null on "All work", whose order is kept apart from the categories. */
   onReorderProjects?: (laneLabel: string | null, fromId: string, toId: string) => void;
 }>) {
+  preconnectReelHosts();
   const [activeLane, setActiveLane] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
   // The freeform canvas is a desktop flourish; a phone always gets the grid.
@@ -460,7 +462,6 @@ export function WorkConsole({
               alt={`${project.title} still`}
               fill
               sizes={sizes}
-              unoptimized={reel.kind !== "youtube"}
               onError={
                 reel.thumbnailCanFail
                   ? () =>
@@ -776,13 +777,14 @@ export function WorkConsole({
           </div>
           {preview ? (
             <>
+              {/* Same pop-up as the Drawing Room's card viewer (the mood-player styles). */}
               <div
-                className="work__preview-scrim"
+                className="mood-player__scrim"
                 aria-hidden="true"
                 onClick={() => setPreview(null)}
               />
               <div
-                className="work__preview"
+                className={`mood-player mood-player--${previewReel?.kind ?? "none"}`}
                 role="dialog"
                 aria-modal="true"
                 aria-label={`${preview.project.title} preview`}
@@ -791,18 +793,14 @@ export function WorkConsole({
               >
                 <button
                   type="button"
-                  className="work__preview-close"
+                  className="mood-player__close"
                   onClick={() => setPreview(null)}
                   aria-label="Close video preview"
                 >
                   &times;
                 </button>
                 <div
-                  className={`work__preview-media work__preview-media--${previewReel?.kind ?? "none"}${
-                    previewReel?.kind === "linkedin" || previewReel?.kind === "instagram"
-                      ? " work__preview-media--post"
-                      : ""
-                  }`}
+                  className={`mood-player__media mood-player__media--${previewReel?.kind ?? "none"}`}
                 >
                   {previewReel?.file ? (
                     <video
@@ -813,36 +811,42 @@ export function WorkConsole({
                       playsInline
                     />
                   ) : previewReel?.embed ? (
-                    <iframe
+                    <ReelEmbed
+                      key={previewReel.embed}
                       src={previewReel.embed}
                       title={`${preview.project.title} video`}
                       allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      sandbox={EMBED_SANDBOX}
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
+                      still={previewReel.thumbnail}
+                      stillSizes="200px"
                     />
                   ) : (
-                    <div className="work__preview-unavailable">
+                    <div className="mood-player__unavailable">
                       <span>{data.previewUnavailableLabel}</span>
-                      {preview.project.href ? (
-                        <a href={preview.project.href} target="_blank" rel="noreferrer">
-                          Open {preview.project.hrefLabel ?? "project"}{" "}
-                          <span aria-hidden="true">↗</span>
-                        </a>
-                      ) : null}
                     </div>
                   )}
                 </div>
-                <div className="work__preview-copy">
+                <div className="mood-player__copy">
+                  <span className="mood-player__source">
+                    <i aria-hidden="true" />
+                    {reelSourceLabel(previewReel?.kind ?? "none")}
+                  </span>
                   <small>{preview.laneLabel}</small>
                   <h3>{preview.project.title}</h3>
-                  <p>{preview.project.subtitle}</p>
+                  {preview.project.subtitle ? <p>{preview.project.subtitle}</p> : null}
                   {preview.project.href ? (
-                    <a href={preview.project.href} target="_blank" rel="noreferrer">
+                    <a
+                      className="mood-player__cta"
+                      href={preview.project.href}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       {preview.project.hrefLabel ?? "Watch full video"}{" "}
-                      <span aria-hidden="true">&rarr;</span>
+                      <span aria-hidden="true">&#8599;</span>
                     </a>
                   ) : null}
+                  <span className="mood-player__hint" aria-hidden="true">
+                    Esc to close
+                  </span>
                 </div>
               </div>
             </>

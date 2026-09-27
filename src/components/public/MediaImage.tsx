@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { isUploadedMediaSrc } from "@/lib/media-src";
+import { loaderSourceUrl } from "@/lib/media-src";
 
 type MediaImageProps = Readonly<{
   src: string;
@@ -12,22 +12,15 @@ type MediaImageProps = Readonly<{
   // back to its gradient when a fetched preview (a LinkedIn thumbnail, say)
   // does not resolve to a real image.
   onError?: () => void;
-  // Skips next/image's own optimizer. Needed for a source whose query string
-  // next/image will not touch without it being named in `images.localPatterns`
-  // - our own LinkedIn thumbnail route carries a different `url=` on every
-  // card, so it cannot be named there. The route already returns a
-  // reasonably-sized image with its own long cache lifetime, so there is
-  // nothing left for the optimizer to usefully do anyway.
-  unoptimized?: boolean;
   // For an image inside a draggable card, so dragging moves the card, not the picture.
   draggable?: boolean;
   className?: string;
 }>;
 
-/* Uploads go through the Cloudflare loader (src/lib/image-loader.ts), which asks for each
-   one at the width the layout needs instead of shipping the multi-megabyte original. Any
-   other source - a YouTube still, our own LinkedIn/Instagram thumbnail route - is served as
-   it is: those are already small, and next/image's built-in optimizer would resize them on
+/* Uploads and our LinkedIn/Instagram thumbnail routes go through the Cloudflare loader
+   (src/lib/image-loader.ts), which asks for each one at the width the layout needs instead
+   of shipping the full-size original. Any other source - a YouTube still - is served as it
+   is: those are already small, and next/image's built-in optimizer would resize them on
    the Worker's CPU budget. */
 export function MediaImage({
   src,
@@ -37,11 +30,10 @@ export function MediaImage({
   width,
   height,
   onError,
-  unoptimized,
   draggable,
   className,
 }: MediaImageProps) {
-  const skipLoader = unoptimized || !isUploadedMediaSrc(src);
+  const skipLoader = !loaderSourceUrl(src);
   return fill ? (
     <Image
       src={src}

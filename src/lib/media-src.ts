@@ -15,3 +15,23 @@ export function uploadKey(src: string) {
 export function isUploadedMediaSrc(src: string) {
   return uploadKey(src) !== null;
 }
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+const thumbRoutes = ["/api/linkedin-thumb?", "/api/instagram-thumb?"];
+
+/** What the Cloudflare image loader resizes `src` from - an upload's R2 key, or the live
+    site's full address for one of our thumbnail routes - or null when it cannot resize it.
+    The routes answer ~1s later on every request, as the Worker's responses are not cached
+    at the edge; a transformation is. Without NEXT_PUBLIC_SITE_URL they are served as-is. */
+export function loaderSourceUrl(src: string) {
+  if (siteUrl && thumbRoutes.some((route) => src.startsWith(route))) return `${siteUrl}${src}`;
+  return uploadKey(src);
+}
+
+/** An uploaded video run through Cloudflare Media Transformations - a still frame
+    (`mode=frame,...`) or a smaller re-encode (`mode=video,...`), each cached at the edge -
+    or null for any other source. */
+export function transformedVideoSrc(src: string, options: string) {
+  const key = uploadKey(src);
+  return mediaUrl && key ? `${mediaUrl}/cdn-cgi/media/${options}/${key}` : null;
+}

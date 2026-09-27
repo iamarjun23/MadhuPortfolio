@@ -54,7 +54,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function PublicLayout({ children }: PublicLayoutProps) {
   const [contact, settings] = await Promise.all([getContact(), getSettings()]);
   const siteUrl = getSiteUrl(settings.domain).toString();
-  const sameAs = Object.values(contact.socials).filter((value): value is string => Boolean(value));
+  const { linkedin, instagram, youtube } = contact.socials;
+  const sameAs = [linkedin, instagram, youtube].filter((value): value is string => Boolean(value));
   const jsonLd = JSON.stringify([
     {
       "@context": "https://schema.org",

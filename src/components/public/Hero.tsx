@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { isUploadedMediaSrc } from "@/lib/media-src";
+import { isUploadedMediaSrc, transformedVideoSrc } from "@/lib/media-src";
 import { initialTimecode, useTimecode } from "@/lib/use-timecode";
 import type { Hero as HeroData } from "@/schemas";
 
@@ -19,6 +19,14 @@ export function Hero({ data }: HeroProps) {
   const timecodeRef = useTimecode();
   const parallaxRef = useRef({ allowed: false, frame: 0, x: 0, y: 0 });
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
+  /* An uploaded poster wins. Otherwise an uploaded video supplies its own first frame, so the
+     still always matches the clip (an external stock poster would not, and can go dead). */
+  const uploadedPoster =
+    data.bgVideo.poster && isUploadedMediaSrc(data.bgVideo.poster) ? data.bgVideo.poster : null;
+  const poster =
+    uploadedPoster ??
+    transformedVideoSrc(data.bgVideo.url, "mode=frame,time=0s,width=1280") ??
+    data.bgVideo.poster;
 
   /* The background video runs to tens of megabytes, and an autoplaying <video> starts
      downloading the moment it is parsed, whatever `preload` says - competing with the
@@ -29,7 +37,17 @@ export function Hero({ data }: HeroProps) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let cancelPending = () => {};
-    const attach = () => setVideoSrc(data.bgVideo.url);
+    /* An upload is swapped for an edge-cached re-encode: the originals run to ~20 Mbit/s, and
+       R2's own responses are not cached at the edge. 1920 keeps full HD on desktop at about
+       half the bytes; phones get 1280, about a fifth. `screen` rather than `innerWidth`, since
+       the public layout pins phones to a 1280px viewport. */
+    const attach = () =>
+      setVideoSrc(
+        transformedVideoSrc(
+          data.bgVideo.url,
+          `mode=video,width=${window.screen.width > 900 ? 1920 : 1280}`,
+        ) ?? data.bgVideo.url,
+      );
     // Safari has no requestIdleCallback; a short timeout after `load` is close enough there.
     const whenIdle = () => {
       if (typeof window.requestIdleCallback === "function") {
@@ -123,16 +141,18 @@ export function Hero({ data }: HeroProps) {
         <div className="hero__fallback" />
         {/* The first thing a visitor sees, so it is preloaded from <head> at high priority and
             becomes the LCP element; the video, attached after load, covers it from its first frame. */}
-        {data.bgVideo.poster ? (
+        {poster ? (
           <Image
             className="hero__poster"
-            src={data.bgVideo.poster}
+            src={poster}
             alt=""
             fill
             sizes="100vw"
             preload
             fetchPriority="high"
-            unoptimized={!isUploadedMediaSrc(data.bgVideo.poster)}
+            // Only an uploaded poster can go through the image loader; Cloudflare will not
+            // resize a video frame a second time.
+            unoptimized={!uploadedPoster}
           />
         ) : null}
         <video
@@ -143,6 +163,8 @@ export function Hero({ data }: HeroProps) {
           playsInline
           preload="none"
           src={videoSrc ?? undefined}
+          // If the re-encode fails (say, a source past Cloudflare's size limit), play the original.
+          onError={() => setVideoSrc((current) => (current ? data.bgVideo.url : current))}
         />
         {data.bgVideo.duotone ? <div className="hero__tint" /> : null}
         <div className="hero__scrim" />

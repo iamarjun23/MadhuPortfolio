@@ -391,6 +391,7 @@ button {
     0 0 10px var(--green);
   content: "";
   transform: translate(-50%, -50%);
+  animation: blip 1.3s ease-in-out infinite;
 }
 
 .brand__caption-track {
@@ -1282,6 +1283,7 @@ button {
   border-radius: 50%;
   background: var(--green);
   box-shadow: 0 0 8px var(--green);
+  animation: blip 1.3s ease-in-out infinite;
 }
 .tags {
   display: flex;
@@ -1510,136 +1512,6 @@ button {
   font-weight: 400;
   letter-spacing: 0.02em;
   overflow-wrap: break-word;
-}
-
-.impact__preview-scrim {
-  position: fixed;
-  z-index: 9;
-  inset: 0;
-  background:
-    radial-gradient(
-      circle at 20% 15%,
-      color-mix(in srgb, var(--accent) 24%, transparent),
-      transparent 34%
-    ),
-    radial-gradient(
-      circle at 82% 76%,
-      color-mix(in srgb, var(--accent) 14%, transparent),
-      transparent 38%
-    ),
-    rgba(0, 0, 0, 0.58);
-  cursor: pointer;
-  backdrop-filter: blur(16px) saturate(82%);
-  -webkit-backdrop-filter: blur(16px) saturate(82%);
-  animation: work-scrim-in 0.28s var(--e-cut) both;
-}
-.impact__preview {
-  position: fixed;
-  z-index: 10;
-  top: 50%;
-  left: 50%;
-  display: flex;
-  flex-direction: column;
-  width: max-content;
-  max-width: calc(100% - 2rem);
-  max-height: calc(100% - 2rem);
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, rgba(255, 255, 255, 0.4));
-  border-radius: var(--r-lg);
-  background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.14), transparent 38%),
-    linear-gradient(300deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%),
-    color-mix(in srgb, var(--surface) 74%, transparent);
-  backdrop-filter: blur(28px) saturate(150%);
-  -webkit-backdrop-filter: blur(28px) saturate(150%);
-  box-shadow:
-    0 32px 80px rgba(0, 0, 0, 0.68),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transform: translate(-50%, -50%);
-  animation: work-preview-in 0.32s var(--e-reveal) both;
-}
-/* Auto-adjusts to the photo's own aspect ratio and to the viewport, instead of
-   forcing every image into the same cropped box. */
-.impact__preview-photo {
-  display: block;
-  flex: 1 1 auto;
-  min-height: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
-}
-.impact__preview-photo img {
-  display: block;
-  width: auto;
-  height: auto;
-  max-width: min(80vw, 520px);
-  max-height: min(72vh, 520px);
-  object-fit: contain;
-}
-.impact__preview-copy {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  flex-direction: column;
-  flex: 0 0 auto;
-  min-width: 0;
-  padding: clamp(1.25rem, 3.5vw, 2rem) clamp(1.75rem, 3.5vw, 2.75rem);
-  overflow-y: auto;
-}
-.impact__preview-copy em {
-  margin-bottom: 0.8rem;
-  color: var(--accent-text);
-  font-family: var(--f-mono);
-  font-size: 0.65rem;
-  font-style: normal;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.impact__preview-copy b {
-  display: block;
-  max-width: 22ch;
-  font-family: var(--f-display);
-  font-size: clamp(1.5rem, 2.4vw, 2.05rem);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.05;
-}
-.impact__preview-copy span {
-  margin-top: 0.85rem;
-  color: var(--text-2);
-  font-family: var(--f-mono);
-  font-size: 0.82rem;
-  letter-spacing: 0.03em;
-}
-.impact__preview-close {
-  position: absolute;
-  z-index: 2;
-  top: 0.8rem;
-  right: 0.8rem;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 50%;
-  background: rgba(8, 14, 19, 0.52);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--text);
-  font-size: 1.1rem;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    background 0.25s var(--e-cut),
-    border-color 0.25s var(--e-cut);
-}
-.impact__preview-close:hover,
-.impact__preview-close:focus-visible {
-  border-color: transparent;
-  background: var(--accent);
-  color: var(--on-accent);
-}
-@media (prefers-reduced-motion: reduce) {
-  .impact__preview,
-  .impact__preview-scrim {
-    animation: none;
-  }
 }
 
 @media (max-width: 900px) {
@@ -2293,169 +2165,6 @@ button {
     animation-play-state: paused;
   }
 }
-
-/* The dialog is sized from the visible viewport, never from fixed pixels: the
-   width tracks the window up to a readable cap and the height falls out of the
-   16:9 media pane, so the video keeps its aspect ratio on any screen. */
-.work__preview {
-  position: fixed;
-  z-index: 10;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(clamp(15rem, 20vw, 19rem), 0.85fr);
-  /* The third term keeps the 16:9 media pane inside a short window: the pane is
-     ~0.63 of the dialog, so a dialog wider than 2.8x the free height would push
-     the video past the bottom edge. */
-  width: min(1180px, calc(100vw - 3rem), calc((100dvh - 3rem) * 2.8));
-  height: auto;
-  max-height: calc(100dvh - 3rem);
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--ember-400) 72%, rgba(255, 255, 255, 0.5));
-  border-radius: var(--r-lg);
-  background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.16), transparent 38%),
-    linear-gradient(300deg, rgba(226, 104, 46, 0.12), transparent 46%), rgba(13, 20, 26, 0.52);
-  backdrop-filter: blur(32px) saturate(160%);
-  -webkit-backdrop-filter: blur(32px) saturate(160%);
-  box-shadow:
-    0 32px 90px rgba(0, 0, 0, 0.72),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transform: translate(-50%, -50%);
-  user-select: text;
-  animation: work-preview-in 0.32s var(--e-reveal) both;
-}
-@keyframes work-preview-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -46%) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
-}
-@keyframes work-scrim-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-.work__preview-scrim {
-  position: fixed;
-  z-index: 9;
-  inset: 0;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(255, 106, 0, 0.2), transparent 34%),
-    radial-gradient(circle at 82% 76%, rgba(255, 138, 51, 0.1), transparent 38%),
-    rgba(0, 0, 0, 0.58);
-  cursor: pointer;
-  backdrop-filter: blur(16px) saturate(82%);
-  -webkit-backdrop-filter: blur(16px) saturate(82%);
-  animation: work-scrim-in 0.28s var(--e-cut) both;
-}
-.work__preview-close {
-  position: absolute;
-  z-index: 2;
-  top: 0.8rem;
-  right: 0.8rem;
-  width: 38px;
-  height: 38px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 50%;
-  background: rgba(8, 14, 19, 0.52);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--ink-100);
-  font-size: 1.25rem;
-  cursor: pointer;
-  transition:
-    background 0.25s var(--e-cut),
-    border-color 0.25s var(--e-cut);
-}
-.work__preview-close:hover,
-.work__preview-close:focus-visible {
-  border-color: transparent;
-  background: var(--accent);
-  color: var(--on-accent);
-}
-.work__preview-media {
-  display: grid;
-  /* A definite grid row (the narrow stacked layouts below) wins over this ratio,
-     so the video shrinks to fit instead of overflowing the dialog and getting
-     clipped; with no such row (the two-column desktop layout) the percentages
-     are indefinite and the ratio governs the size as before. */
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  aspect-ratio: 16 / 9;
-  place-items: center;
-  overflow: hidden;
-  background: rgba(3, 6, 9, 0.86);
-  color: var(--ink-400);
-  font-family: var(--f-mono);
-}
-.work__preview-media video {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.work__preview-unavailable {
-  display: grid;
-  justify-items: center;
-  gap: 1rem;
-  padding: 2rem;
-  text-align: center;
-}
-.work__preview-unavailable a {
-  color: var(--ember-400);
-  font-family: var(--f-mono);
-  font-size: 0.72rem;
-}
-.work__preview-copy {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  padding: clamp(2.5rem, 4vw, 3.5rem) clamp(1.25rem, 3vw, 2.25rem) 1.5rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(12, 18, 23, 0.34);
-  backdrop-filter: blur(16px) saturate(125%);
-  -webkit-backdrop-filter: blur(16px) saturate(125%);
-}
-.work__preview-copy small {
-  color: var(--ember-400);
-  font-family: var(--f-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.work__preview-copy h3 {
-  max-width: 16ch;
-  margin: 0.65rem 0 0;
-  color: #fff;
-  font-size: clamp(1.35rem, 2.1vw, 2.05rem);
-  line-height: 1.02;
-  overflow-wrap: anywhere;
-  text-wrap: balance;
-}
-.work__preview-copy p {
-  margin: 0.85rem 0 1.4rem;
-  color: var(--ink-300);
-  font-size: 0.95rem;
-  line-height: 1.45;
-}
-.work__preview-copy a {
-  color: var(--ember-400);
-  font-family: var(--f-mono);
-  font-size: 0.72rem;
-}
 .work__panel footer {
   display: flex;
   flex-wrap: wrap;
@@ -2503,72 +2212,99 @@ button {
     transform: translateX(-50%);
   }
 }
+/* Each card is a clapperboard: striped sticks, a slate, then the quote burned in
+   like subtitles over a dark viewer. */
 .testimonials figure {
   position: relative;
   display: flex;
-  flex: 0 0 480px;
+  flex: 0 0 min(480px, 85vw);
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 170px;
-  padding: 2.4rem 1.7rem 1.4rem;
-  overflow: hidden;
-  /* Gradient hairline border: warm at the top-left, fading to near-invisible. */
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  background:
-    radial-gradient(120% 90% at 0% 0%, rgba(255, 106, 0, 0.09), transparent 55%) padding-box,
-    linear-gradient(180deg, var(--ink-850), color-mix(in srgb, var(--ink-850) 70%, #000)) padding-box,
-    linear-gradient(
-        150deg,
-        rgba(255, 154, 61, 0.45),
-        rgba(255, 255, 255, 0.06) 40%,
-        rgba(255, 255, 255, 0.03) 70%,
-        rgba(255, 154, 61, 0.18)
-      )
-      border-box;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 24px 48px -28px rgba(0, 0, 0, 0.9);
+  background: var(--ink-850);
+  box-shadow: 0 24px 48px -28px rgba(0, 0, 0, 0.9);
   transition:
     transform 0.35s var(--e-reveal),
     box-shadow 0.35s var(--e-reveal),
     border-color 0.25s var(--e-cut);
 }
-/* Oversized opening quote mark as a quiet watermark. */
+/* Clapper base, with the hinged top stick laid over it. */
+.testimonials figure::before,
+.testimonials figure::after {
+  content: "";
+  height: 18px;
+  border-radius: calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px) 0 0;
+}
 .testimonials figure::before {
-  content: "\201C";
+  flex: none;
+  border-bottom: 2px solid var(--ink-950);
+  background: repeating-linear-gradient(45deg, var(--paper-100) 0 12px, var(--ink-950) 12px 24px);
+}
+.testimonials figure::after {
   position: absolute;
-  top: -0.9rem;
-  left: 1.2rem;
-  background: linear-gradient(180deg, var(--ember-400), transparent 85%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 5.5rem;
-  line-height: 1;
-  opacity: 0.55;
-  pointer-events: none;
+  top: 0;
+  right: 0;
+  left: 0;
+  transform-origin: 0 100%;
+  background: repeating-linear-gradient(-45deg, var(--paper-100) 0 12px, var(--ink-950) 12px 24px);
+}
+.testimonials__slate {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--border);
+  background: var(--ink-900);
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+}
+.testimonials__slate > div {
+  padding: 0.45rem 0.8rem;
+}
+.testimonials__slate > div + div {
+  border-left: 1px solid var(--border);
+}
+.testimonials__slate > div:last-child {
+  color: var(--ember-400);
+}
+.testimonials__slate span {
+  display: block;
+  color: var(--paper-600);
+  font-size: 0.62rem;
+  text-transform: uppercase;
 }
 .testimonials blockquote {
-  position: relative;
-  color: var(--paper-200);
+  margin: auto 0;
+  padding: 1.5rem 1.4rem;
+  text-align: center;
+}
+.testimonials blockquote span {
+  padding: 0.12em 0.5em;
+  background: rgba(0, 0, 0, 0.82);
+  color: var(--text);
   font-family: var(--f-display);
-  font-size: 1.12rem;
-  font-weight: 400;
-  line-height: 1.6;
-  letter-spacing: 0.005em;
+  font-size: 1.02rem;
+  line-height: 1.9;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 .testimonials figcaption {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  margin-top: 1.6rem;
-  padding-top: 1.1rem;
-  border-top: 1px solid transparent;
-  border-image: linear-gradient(90deg, rgba(255, 154, 61, 0.35), transparent 75%) 1;
+  padding: 0.8rem 1.1rem;
+  border-top: 1px solid var(--border);
+  border-radius: 0 0 calc(var(--r-lg) - 1px) calc(var(--r-lg) - 1px);
+  background: var(--ink-900);
 }
-.testimonials figcaption > span {
+.testimonials__dir {
+  color: var(--paper-600);
+  font-family: var(--f-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.testimonials__avatar {
   display: grid;
   flex-shrink: 0;
   width: 40px;
@@ -2577,14 +2313,14 @@ button {
   border-radius: 50%;
   background: linear-gradient(140deg, var(--ember-400), var(--accent));
   box-shadow:
-    0 0 0 2px var(--ink-850),
+    0 0 0 2px var(--ink-900),
     0 0 0 3px rgba(255, 154, 61, 0.45);
   color: var(--on-accent);
   font-family: var(--f-mono);
   font-size: 0.7rem;
   overflow: hidden;
 }
-.testimonials figcaption > span img {
+.testimonials__avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -3284,6 +3020,7 @@ button {
   background: var(--green);
   box-shadow: 0 0 9px var(--green);
   content: "";
+  animation: blip 1.3s ease-in-out infinite;
 }
 .contact__links {
   display: flex;
@@ -4252,6 +3989,7 @@ button {
   height: 8px;
   border-radius: 50%;
   background: var(--green);
+  animation: blip 1.3s ease-in-out infinite;
 }
 
 .studio-hero-preview__screen {
@@ -4640,29 +4378,6 @@ button {
   .impact__worked-thumb em {
     font-size: 1rem;
   }
-  .impact__preview {
-    width: calc(100% - 1.5rem);
-    max-height: calc(100% - 1.5rem);
-  }
-  .impact__preview-photo img {
-    max-width: 100%;
-    max-height: 52vh;
-  }
-  .impact__preview-copy {
-    max-height: 11rem;
-    padding: 1rem;
-  }
-  .impact__preview-copy em {
-    display: none;
-  }
-  .impact__preview-copy b {
-    max-width: 100%;
-    font-size: clamp(1.15rem, 5vw, 1.55rem);
-    overflow-wrap: anywhere;
-  }
-  .impact__preview-copy span {
-    margin-top: 0.45rem;
-  }
   .work__panel {
     padding: 1.15rem;
   }
@@ -4712,22 +4427,6 @@ button {
     width: 30px;
     height: 30px;
     opacity: 1;
-  }
-  .work__preview {
-    width: calc(100vw - 1.5rem);
-    height: min(calc(100dvh - 1.5rem), max-content);
-    max-height: calc(100dvh - 1.5rem);
-    grid-template-columns: 1fr;
-    /* The copy row is sized to its own content (never shrunk, never clipped);
-       the video takes whatever is left and letterboxes instead of overflowing
-       the dialog's height cap on a short screen. */
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-  .work__preview-copy {
-    padding: 1rem;
-  }
-  .work__preview-copy h3 {
-    font-size: 1.35rem;
   }
   .experience__intro {
     align-items: flex-start;
@@ -5428,6 +5127,10 @@ button {
   border-bottom: 1px solid var(--border);
   background: var(--bg-subtle);
 }
+/* The marquee is full-bleed, so its heading sits on the page gutter, not the centred column. */
+#top .clients .wrap {
+  max-width: none;
+}
 .clients h2 {
   margin: 0 0 1rem;
 }
@@ -5467,6 +5170,10 @@ button {
   height: 2.25rem;
   object-fit: contain;
 }
+/* Logo-only clients are usually wordmarks: give them the room the name would take. */
+.clients__track li:not(:has(span)) img {
+  max-width: 10rem;
+}
 /* With motion off, a marquee would freeze at its start with the rest clipped.
    Show each item once instead, wrapped onto as many rows as it needs. Kept after
    the base .testimonials and .clients rules, which have the same specificity. */
@@ -5495,68 +5202,6 @@ button {
   }
   :is(.testimonials__track, .clients__track) > [aria-hidden="true"] {
     display: none;
-  }
-}
-
-.work__preview-media iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
-.work__preview-media--post {
-  aspect-ratio: auto;
-  height: min(calc(100dvh - 6rem), 620px);
-  place-items: start stretch;
-  overflow-y: auto;
-  background: #fff;
-}
-.work__preview-media--post iframe {
-  height: 660px;
-  min-height: 100%;
-}
-
-/* Phones and tablets render the page as a scaled 1280px artboard, so width
-   queries stay in desktop mode. Key the dialog off the visible viewport height
-   instead and let it fill the device screen as a stacked sheet. */
-@media (hover: none) and (pointer: coarse) {
-  .work__preview {
-    width: calc(100vw - 2rem);
-    /* Hug the content when there's room; on a short screen max-height wins and
-       the copy row (sized to its own content, below) keeps the video row from
-       forcing the dialog past the screen and getting clipped. */
-    height: auto;
-    max-height: calc(100dvh - 2rem);
-    grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
-  }
-  .work__preview-copy {
-    padding: 1.5rem;
-  }
-  .work__preview-media--post {
-    height: auto;
-    min-height: 0;
-  }
-}
-
-/* Short windows - laptops in landscape, split screens. The width formula above
-   already shrinks the dialog to fit, so here we only trim its own chrome to buy
-   the copy pane back some room. */
-@media (hover: hover) and (max-height: 620px) {
-  .work__preview {
-    max-height: calc(100dvh - 1.5rem);
-  }
-  .work__preview-copy {
-    padding: 2.5rem 1.25rem 1.25rem;
-  }
-  .work__preview-copy p {
-    margin: 0.6rem 0 1rem;
-  }
-  .work__preview-close {
-    top: 0.5rem;
-    right: 0.5rem;
-    width: 32px;
-    height: 32px;
   }
 }
 
@@ -6023,12 +5668,8 @@ button {
    Firefox lacks animation-timeline: view() → elements stay visible (no JS fallback needed). */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .landing > section:not(:first-of-type) h1,
-    .landing > section:not(:first-of-type) h2,
-    .landing > section:not(:first-of-type) h3,
-    .landing > section:not(:first-of-type) p,
-    .landing > section:not(:first-of-type) li,
-    .landing > section:not(:first-of-type) blockquote {
+    /* The pop-up is fixed to the screen, so a scroll-driven reveal would leave its copy hidden. */
+    .landing > section:not(:first-of-type) :is(h1, h2, h3, p, li, blockquote):not(.mood-player *) {
       animation: reveal-up linear both;
       animation-timeline: view();
       animation-range: entry 10% cover 40%;
@@ -6172,10 +5813,12 @@ button {
        track a rail card being carried sideways by its track. */
     /* The Drawing Room teaser sits too near the page end for the range to finish,
        leaving its CTA half-faded and its card untilted. */
-    .landing > section:not(:first-of-type) a[href]:not(.drawing-teaser__link, .drawing-teaser__archive),
     .landing
       > section:not(:first-of-type)
-      button:not(.work__card, .work__rail-card) {
+      a[href]:not(.drawing-teaser__link, .drawing-teaser__archive, .mood-player *),
+    .landing
+      > section:not(:first-of-type)
+      button:not(.work__card, .work__rail-card, .mood-player *) {
       animation: reveal-up linear both;
       animation-timeline: view();
       animation-range: entry 25% cover 45%;
@@ -6236,13 +5879,59 @@ button {
     box-shadow: var(--sh-md);
   }
 
-  /* Keep the gradient hairline; lift with a warm halo instead. */
+  /* Lift with a warm halo on top of the accent border. */
   .testimonials figure:hover {
-    border-color: transparent;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.07),
       0 28px 56px -26px rgba(0, 0, 0, 0.95),
       0 0 0 1px rgba(255, 154, 61, 0.22);
+  }
+}
+
+/* Hovering a testimonial claps its slate: a slow lift, a beat, then a snap shut.
+   The strip gets extra headroom (offset by the negative margin) so the raised
+   stick is not clipped by the marquee. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .testimonials {
+    margin-top: -3rem;
+    padding-top: 3.5rem;
+  }
+
+  .testimonials figure:hover {
+    animation: testimonials-thud 1.6s;
+  }
+
+  .testimonials figure:hover::after {
+    animation: testimonials-clap 1.6s;
+  }
+}
+
+@keyframes testimonials-clap {
+  0% {
+    rotate: 0deg;
+    animation-timing-function: var(--e-reveal);
+  }
+  40%,
+  58% {
+    rotate: -6deg;
+    animation-timing-function: ease-in;
+  }
+  66%,
+  78% {
+    rotate: 0deg;
+  }
+  72% {
+    rotate: -0.8deg;
+  }
+}
+
+@keyframes testimonials-thud {
+  0%,
+  65%,
+  74% {
+    translate: 0 0;
+  }
+  68% {
+    translate: 0 2px;
   }
 }
 
@@ -7644,6 +7333,23 @@ button {
   border: 0;
   object-fit: contain;
   background: #000;
+}
+
+/* An embedded player boots over the card's still (ReelEmbed) instead of a black box,
+   and fades in once its page has loaded. */
+.mood-player__media .mood-player__still {
+  object-fit: cover;
+}
+
+.mood-player__media iframe {
+  position: relative;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.mood-player__media iframe.is-loaded {
+  opacity: 1;
 }
 
 .mood-player__media--linkedin {

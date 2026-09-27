@@ -4,8 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HOME_SCROLL_KEY, RESTORE_HOME_SCROLL_KEY } from "@/components/public/Nav";
 import { MediaImage } from "@/components/public/MediaImage";
+import { preconnectReelHosts, ReelEmbed } from "@/components/public/ReelEmbed";
 import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
-import { EMBED_SANDBOX, reelBadge, reelSourceLabel, resolveReel } from "@/lib/reel";
+import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
+import { reelBadge, reelSourceLabel, resolveReel } from "@/lib/reel";
 import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Contact, Room } from "@/schemas";
 
@@ -41,13 +43,12 @@ function videoCardFace(card: VideoCard, fallbackImage: FallbackImage) {
   const reel = resolveReel(card);
   if (!reel.thumbnail) {
     // The stand-in is not a still from this video, so it is decorative.
-    return fallbackImage ? { url: fallbackImage.url, alt: "", remote: false } : null;
+    return fallbackImage ? { url: fallbackImage.url, alt: "" } : null;
   }
 
   return {
     url: reel.thumbnail,
     alt: card.image?.alt || (card.caption.trim() ? `Still from ${card.caption.trim()}` : ""),
-    remote: reel.thumbnail !== reel.cover,
   };
 }
 
@@ -61,15 +62,7 @@ function cardContent(card: Room["cards"][number], fallbackImage: FallbackImage) 
           {/* No still to show is the tint wash on its own - the card still reads
               as a reel through its label and play badge. */}
           <span className={`mood-card__image ${card.tint}`}>
-            {face ? (
-              <MediaImage
-                src={face.url}
-                alt={face.alt}
-                fill
-                sizes="220px"
-                unoptimized={face.remote}
-              />
-            ) : null}
+            {face ? <MediaImage src={face.url} alt={face.alt} fill sizes="220px" /> : null}
             <span className="mood-card__image-label">{card.tag}</span>
             <span className="mood-card__play" aria-hidden="true">
               {reelBadge(resolveReel(card).kind)}
@@ -149,7 +142,8 @@ function CardViewer({
   onClose,
 }: Readonly<{ card: ViewableCard; fallbackImage: FallbackImage; onClose: () => void }>) {
   const reel = card.type === "video" ? resolveReel(card) : null;
-  const photo = card.type === "polaroid" ? imageOrFallback(card.image, fallbackImage, card.caption) : null;
+  const photo =
+    card.type === "polaroid" ? imageOrFallback(card.image, fallbackImage, card.caption) : null;
   const kind = reel ? reel.kind : "photo";
   const source = reel ? reelSourceLabel(reel.kind) : "Photograph";
   const outbound = card.type === "video" ? card.href : null;
@@ -167,7 +161,12 @@ function CardViewer({
         aria-modal="true"
         aria-label={`${card.caption} preview`}
       >
-        <button className="mood-player__close" type="button" onClick={onClose} aria-label="Close preview">
+        <button
+          className="mood-player__close"
+          type="button"
+          onClick={onClose}
+          aria-label="Close preview"
+        >
           &times;
         </button>
         <div className={`mood-player__media mood-player__media--${kind}`}>
@@ -178,19 +177,24 @@ function CardViewer({
               alt={photo.alt}
               width={1600}
               height={1200}
-              sizes="(max-width: 820px) 92vw, min(64vw, 820px)"
+              sizes={PHOTO_VIEWER_SIZES}
             />
           ) : reel?.file ? (
-            <video src={reel.file} poster={reel.poster ?? undefined} controls autoPlay playsInline />
+            <video
+              src={reel.file}
+              poster={reel.poster ?? undefined}
+              controls
+              autoPlay
+              playsInline
+            />
           ) : reel?.embed ? (
-            <iframe
+            <ReelEmbed
+              key={reel.embed}
               src={reel.embed}
               title={`${card.caption} video`}
-              scrolling="no"
               allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
-              sandbox={EMBED_SANDBOX}
-              referrerPolicy="strict-origin-when-cross-origin"
-              allowFullScreen
+              still={reel.thumbnail}
+              stillSizes="220px"
             />
           ) : (
             <div className="mood-player__unavailable">
@@ -222,6 +226,7 @@ function CardViewer({
 }
 
 export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProps) {
+  preconnectReelHosts();
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
   // The board and card geometry is measured once per drag; re-measuring on
@@ -447,6 +452,12 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     card.type === "video" ||
     (card.type === "polaroid" && !!imageOrFallback(card.image, fallbackImage, card.caption));
 
+  function preloadCardPhoto(card: RoomCard) {
+    if (card.type !== "polaroid") return;
+    const photo = imageOrFallback(card.image, fallbackImage, card.caption);
+    if (photo) preloadViewerPhoto(photo.url);
+  }
+
   function openCard(card: RoomCard) {
     if (!isViewable(card)) return;
     if (draggedRatherThanClicked.current) {
@@ -506,6 +517,9 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
                   rotate: `${position.rot}deg`,
                 }}
                 onPointerDown={(event) => pointerDown(event, card.id)}
+                // Fires on hover, and on a touch before its click.
+                onPointerEnter={() => preloadCardPhoto(card)}
+                onFocus={() => preloadCardPhoto(card)}
                 onPointerMove={pointerMove}
                 onClick={() => openCard(card)}
                 onKeyDown={(event) => {
