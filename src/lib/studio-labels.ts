@@ -49,8 +49,7 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
     media: "One portrait photo, plus an optional portrait video that replaces it.",
   },
   impact: {
-    summary:
-      "The numbers strip and the list of people and brands you have worked with.",
+    summary: "The numbers strip and the list of people and brands you have worked with.",
     media: "One optional photo per collaborator. Without one, the tile shows their initials.",
   },
   clients: {
@@ -82,7 +81,7 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
   },
   resume: {
     summary:
-      "The /resume page the menu's Resume link opens: a heading, a short intro, and your resume shown right on the page with a download button.",
+      "The PDF behind the menu's Resume link: clicking it opens the PDF in a new tab and downloads a copy.",
     media: "One PDF - your resume. Upload a new one any time to replace it.",
   },
   contact: {
@@ -184,7 +183,7 @@ const fieldRules: readonly FieldRule[] = [
     doc: {
       label: "Invitation photo",
       media: "photo",
-      hint: "Fills the tilted invitation card on the home page. Leave empty for a plain card.",
+      hint: "The upright photo on the home page teaser. A portrait (3:4) shot fits best. Leave empty for a plain card.",
     },
   },
   { key: "image", doc: { label: "Photo", media: "photo", hint: "Image shown in this section." } },
@@ -193,19 +192,17 @@ const fieldRules: readonly FieldRule[] = [
     doc: {
       label: "Resume PDF",
       media: "document",
-      hint: "Shown on the Resume page and offered as a download. Until one is uploaded the page shows the waiting message below.",
+      hint: "Opened in a new tab and downloaded when a visitor clicks Resume in the menu. Until one is uploaded the menu hides the Resume link.",
     },
-  },
-  { key: "downloadLabel", doc: { label: "Download button text" } },
-  {
-    key: "emptyMessage",
-    doc: { label: "Waiting message", hint: "Shown on the Resume page while no PDF is uploaded." },
   },
 
   /* ---------- Hero ---------- */
   {
     key: "eyebrow",
-    doc: { label: "Eyebrow line", hint: "The small line of text sitting above the main heading." },
+    doc: {
+      label: "Eyebrow line",
+      hint: "The short label for this section. On the homepage it sits on the timeline strip at the top of the section; the number is added automatically.",
+    },
   },
   { key: "line1", doc: { label: "Headline - first line", hint: "Max 60 characters." } },
   { key: "line2", doc: { label: "Headline - second line", hint: "Max 60 characters." } },
@@ -254,24 +251,30 @@ const fieldRules: readonly FieldRule[] = [
   },
   {
     key: "reelLabel",
-    doc: { label: "Reel slate label", hint: "Film-slate text in the corner of the hero frame." },
+    doc: { label: "Reel slate label", hint: "Top-left label in the hero frame." },
   },
   {
     key: "aspectRatioLabel",
-    doc: { label: "Aspect ratio label", hint: "Decorative frame marking, e.g. 2.39 : 1." },
+    doc: {
+      label: "Aspect ratio label",
+      hint: "Last item in the hero's bottom info row, e.g. 2.39 : 1.",
+    },
   },
-  { key: "creditLine1", doc: { label: "Credit line 1", hint: "First line of the frame credits." } },
+  {
+    key: "creditLine1",
+    doc: { label: "Credit line 1", hint: "Second item in the hero's bottom info row." },
+  },
   {
     key: "creditLine2",
-    doc: { label: "Credit line 2", hint: "Second line of the frame credits." },
+    doc: { label: "Credit line 2", hint: "Third item in the hero's bottom info row." },
   },
   {
     key: "footerLeftLabel",
-    doc: { label: "Frame label - bottom left", hint: "Small decorative label in the hero frame." },
+    doc: { label: "Frame label - bottom left", hint: "First item in the hero's bottom info row." },
   },
   {
     key: "footerRightLabel",
-    doc: { label: "Frame label - bottom right", hint: "Small decorative label in the hero frame." },
+    doc: { label: "Frame label - bottom right", hint: "Right end of the hero's bottom info row." },
   },
   {
     key: "poster",
@@ -560,6 +563,8 @@ const fieldRules: readonly FieldRule[] = [
   { key: "scenesLabel", doc: { label: '"Scenes" word (plural)' } },
   { key: "previousLabel", doc: { label: '"Previous scene" button text' } },
   { key: "nextLabel", doc: { label: '"Next scene" button text' } },
+  { key: "playLabel", doc: { label: '"Play reel" button text' } },
+  { key: "pauseLabel", doc: { label: '"Pause reel" button text' } },
 
   /* ---------- Drawing Room ---------- */
   {
@@ -676,41 +681,36 @@ const fieldRules: readonly FieldRule[] = [
     key: "stamp",
     doc: {
       label: "Stamp text",
-      hint: 'The stamped marking on the teaser, e.g. "Private archive".',
+      hint: 'Small line above the teaser heading, e.g. "Private archive".',
     },
   },
-  { key: "note", doc: { label: "Teaser note", hint: "Small line beside the teaser stamp." } },
-  {
-    key: "invitation",
-    doc: { label: "Invitation label", hint: 'Usually "YOU’RE INVITED".' },
-  },
-  { key: "invitationNote", doc: { label: "Invitation note" } },
 
   /* ---------- Contact ---------- */
   {
     key: "headingAccent",
     doc: { label: "Heading - highlighted part", hint: "This half is drawn in the accent colour." },
   },
-  { key: "projectCtaLabel", doc: { label: '"Start a project" button text' } },
+  {
+    key: "projectCtaLabel",
+    doc: { label: "Email button text", hint: 'The button on the contact card\'s "Email" tab.' },
+  },
+  {
+    key: "emailNote",
+    doc: { label: "Email note", hint: "One line under your email address on the contact card." },
+  },
+  { key: "callbackHeading", doc: { label: "Callback heading" } },
+  {
+    key: "callbackNote",
+    doc: { label: "Callback note", hint: 'One line on the contact card\'s "Callback" tab.' },
+  },
   { key: "callbackCtaLabel", doc: { label: '"Request a callback" button text' } },
-  { key: "bestForLabel", doc: { label: '"Best for" label' } },
   {
-    key: "bestFor",
+    key: "timeZone",
     doc: {
-      label: "Best for - the list",
-      hint: 'The kinds of work you want, e.g. "Podcasts, campaigns, events".',
+      label: "Time zone",
+      hint: 'Sets the local time shown on the contact card, e.g. "Asia/Kolkata".',
     },
   },
-  { key: "availabilityHeading", doc: { label: "Availability heading" } },
-  {
-    key: "availableForFreelance",
-    doc: {
-      label: "Available for freelance",
-      hint: "Switches the availability dot on and off.",
-    },
-  },
-  { key: "availabilityLabel", doc: { label: "Availability text" } },
-  { key: "locationLabel", doc: { label: '"Based in" label' } },
   {
     key: "email",
     doc: {
@@ -718,7 +718,13 @@ const fieldRules: readonly FieldRule[] = [
       hint: "Must be a real address - the contact buttons link to it.",
     },
   },
-  { key: "phone", doc: { label: "Phone number", hint: "Optional." } },
+  {
+    key: "phone",
+    doc: {
+      label: "Phone number",
+      hint: "Optional. Shown as a call button on the contact card's Callback tab.",
+    },
+  },
   {
     key: "socials",
     doc: {
@@ -733,10 +739,16 @@ const fieldRules: readonly FieldRule[] = [
     key: "whatsapp",
     doc: {
       label: "WhatsApp number",
-      hint: "Start with + and the country code, e.g. +91 98765 43210. The footer icon opens a chat with this number.",
+      hint: "Start with + and the country code, e.g. +91 98765 43210. The footer icon and the contact card's Message tab open a chat with this number.",
     },
   },
-  { key: "footerStatus", doc: { label: "Footer status line" } },
+  {
+    key: "footerStatus",
+    doc: {
+      label: "Status line",
+      hint: "Shown in the navbar, on the contact card and in the footer while you are marked available. The switch for that is on the Menu page.",
+    },
+  },
   { key: "footerTagline", doc: { label: "Footer tagline" } },
 
   /* ---------- Site & navigation ---------- */
@@ -813,16 +825,21 @@ const fieldRules: readonly FieldRule[] = [
   },
   { key: "drawingRoomCaption", doc: { label: "Drawing Room caption" } },
   { key: "workLabel", doc: { label: '"Work" menu item' } },
-  { key: "drawingRoomLabel", doc: { label: '"Drawing Room" menu item' } },
-  { key: "resumeLabel", doc: { label: '"Resume" menu item' } },
   {
-    key: "resumeCaption",
+    key: "drawingRoomLabel",
     doc: {
-      label: "Resume page ticker",
-      hint: "The line that runs beside the wordmark while the Resume page is open.",
+      label: '"Drawing Room" menu item',
+      hint: "Also the Drawing Room link in the footer.",
     },
   },
-  { key: "contactLabel", doc: { label: '"Get in touch" menu item' } },
+  { key: "resumeLabel", doc: { label: '"Resume" menu item' } },
+  {
+    key: "contactLabel",
+    doc: {
+      label: '"Get in touch" menu item',
+      hint: "Also the heading above your contact details in the footer.",
+    },
+  },
   { key: "portfolioLabel", doc: { label: '"Portfolio" menu item' } },
   {
     key: "skipLinkLabel",
@@ -847,7 +864,6 @@ const fieldRules: readonly FieldRule[] = [
   { key: "exploreHeading", doc: { label: '"Explore" heading' } },
   { key: "selectedWorkLabel", doc: { label: '"Selected work" footer link' } },
   { key: "experienceLabel", doc: { label: '"Experience" footer link' } },
-  { key: "contactHeading", doc: { label: '"Get in touch" footer heading' } },
   { key: "copyrightPrefix", doc: { label: "Copyright symbol" } },
   { key: "closingLine", doc: { label: "Closing line", hint: "The last line of the footer." } },
 

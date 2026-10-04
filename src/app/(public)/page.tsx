@@ -8,6 +8,7 @@ import { Hero } from "@/components/public/Hero";
 import { ImpactStrip } from "@/components/public/ImpactStrip";
 import { Testimonials } from "@/components/public/Testimonials";
 import { WorkConsole } from "@/components/public/WorkConsole";
+import { sectionTimeline } from "@/lib/section-timeline";
 import { defaultSiteSettings } from "@/schemas/settings";
 import {
   getAbout,
@@ -42,6 +43,17 @@ export default async function PortfolioPage() {
       getContact(),
       getSettings(),
     ]);
+  // Mirrors each section's own "render nothing" check so hidden sections drop off the timeline.
+  const timeline = sectionTimeline([
+    ["about", true],
+    ["impact", true],
+    ["clients", clients.clients.length > 0],
+    ["work", true],
+    ["praise", praise.visible && praise.quotes.length > 0],
+    ["experience", experience.roles.length > 0],
+    ["room", true],
+    ["contact", true],
+  ]);
 
   return (
     <main id="top" className="landing">
@@ -49,14 +61,22 @@ export default async function PortfolioPage() {
         {settings.site?.navigation?.skipLinkLabel ?? defaultSiteSettings.navigation.skipLinkLabel}
       </a>
       <Hero data={hero} />
-      <AboutBlock data={about} fallbackImage={settings.fallbackImage} />
-      <ImpactStrip data={impact} />
-      <ClientsMarquee data={clients} />
-      <WorkConsole data={work} contactEmail={contact.email} />
-      <Testimonials data={praise} />
-      <Experience data={experience} fallbackImage={settings.fallbackImage} />
-      <DrawingRoomTeaser data={room} />
-      <ContactBlock contact={contact} />
+      <AboutBlock
+        data={about}
+        fallbackImage={settings.fallbackImage}
+        timeline={timeline.get("about")}
+      />
+      <ImpactStrip data={impact} timeline={timeline.get("impact")} />
+      <ClientsMarquee data={clients} timeline={timeline.get("clients")} />
+      <WorkConsole data={work} contactEmail={contact.email} timeline={timeline.get("work")} />
+      <Testimonials data={praise} timeline={timeline.get("praise")} />
+      <Experience
+        data={experience}
+        fallbackImage={settings.fallbackImage}
+        timeline={timeline.get("experience")}
+      />
+      <DrawingRoomTeaser data={room} timeline={timeline.get("room")} />
+      <ContactBlock contact={contact} timeline={timeline.get("contact")} />
     </main>
   );
 }

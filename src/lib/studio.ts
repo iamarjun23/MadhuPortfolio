@@ -1,112 +1,57 @@
 import { cache } from "react";
-import { Status } from "@/generated/prisma/client";
-import { getPraise, getWork } from "@/lib/content";
 import { getDb, isDatabaseConfigured } from "@/lib/db";
+import { partEdited } from "@/lib/draft-diff";
 import { sectionKeys } from "@/lib/sections";
 import type { StudioShellData } from "@/lib/studio-nav";
 
 export type { StudioShellData } from "@/lib/studio-nav";
 
-export type StudioDashboardData = Readonly<{
-  hasUnpublishedChanges: boolean;
-  testimonials: number;
-  workItems: number;
-  activity: ReadonlyArray<{
-    id: string;
-    message: string;
-    createdAt: Date;
-  }>;
+export type StudioActivity = ReadonlyArray<{
+  id: string;
+  message: string;
+  createdAt: Date;
 }>;
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && !Array.isArray(value) && typeof value === "object";
-}
+/* Every section's draft and published row. Memoised per request: the layout asks
+   whether anything is unpublished and the Menu page asks which parts are, and one
+   read answers both. */
+export const getSectionRows = cache(async () => {
+  if (!isDatabaseConfigured()) return [];
 
-function jsonValuesEqual(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true;
-
-  if (Array.isArray(left) && Array.isArray(right)) {
-    return (
-      left.length === right.length &&
-      left.every((value, index) => jsonValuesEqual(value, right[index]))
-    );
-  }
-
-  if (!isJsonRecord(left) || !isJsonRecord(right)) return false;
-
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  return (
-    leftKeys.length === rightKeys.length &&
-    leftKeys.every(
-      (key, index) => key === rightKeys[index] && jsonValuesEqual(left[key], right[key]),
-    )
-  );
-}
-
-function hasChangedDraft(
-  sections: ReadonlyArray<{
-    key: string;
-    status: Status;
-    data: unknown;
-  }>,
-) {
-  return sectionKeys.some((key) => {
-    const draft = sections.find(
-      (section) => section.key === key && section.status === Status.DRAFT,
-    );
-    const published = sections.find(
-      (section) => section.key === key && section.status === Status.PUBLISHED,
-    );
-
-    return Boolean(draft && (!published || !jsonValuesEqual(draft.data, published.data)));
-  });
-}
-
-export const hasPendingChanges = cache(async () => {
-  if (!isDatabaseConfigured()) return false;
-
-  const sections = await getDb().section.findMany({
+  return getDb().section.findMany({
     where: { key: { in: [...sectionKeys] } },
-    select: { key: true, status: true, data: true },
+    select: { key: true, status: true, data: true, updatedAt: true },
   });
-
-  return hasChangedDraft(sections);
 });
 
-// Counts come from the drafts, so they match what the owner is editing rather than
-// lagging until the next publish.
-export async function getStudioShellData(): Promise<StudioShellData> {
-  const [work, praise, hasUnpublishedChanges] = await Promise.all([
-    getWork(Status.DRAFT),
-    getPraise(Status.DRAFT),
-    hasPendingChanges(),
-  ]);
+export const hasPendingChanges = cache(async () => {
+  const sections = await getSectionRows();
+  return sectionKeys.some((key) => partEdited(sections, key));
+});
 
-  return {
-    badges: {
-      work: work.lanes.reduce((total, lane) => total + lane.projects.length, 0),
-      praise: praise.quotes.length,
-    },
-    hasUnpublishedChanges,
-  };
+export async function getStudioShellData(): Promise<StudioShellData> {
+  return { hasUnpublishedChanges: await hasPendingChanges() };
 }
 
-export async function getStudioDashboardData(): Promise<StudioDashboardData> {
-  const shellData = await getStudioShellData();
-  const common = {
-    hasUnpublishedChanges: shellData.hasUnpublishedChanges,
-    testimonials: shellData.badges.praise,
-    workItems: shellData.badges.work,
-  };
+/** The latest saves and publishes, newest first, for the Menu page. */
+export async function getRecentActivity(): Promise<StudioActivity> {
+  if (!isDatabaseConfigured()) return [];
 
-  if (!isDatabaseConfigured()) return { ...common, activity: [] };
-
-  const activity = await getDb().activity.findMany({
+  return getDb().activity.findMany({
     orderBy: { createdAt: "desc" },
-    take: 5,
+    take: 6,
     select: { id: true, message: true, createdAt: true },
   });
+}
 
-  return { ...common, activity };
+/** How much the uploads in storage add up to, for the Menu page. */
+export async function getStorageUsage() {
+  if (!isDatabaseConfigured()) return { files: 0, bytes: 0 };
+
+  const usage = await getDb().media.aggregate({
+    where: { deletingAt: null },
+    _count: true,
+    _sum: { bytes: true },
+  });
+  return { files: usage._count, bytes: usage._sum.bytes ?? 0 };
 }

@@ -2,9 +2,12 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
+import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
 import { preconnectReelHosts, ReelEmbed } from "@/components/public/ReelEmbed";
-import { reelBadge, reelSourceLabel, reelThumbnail, resolveReel } from "@/lib/reel";
-import { useDialogFocus } from "@/lib/use-dialog-focus";
+import { SectionTimeline } from "@/components/public/SectionTimeline";
+import { pageZoom } from "@/lib/page-zoom";
+import { reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
+import type { TimelinePosition } from "@/lib/section-timeline";
 import type { Work } from "@/schemas";
 
 type WorkProject = Work["lanes"][number]["projects"][number];
@@ -153,14 +156,15 @@ function getBoardBounds(card: HTMLElement, rendered: CardOffset) {
   const board = card.closest<HTMLElement>(".work__board");
   if (!board) return null;
 
+  const zoom = pageZoom(card);
   const boardRect = board.getBoundingClientRect();
   const cardRect = card.getBoundingClientRect();
 
   return {
-    minX: rendered.x + (boardRect.left - BOARD_SLACK) - cardRect.left,
-    maxX: rendered.x + (boardRect.right + BOARD_SLACK) - cardRect.right,
-    minY: rendered.y + (boardRect.top - BOARD_SLACK) - cardRect.top,
-    maxY: rendered.y + (boardRect.bottom + BOARD_SLACK) - cardRect.bottom,
+    minX: rendered.x + (boardRect.left - cardRect.left) / zoom - BOARD_SLACK,
+    maxX: rendered.x + (boardRect.right - cardRect.right) / zoom + BOARD_SLACK,
+    minY: rendered.y + (boardRect.top - cardRect.top) / zoom - BOARD_SLACK,
+    maxY: rendered.y + (boardRect.bottom - cardRect.bottom) / zoom + BOARD_SLACK,
   };
 }
 
@@ -168,6 +172,7 @@ export function WorkConsole({
   data,
   contactEmail,
   interactive = true,
+  timeline,
   onSelectProject,
   onMoveProject,
   onReorderProjects,
@@ -175,6 +180,7 @@ export function WorkConsole({
   data: Work;
   contactEmail: string;
   interactive?: boolean;
+  timeline?: TimelinePosition;
   /* Studio's admin preview is not interactive - a click there opens the
      project's own editor instead of the video, so onSelectProject stands in
      for setPreview. */
@@ -373,8 +379,9 @@ export function WorkConsole({
     const state = drag.current;
     if (!state?.active || state.pointerId !== event.pointerId) return;
 
-    const deltaX = event.clientX - state.startX;
-    const deltaY = event.clientY - state.startY;
+    const zoom = pageZoom(event.currentTarget);
+    const deltaX = (event.clientX - state.startX) / zoom;
+    const deltaY = (event.clientY - state.startY) / zoom;
     if (!state.moved && Math.abs(deltaX) + Math.abs(deltaY) > DRAG_THRESHOLD) state.moved = true;
     if (!state.moved) return;
 
@@ -518,16 +525,44 @@ export function WorkConsole({
     };
   }, [preview]);
 
+  /* The rail fills three-row columns, so a count not divisible by 3 leaves
+     holes in its last column. On the public rail they take repeats from the
+     middle of the list, which sit far from their originals. */
+  const railGap = (3 - (projects.length % 3)) % 3;
+  const railPad = onReorderProjects
+    ? []
+    : Array.from(
+        { length: railGap },
+        (_, i) => projects[(Math.floor(projects.length / 2) + i) % projects.length]!,
+      );
   const brief = `mailto:${contactEmail}?subject=${encodeURIComponent("Brief: Selected work")}`;
   const previewReel = preview ? resolveReel(preview.project) : null;
-  const previewRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(previewRef, preview !== null);
+  const previewSlot = preview
+    ? projects.findIndex(
+        ({ project, laneLabel }) =>
+          project.id === preview.project.id && laneLabel === preview.laneLabel,
+      )
+    : -1;
+  const stepPreview = (direction: 1 | -1) =>
+    setPreview(projects[(previewSlot + direction + projects.length) % projects.length] ?? null);
+  const toViewerItem = ({ project }: PreviewSelection): ViewerItem => {
+    const reel = resolveReel(project);
+    return {
+      kind: reel.kind,
+      title: project.title,
+      subtitle: project.subtitle,
+      thumbnail: reel.thumbnail,
+      cta: project.href
+        ? { href: project.href, label: project.hrefLabel ?? "Watch full video" }
+        : null,
+    };
+  };
 
   return (
     <section className="work section" id="work" data-studio-hooks={interactive ? undefined : ""}>
       <div className="wrap">
+        <SectionTimeline label={data.eyebrow} position={timeline} />
         <header className="section-heading">
-          <span className="slate">{data.eyebrow}</span>
           <h2>{data.heading}</h2>
           <p className="lede">{data.intro}</p>
         </header>
@@ -572,7 +607,15 @@ export function WorkConsole({
             </a>
           </div>
           <div className="work__board-bar">
-            <span className="work__board-hint">{data.canvasHint}</span>
+            <span className="work__board-hint">
+              {data.canvasHint
+                .split("·")
+                .map((part) => part.trim())
+                .filter(Boolean)
+                .map((part, index) => (
+                  <span key={index}>{part}</span>
+                ))}
+            </span>
             {/* Nothing on the rail can be moved out of place, so there is
                 nothing there to put back. In the studio the rail stands
                 still, so it gets buttons to page through instead. */}
@@ -657,8 +700,12 @@ export function WorkConsole({
                       key={echo ? "echo" : "cards"}
                       aria-hidden={echo || undefined}
                     >
-                      {projects.map(({ project, laneLabel }) => {
+                      {[
+                        ...projects.map((slot) => ({ ...slot, pad: false })),
+                        ...railPad.map((slot) => ({ ...slot, pad: true })),
+                      ].map(({ project, laneLabel, pad }) => {
                         const cardId = `${laneLabel}-${project.id}`;
+                        const scenery = echo || pad;
 
                         const canReorder = !!onReorderProjects && !echo;
 
@@ -676,8 +723,9 @@ export function WorkConsole({
                             ]
                               .filter(Boolean)
                               .join(" ")}
-                            key={cardId}
-                            tabIndex={echo ? -1 : undefined}
+                            key={pad ? `pad-${cardId}` : cardId}
+                            tabIndex={scenery ? -1 : undefined}
+                            aria-hidden={(pad && !echo) || undefined}
                             onClick={() => cardClick(project, laneLabel)}
                             aria-label={`Preview ${project.title}`}
                             {...(canReorder
@@ -709,14 +757,18 @@ export function WorkConsole({
                           </button>
                         );
                       })}
-                      {/* grid-auto-flow: column always reserves a full 3-row
-                          last column, so a count not divisible by 3 leaves
-                          empty cells showing the grid's own background - a
-                          stray gray block instead of the hairline it's meant
-                          for. Fillers just occupy those cells. */}
-                      {Array.from({ length: (3 - (projects.length % 3)) % 3 }, (_, i) => (
-                        <span key={`fill-${i}`} className="work__rail-filler" aria-hidden="true" />
-                      ))}
+                      {/* The studio rail stands still and is reordered, so a
+                          repeated card there would only confuse; blank
+                          fillers hold its leftover cells instead. */}
+                      {onReorderProjects
+                        ? Array.from({ length: railGap }, (_, i) => (
+                            <span
+                              key={`fill-${i}`}
+                              className="work__rail-filler"
+                              aria-hidden="true"
+                            />
+                          ))
+                        : null}
                     </div>
                   ))}
                 </div>
@@ -775,81 +827,43 @@ export function WorkConsole({
               })
             )}
           </div>
-          {preview ? (
-            <>
-              {/* Same pop-up as the Drawing Room's card viewer (the mood-player styles). */}
-              <div
-                className="mood-player__scrim"
-                aria-hidden="true"
-                onClick={() => setPreview(null)}
-              />
-              <div
-                className={`mood-player mood-player--${previewReel?.kind ?? "none"}`}
-                role="dialog"
-                aria-modal="true"
-                aria-label={`${preview.project.title} preview`}
-                ref={previewRef}
-                tabIndex={-1}
-              >
-                <button
-                  type="button"
-                  className="mood-player__close"
-                  onClick={() => setPreview(null)}
-                  aria-label="Close video preview"
-                >
-                  &times;
-                </button>
-                <div
-                  className={`mood-player__media mood-player__media--${previewReel?.kind ?? "none"}`}
-                >
-                  {previewReel?.file ? (
-                    <video
-                      src={previewReel.file}
-                      poster={previewReel.poster ?? undefined}
-                      controls
-                      autoPlay
-                      playsInline
-                    />
-                  ) : previewReel?.embed ? (
-                    <ReelEmbed
-                      key={previewReel.embed}
-                      src={previewReel.embed}
-                      title={`${preview.project.title} video`}
-                      allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      still={previewReel.thumbnail}
-                      stillSizes="200px"
-                    />
-                  ) : (
-                    <div className="mood-player__unavailable">
-                      <span>{data.previewUnavailableLabel}</span>
-                    </div>
-                  )}
+          {preview && previewSlot >= 0 ? (
+            <MediaViewer
+              item={toViewerItem(preview)}
+              next={
+                projects.length > 1
+                  ? toViewerItem(projects[(previewSlot + 1) % projects.length]!)
+                  : null
+              }
+              index={previewSlot}
+              total={projects.length}
+              onStep={stepPreview}
+              onClose={() => setPreview(null)}
+            >
+              {previewReel?.file ? (
+                <video
+                  key={previewReel.file}
+                  src={previewReel.file}
+                  poster={previewReel.poster ?? undefined}
+                  controls
+                  autoPlay
+                  playsInline
+                />
+              ) : previewReel?.embed ? (
+                <ReelEmbed
+                  key={previewReel.embed}
+                  src={previewReel.embed}
+                  title={`${preview.project.title} video`}
+                  allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  still={previewReel.thumbnail}
+                  stillSizes="200px"
+                />
+              ) : (
+                <div className="mood-player__unavailable">
+                  <span>{data.previewUnavailableLabel}</span>
                 </div>
-                <div className="mood-player__copy">
-                  <span className="mood-player__source">
-                    <i aria-hidden="true" />
-                    {reelSourceLabel(previewReel?.kind ?? "none")}
-                  </span>
-                  <small>{preview.laneLabel}</small>
-                  <h3>{preview.project.title}</h3>
-                  {preview.project.subtitle ? <p>{preview.project.subtitle}</p> : null}
-                  {preview.project.href ? (
-                    <a
-                      className="mood-player__cta"
-                      href={preview.project.href}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {preview.project.hrefLabel ?? "Watch full video"}{" "}
-                      <span aria-hidden="true">&#8599;</span>
-                    </a>
-                  ) : null}
-                  <span className="mood-player__hint" aria-hidden="true">
-                    Esc to close
-                  </span>
-                </div>
-              </div>
-            </>
+              )}
+            </MediaViewer>
           ) : null}
         </article>
       </div>

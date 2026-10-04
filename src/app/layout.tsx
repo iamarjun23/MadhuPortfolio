@@ -1,27 +1,27 @@
 import type { Metadata } from "next";
-import { DM_Sans, Instrument_Serif, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Hanken_Grotesk, JetBrains_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 
-const display = Space_Grotesk({
+// Titles, quotes and big numbers. opsz lets the serif tighten up at headline sizes.
+const display = Newsreader({
   subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["opsz"],
   variable: "--f-display",
 });
 
-const body = DM_Sans({
+// Everything read or clicked: body copy, navigation, buttons, labels and captions.
+const body = Hanken_Grotesk({
   subsets: ["latin"],
   variable: "--f-body",
 });
 
+// Machine data only (timecode, frame rate, slate boards, durations), so one weight is enough.
 const mono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--f-mono",
-});
-
-const serif = Instrument_Serif({
-  subsets: ["latin"],
   weight: "400",
-  style: ["normal", "italic"],
-  variable: "--f-serif",
+  fallback: ["ui-monospace", "Consolas", "monospace"],
+  variable: "--f-mono",
 });
 
 export const metadata: Metadata = {
@@ -43,11 +43,13 @@ type RootLayoutProps = Readonly<{
 
 export default async function RootLayout({ children }: RootLayoutProps) {
   return (
+    // suppressHydrationWarning: the public layout's scale script sets zoom on <html> before hydration.
     <html
+      suppressHydrationWarning
       lang="en"
       data-theme="dark"
       data-scroll-behavior="smooth"
-      className={`${display.variable} ${body.variable} ${mono.variable} ${serif.variable}`}
+      className={`${display.variable} ${body.variable} ${mono.variable}`}
     >
       <body>{children}</body>
     </html>

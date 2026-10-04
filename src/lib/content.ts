@@ -70,7 +70,9 @@ async function getSection<TSchema extends z.ZodType>(
     // A production build prerenders the public pages into the live cache. Without a database
     // that bakes the seed defaults in, and the site shows them until the next publish.
     if (process.env.NEXT_PHASE === "phase-production-build") {
-      throw new Error("DATABASE_URL must be set to build: the public pages prerender published content.");
+      throw new Error(
+        "DATABASE_URL must be set to build: the public pages prerender published content.",
+      );
     }
     return schema.parse(await sectionDefaults(key));
   }

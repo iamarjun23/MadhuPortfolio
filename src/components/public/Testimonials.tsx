@@ -1,14 +1,19 @@
 import { MediaImage } from "@/components/public/MediaImage";
+import { SectionTimeline } from "@/components/public/SectionTimeline";
+import type { TimelinePosition } from "@/lib/section-timeline";
 import { realImage } from "@/lib/placeholders";
 import type { Praise } from "@/schemas";
 
 // Card width (incl. gap) used to size the marquee. Keep in sync with .testimonials figure in base.css.
-const CARD_SPAN = 496;
+const CARD_SPAN = 696;
 // A single copy of the track must be wider than any real viewport, or the duplicate
 // copy used for the seamless loop would become visible at the same time as the original.
 const MIN_TRACK_WIDTH = 2600;
 
-export function Testimonials({ data }: Readonly<{ data: Praise }>) {
+export function Testimonials({
+  data,
+  timeline,
+}: Readonly<{ data: Praise; timeline?: TimelinePosition }>) {
   if (!data.visible || data.quotes.length === 0) return null;
 
   const repeats = Math.max(1, Math.ceil(MIN_TRACK_WIDTH / (CARD_SPAN * data.quotes.length)));
@@ -18,8 +23,8 @@ export function Testimonials({ data }: Readonly<{ data: Praise }>) {
   return (
     <section className="section" id="testimonials">
       <div className="wrap">
+        <SectionTimeline label={data.eyebrow} position={timeline} />
         <header className="section-heading">
-          <span className="slate">{data.eyebrow}</span>
           <h2>{data.heading}</h2>
         </header>
         <div className="testimonials">

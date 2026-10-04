@@ -1,26 +1,21 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
+import { logout } from "@/actions/account";
 import { publishAll, retryLiveRefresh } from "@/actions/publish";
-import { STUDIO_BASE, studioSectionLabels } from "@/lib/studio-nav";
+import { StudioIcon } from "@/components/studio/StudioIcon";
+import { studioHref } from "@/lib/studio-nav";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type TopbarProps = Readonly<{
-  onMenu: () => void;
   publicSiteUrl: string;
+  /** The section tabs, which sit in the bar between the brand and the actions. */
+  children: React.ReactNode;
 }>;
 
-function getCrumb(pathname: string) {
-  const relative = pathname.startsWith(STUDIO_BASE) ? pathname.slice(STUDIO_BASE.length) : pathname;
-  const section = relative.split("/")[1];
-  return section && section in studioSectionLabels
-    ? studioSectionLabels[section as keyof typeof studioSectionLabels]
-    : "Dashboard";
-}
-
-export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
-  const pathname = usePathname();
+export function Topbar({ publicSiteUrl, children }: TopbarProps) {
   const router = useRouter();
   const pushToast = useStudioStore((state) => state.pushToast);
   const dirtySection = useStudioStore((state) => state.dirtySection);
@@ -28,43 +23,22 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
   const { blocked: uploadBlocked, label: uploadLabel } = useUploadBlock();
   const setHasUnpublishedChanges = useStudioStore((state) => state.setHasUnpublishedChanges);
   const [isPublishing, startTransition] = useTransition();
-  const [networkAvailable, setNetworkAvailable] = useState(true);
   // Published, but the live site's cache did not clear: the button offers to retry that step.
   const [liveStale, setLiveStale] = useState(false);
-  const crumb = getCrumb(pathname);
   const offerRefresh = liveStale && !hasUnpublishedChanges;
 
-  useEffect(() => {
-    let active = true;
-
-    const checkNetwork = async () => {
-      if (!navigator.onLine) {
-        if (active) setNetworkAvailable(false);
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/ping", { cache: "no-store" });
-        if (active) setNetworkAvailable(response.ok);
-      } catch {
-        if (active) setNetworkAvailable(false);
-      }
-    };
-
-    const markOffline = () => setNetworkAvailable(false);
-    const markOnline = () => void checkNetwork();
-    void checkNetwork();
-    const interval = window.setInterval(() => void checkNetwork(), 30_000);
-    window.addEventListener("offline", markOffline);
-    window.addEventListener("online", markOnline);
-
-    return () => {
-      active = false;
-      window.clearInterval(interval);
-      window.removeEventListener("offline", markOffline);
-      window.removeEventListener("online", markOnline);
-    };
-  }, []);
+  /* Unsaved edits live only inside the open editor, so moving away from it here
+     would drop them without a word. The section tabs offer save-or-discard; these
+     few links just ask for that choice to be made first. */
+  const holdIfBusy = (event: React.SyntheticEvent) => {
+    if (uploadBlocked) {
+      event.preventDefault();
+      pushToast(`${uploadLabel} is still uploading. Wait for it to finish.`, "info");
+    } else if (dirtySection) {
+      event.preventDefault();
+      pushToast("Save or discard your changes first.", "info");
+    }
+  };
 
   const publish = () => {
     startTransition(async () => {
@@ -100,40 +74,38 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
 
   return (
     <header className="studio-topbar">
-      <button
-        className="studio-icon-button studio-topbar__menu"
-        type="button"
-        onClick={onMenu}
-        aria-label="Open navigation"
-      >
-        <span className="studio-menu-icon" aria-hidden="true" />
-      </button>
-      <p className="studio-topbar__crumb">
-        Site <span aria-hidden="true">/</span> {crumb}
-      </p>
+      <Link className="studio-topbar__brand" href={studioHref("/hero")} onClick={holdIfBusy}>
+        Studio
+      </Link>
+      {children}
       <div className="studio-topbar__actions">
-        {!dirtySection && !hasUnpublishedChanges && !isPublishing && !offerRefresh ? (
-          <p
-            className={`studio-release-state${networkAvailable ? "" : " is-offline"}`}
-            aria-live="polite"
-          >
-            <span className="studio-release-state__signal" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
-            <span className="studio-release-state__label">
-              {networkAvailable ? "Ping / network" : "Ping / offline"}
-            </span>
-          </p>
-        ) : null}
-        <a className="studio-view-site" href={publicSiteUrl} target="_blank" rel="noreferrer">
-          View site
+        <p className="studio-topbar__state" aria-live="polite">
+          <i className={hasUnpublishedChanges ? "is-pending" : undefined} aria-hidden="true" />
+          <span>{hasUnpublishedChanges ? "Changes not live" : "All changes live"}</span>
+        </p>
+        <a
+          className="studio-topbar__icon"
+          href={publicSiteUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="View site (opens in a new tab)"
+          title="View site"
+        >
+          <StudioIcon name="viewSite" />
         </a>
+        <form action={logout} onSubmit={holdIfBusy}>
+          <button
+            className="studio-topbar__icon"
+            type="submit"
+            aria-label="Log out"
+            title="Log out"
+          >
+            <StudioIcon name="logOut" />
+          </button>
+        </form>
         {offerRefresh ? (
           <button
-            className="button button--primary studio-publish"
+            className="studio-topbar__button studio-topbar__button--primary"
             type="button"
             disabled={isPublishing}
             onClick={refreshLive}
@@ -142,7 +114,7 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
           </button>
         ) : (
           <button
-            className="button button--primary studio-publish"
+            className="studio-topbar__button studio-topbar__button--primary"
             type="button"
             disabled={
               !hasUnpublishedChanges || Boolean(dirtySection) || isPublishing || uploadBlocked
@@ -150,7 +122,7 @@ export function Topbar({ onMenu, publicSiteUrl }: TopbarProps) {
             title={uploadBlocked ? `${uploadLabel} is still uploading.` : undefined}
             onClick={publish}
           >
-            {isPublishing ? "Publishing..." : uploadBlocked ? "Uploading..." : "Publish updates"}
+            {isPublishing ? "Publishing..." : uploadBlocked ? "Uploading..." : "Publish"}
           </button>
         )}
       </div>

@@ -169,13 +169,20 @@ export function Hero({ data }: HeroProps) {
         {data.bgVideo.duotone ? <div className="hero__tint" /> : null}
         <div className="hero__scrim" />
       </div>
-      <div className="hero__letterbox hero__letterbox--top">
-        <span>{data.reelLabel}</span>
-        <span>{data.aspectRatioLabel}</span>
+      {/* Keyed on the cut word so each swap remounts it and replays the crop marks' snap. */}
+      <div className="hero__frame" key={cutWord} aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
       </div>
-      <div className="hero__timecode">
-        <span className="hero__record" />
-        <span ref={timecodeRef}>{initialTimecode}</span>
+      <div className="hero__hud">
+        <span>{data.reelLabel}</span>
+        <span className="hero__timecode">
+          <span className="hero__record" />
+          REC
+          <span ref={timecodeRef}>{initialTimecode}</span>
+        </span>
       </div>
       <div className="wrap hero__content">
         <span className="slate">{data.eyebrow}</span>
@@ -197,13 +204,15 @@ export function Hero({ data }: HeroProps) {
           </Link>
         </div>
       </div>
-      <div className="hero__credit">
-        {data.creditLine1}
-        <br />
-        {data.creditLine2}
-      </div>
-      <div className="hero__letterbox hero__letterbox--bottom">
-        <span>{data.footerLeftLabel}</span>
+      <div className="hero__meta">
+        {/* Blanked fields drop out rather than leaving an empty cell between dividers. */}
+        <ul>
+          {[data.footerLeftLabel, data.creditLine1, data.creditLine2, data.aspectRatioLabel]
+            .filter(Boolean)
+            .map((label, index) => (
+              <li key={index}>{label}</li>
+            ))}
+        </ul>
         <span>{data.footerRightLabel}</span>
       </div>
     </section>

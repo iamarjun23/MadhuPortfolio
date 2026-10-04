@@ -8,7 +8,7 @@ import {
   loginThrottleKeys,
   recordLoginFailure,
 } from "@/lib/login-throttle";
-import { verifyPassword } from "@/lib/password";
+import { hashPassword, needsRehash, verifyPassword } from "@/lib/password";
 
 // Surfaces on the login page as `?code=rate_limited`.
 class LoginRateLimited extends CredentialsSignin {
@@ -39,6 +39,13 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
           return null;
         }
         await clearLoginFailures(keys);
+        // The plain password is only in hand here, so this is the one place an old hash can be upgraded.
+        if (needsRehash(user.password)) {
+          await getDb().user.update({
+            where: { id: user.id },
+            data: { password: await hashPassword(password) },
+          });
+        }
         return { id: user.id, email: user.email, name: user.name };
       },
     }),

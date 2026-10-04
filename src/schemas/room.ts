@@ -76,29 +76,20 @@ export const RoomSchema = z.object({
   teaser: z
     .object({
       eyebrow: z.string().max(40),
-      kicker: z.string().max(80),
       heading: z.string().max(80),
       headingAccent: z.string().max(60),
       description: z.string().max(260),
       ctaLabel: z.string().max(60),
       stamp: z.string().max(40),
-      note: z.string().max(60),
-      invitation: z.string().max(40),
-      invitationNote: z.string().max(40),
       image: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable().default(null),
     })
     .default({
       eyebrow: "Off the clock",
-      kicker: "A small side door in the portfolio",
       heading: "There's more in the",
       headingAccent: "cutting room.",
-      description:
-        "Not a reel. A living shelf of bike rides, half-finished thoughts, frames worth keeping, and the things that feed the work when the timeline is closed.",
+      description: "Bike rides, frames worth keeping and the ideas that feed the work.",
       ctaLabel: "Open the Drawing Room",
       stamp: "Private archive",
-      note: "01 / The reel between reels",
-      invitation: "YOU'RE INVITED",
-      invitationNote: "Open when curious",
       image: null,
     }),
   eyebrow: z.string().max(40).default("Off the clock"),

@@ -22,7 +22,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [settings, lastModified] = await Promise.all([getSettings(), lastPublished()]);
   const siteUrl = getSiteUrl(settings.domain);
 
-  return ["/", "/resume", "/room"].map((path) => ({
+  return ["/", "/room"].map((path) => ({
     url: new URL(path, siteUrl).toString(),
     lastModified,
   }));

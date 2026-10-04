@@ -1,0 +1,1076 @@
+/* ==========================================================================
+   Studio shell: a matte black workspace - one bar holding the brand, the
+   section tabs and the actions, then the preview (3/4) beside the inspector
+   (1/4), filling the window at any size. The preview zooms each section to fit
+   its pane, so nothing at page level scrolls.
+   Loaded after base.css and studio-inspector.css so it has the last word on
+   the Studio chrome. The public components inside the preview keep the site's
+   own palette: the accent overrides below stop at the chrome's containers.
+   ========================================================================== */
+
+.studio-shell {
+  --st-bg: #0e0e0f;
+  --st-panel: #141415;
+  --st-raised: #1a1a1c;
+  --st-line: #252527;
+  --st-line-strong: #333336;
+  --st-text: #ececec;
+  --st-text-2: #bababd;
+  --st-muted: #7f7f84;
+  --st-pending: #d9a441;
+  --st-live: #4ade80;
+  --st-gutter: clamp(0.75rem, 1vw, 1rem);
+  --st-bar: 48px;
+
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--st-bg);
+  color: var(--st-text);
+}
+
+.studio-topbar,
+.studio-tabs,
+.studio-ins,
+.studio-settings,
+.studio-canvas__topbar,
+.studio-toasts {
+  --accent: var(--st-text);
+  --accent-text: var(--st-text);
+  --on-accent: var(--st-bg);
+  --d-text: var(--st-text);
+  --d-text2: var(--st-text-2);
+  --d-muted: var(--st-muted);
+}
+
+.studio-shell :focus-visible {
+  outline: 2px solid var(--st-text);
+  outline-offset: 2px;
+}
+
+.studio-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+/* Top bar ------------------------------------------------------------------ */
+
+.studio-topbar {
+  position: static;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 0 1rem;
+  min-height: 0;
+  padding: 0 var(--st-gutter);
+  border-bottom: 1px solid var(--st-line);
+  background: var(--st-panel);
+  backdrop-filter: none;
+}
+
+.studio-topbar__brand {
+  display: flex;
+  align-items: center;
+  min-height: var(--st-bar);
+  padding-right: 1rem;
+  border-right: 1px solid var(--st-line);
+  color: var(--st-text);
+  font-family: var(--f-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.studio-topbar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: var(--st-bar);
+  margin-left: auto;
+}
+
+.studio-topbar__actions form {
+  display: contents;
+}
+
+.studio-topbar__state {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0.5rem 0 0;
+  color: var(--st-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.studio-topbar__state i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st-live);
+}
+
+.studio-topbar__state i.is-pending {
+  background: var(--st-pending);
+}
+
+.studio-topbar__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--st-text-2);
+  cursor: pointer;
+}
+
+.studio-topbar__icon:hover,
+.studio-topbar__icon[aria-current="page"] {
+  background: var(--st-raised);
+  color: var(--st-text);
+}
+
+.studio-topbar__button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  margin-left: 0.5rem;
+  padding: 0 1rem;
+  border: 1px solid var(--st-line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--st-text-2);
+  cursor: pointer;
+  font-family: var(--f-body);
+  font-size: 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.studio-topbar__button--primary {
+  border-color: var(--st-text);
+  background: var(--st-text);
+  color: var(--st-bg);
+  font-weight: 600;
+}
+
+.studio-topbar__button--primary:hover {
+  background: #fff;
+  color: var(--st-bg);
+}
+
+.studio-topbar__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Section tabs -------------------------------------------------------------- */
+
+/* Inside the top bar, between the brand and the actions. When there is not room
+   for every tab the strip scrolls sideways rather than pushing the actions out. */
+.studio-tabs {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.studio-tabs ol {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.studio-tabs ol::-webkit-scrollbar {
+  display: none;
+}
+
+.studio-tabs li {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+/* A separate page, set apart from the sections of the landing page. */
+.studio-tabs__page::before {
+  width: 1px;
+  margin: 0.9rem 0.4rem;
+  background: var(--st-line-strong);
+  content: "";
+}
+
+/* The top border only balances the bottom one, so the label sits on the bar's centre line. */
+.studio-tabs a {
+  display: flex;
+  align-items: center;
+  min-height: var(--st-bar);
+  padding: 0 0.7rem;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  color: var(--st-muted);
+  font-family: var(--f-body);
+  font-size: 0.82rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.studio-tabs a:hover {
+  color: var(--st-text);
+}
+
+.studio-tabs a[aria-current="page"] {
+  border-bottom-color: var(--st-text);
+  color: var(--st-text);
+  font-weight: 500;
+}
+
+/* The focus ring is drawn inside the tab: the strip clips anything outside it. */
+.studio-tabs a:focus-visible {
+  outline-offset: -3px;
+}
+
+.studio-tabs__guard {
+  position: fixed;
+  z-index: 60;
+  bottom: 1.25rem;
+  left: 50%;
+  display: grid;
+  gap: 0.75rem;
+  width: min(30rem, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--st-line-strong);
+  border-radius: 12px;
+  background: var(--st-raised);
+  transform: translateX(-50%);
+}
+
+.studio-tabs__guard p {
+  margin: 0;
+  color: var(--st-text-2);
+  font-size: 0.85rem;
+}
+
+.studio-tabs__guard div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Workspace ------------------------------------------------------------------ */
+
+.studio-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: var(--st-gutter);
+  overflow: auto;
+}
+
+.studio-editor {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+}
+
+.studio-editor__layout {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);
+  align-items: stretch;
+  gap: var(--st-gutter);
+  min-height: 0;
+  margin: 0;
+}
+
+.studio-canvas {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--st-line);
+  border-radius: 12px;
+  background: #000;
+  box-shadow: none;
+}
+
+.studio-canvas__topbar {
+  flex: 0 0 auto;
+  gap: 1rem;
+  min-height: 40px;
+  padding: 0.25rem 0.35rem 0.25rem 0.9rem;
+  border-bottom: 1px solid var(--st-line);
+  background: var(--st-panel);
+  color: var(--st-muted);
+  font-family: var(--f-body);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.studio-canvas__topbar > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-canvas__topbar span:last-child {
+  color: inherit;
+}
+
+.studio-canvas__tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.studio-canvas__tools output {
+  min-width: 2.6rem;
+  color: var(--st-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.studio-device-switch {
+  padding: 2px;
+  border-color: var(--st-line-strong);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.studio-device-switch button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 6px;
+  font-family: var(--f-body);
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.studio-device-switch button:hover {
+  color: var(--st-text);
+}
+
+.studio-device-switch button.is-active {
+  color: var(--st-bg);
+  font-weight: 600;
+}
+
+/* The pane the preview is fitted into. "Fit" zooms the whole section inside it, so
+   it never scrolls; "Full width" fits the width only and scrolls down the rest. The
+   gutter is reserved up front so a scrollbar appearing cannot change the fit. */
+.studio-canvas__viewport {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden auto;
+  scrollbar-gutter: stable;
+}
+
+.studio-canvas__viewport--fit {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+/* Auto margins centre the preview when it is smaller than the pane and, unlike
+   alignment, fall back to the top-left when it is larger, so nothing is cut off. */
+.studio-canvas__fit {
+  flex: 0 0 auto;
+  margin: auto;
+}
+
+.studio-canvas--mobile .studio-canvas__viewport {
+  display: flex;
+  padding: 0;
+  background: var(--st-bg);
+}
+
+/* Room for the phone frame's bezel, which is a shadow and takes no space of its own. */
+.studio-canvas--mobile .studio-canvas__page {
+  padding: 12px;
+}
+
+.studio-canvas--mobile .studio-preview-frame {
+  display: block;
+}
+
+.studio-ins {
+  position: relative;
+  top: auto;
+  height: auto;
+  min-height: 0;
+  border-color: var(--st-line);
+  border-radius: 12px;
+  background: var(--st-panel);
+  box-shadow: none;
+}
+
+.studio-ins__head {
+  border-bottom-color: var(--st-line);
+  background: var(--st-panel);
+}
+
+/* Menu page ---------------------------------------------------------------------- */
+
+/* Fills the window under the top bar and never scrolls as a page: the head takes
+   what it needs and the three columns share the rest. A column that still cannot
+   fit (a short window, the password form open) scrolls on its own. */
+.studio-settings {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--st-gutter);
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+}
+
+.studio-settings__head {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--st-gutter);
+}
+
+.studio-settings__intro {
+  flex: 1 1 16rem;
+  align-self: center;
+}
+
+.studio-settings__intro h1 {
+  margin: 0.15rem 0 0;
+  max-width: none;
+  font-family: var(--f-body);
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.studio-settings__intro p {
+  margin: 0.1rem 0 0;
+  color: var(--st-muted);
+  font-size: 0.85rem;
+}
+
+.studio-settings__tiles {
+  display: grid;
+  flex: 3 1 40rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--st-gutter);
+}
+
+.studio-settings__tile {
+  display: grid;
+  align-content: center;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  background: var(--st-panel);
+}
+
+.studio-settings__tile span {
+  color: var(--st-muted);
+  font-size: 0.75rem;
+}
+
+.studio-settings__tile strong {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The page's sections, what needs attention, then the site as a whole. */
+.studio-settings__columns {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--st-gutter);
+  min-height: 0;
+}
+
+.studio-settings__columns > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--st-gutter);
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.studio-settings__card {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--st-line);
+  border-radius: 12px;
+  background: var(--st-panel);
+}
+
+/* The last card of a column takes the height left over, so the columns end level. */
+.studio-settings__card:last-child {
+  flex-grow: 1;
+}
+
+.studio-settings__card h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--f-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.studio-settings__card > p,
+.studio-settings__card li span {
+  color: var(--st-text-2);
+  font-size: 0.85rem;
+}
+
+.studio-settings__pill {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.1);
+  color: var(--st-live);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.studio-settings__pill.is-edited {
+  background: rgba(217, 164, 65, 0.12);
+  color: var(--st-pending);
+}
+
+/* The sections in page order, numbered the way the tabs run. The rows share the
+   card's height, so the list always ends where the card does. */
+.studio-settings__sections {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  counter-reset: section;
+  list-style: none;
+}
+
+.studio-settings__sections li {
+  display: flex;
+  flex: 1 1 32px;
+  max-height: 56px;
+  border-top: 1px solid var(--st-line);
+  counter-increment: section;
+}
+
+.studio-settings__sections li:first-child {
+  border-top: 0;
+}
+
+.studio-settings__sections a {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 32px;
+  margin: 0 -0.5rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  color: var(--st-text);
+  text-decoration: none;
+}
+
+.studio-settings__sections a::before {
+  flex: 0 0 1.4rem;
+  color: var(--st-muted);
+  content: counter(section, decimal-leading-zero);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.studio-settings__sections a:hover {
+  background: var(--st-raised);
+}
+
+.studio-settings__sections a > span:first-child {
+  flex: 1;
+  min-width: 0;
+  color: var(--st-text);
+  font-size: 0.88rem;
+}
+
+.studio-settings__sections small {
+  color: var(--st-muted);
+  font-size: 0.75rem;
+}
+
+.studio-settings__sections b {
+  color: var(--st-muted);
+}
+
+.studio-settings__checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-settings__checks li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--st-line);
+}
+
+.studio-settings__checks li:first-child {
+  border-top: 0;
+}
+
+.studio-settings__checks i {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--st-live);
+}
+
+.studio-settings__checks span {
+  flex: 1;
+  min-width: 0;
+}
+
+.studio-settings__checks .needs-fix i {
+  background: var(--st-pending);
+}
+
+.studio-settings__checks .needs-fix span {
+  color: var(--st-text);
+}
+
+.studio-settings__checks a {
+  color: var(--st-text);
+  font-size: 0.8rem;
+}
+
+.studio-settings__card > .studio-settings__caption {
+  margin: 0.6rem 0 0.35rem;
+  color: var(--st-muted);
+  font-size: 0.75rem;
+}
+
+/* The card a pasted link unfurls into, as a chat app would draw it. */
+.studio-settings__share {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  background: var(--st-raised);
+  color: var(--st-text);
+  text-decoration: none;
+}
+
+.studio-settings__share:hover {
+  border-color: var(--st-line-strong);
+}
+
+.studio-settings__share img,
+.studio-settings__share-empty {
+  display: grid;
+  width: 100%;
+  aspect-ratio: 1.91;
+  place-items: center;
+  padding: 0 0.5rem;
+  object-fit: cover;
+  background: var(--st-bg);
+  color: var(--st-muted);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.studio-settings__share img {
+  padding: 0;
+}
+
+.studio-settings__share > span:last-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.5rem 0.8rem;
+}
+
+.studio-settings__share strong {
+  overflow: hidden;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-settings__share small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--st-muted);
+  font-size: 0.75rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* Account and maintenance: rarely used, so three quiet rows rather than three cards. */
+.studio-maintenance__row {
+  padding: 0.35rem 0;
+  line-height: 1.35;
+  border-top: 1px solid var(--st-line);
+}
+
+h2 + .studio-maintenance__row {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.studio-maintenance__row:last-child {
+  padding-bottom: 0;
+}
+
+div.studio-maintenance__row,
+.studio-maintenance__row summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.studio-maintenance__row summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.studio-maintenance__row summary::-webkit-details-marker {
+  display: none;
+}
+
+.studio-maintenance__row summary::after {
+  color: var(--st-muted);
+  content: "\203A";
+}
+
+.studio-maintenance__row[open] summary::after {
+  transform: rotate(90deg);
+}
+
+.studio-maintenance__row span {
+  display: grid;
+  flex: 1;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.studio-maintenance__row strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.studio-maintenance__row small {
+  color: var(--st-muted);
+  font-size: 0.75rem;
+}
+
+.studio-maintenance__row .studio-account-card__form {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 0.9rem;
+}
+
+.studio-maintenance__row .studio-account-card__form .studio-field {
+  min-width: 0;
+}
+
+.studio-settings .slate {
+  color: var(--st-muted);
+}
+
+.studio-settings .studio-activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-settings .studio-activity li {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.3rem 0;
+  border-top: 1px solid var(--st-line);
+}
+
+.studio-settings .studio-activity li:first-child {
+  border-top: 0;
+}
+
+.studio-settings .studio-activity time {
+  flex: 0 0 auto;
+  color: var(--st-muted);
+  font-size: 0.78rem;
+}
+
+.studio-settings__links {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.studio-settings__links a {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--st-line);
+  border-radius: 10px;
+  line-height: 1.35;
+  background: var(--st-raised);
+  color: var(--st-text);
+  text-decoration: none;
+}
+
+.studio-settings__links a:hover {
+  border-color: var(--st-line-strong);
+}
+
+.studio-settings__links a > span:first-child {
+  display: grid;
+  flex: 1;
+  gap: 0.1rem;
+}
+
+.studio-settings__links strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.studio-settings__links small {
+  color: var(--st-muted);
+  font-size: 0.75rem;
+}
+
+.studio-settings__links b {
+  color: var(--st-muted);
+}
+
+/* The freelance tile: laid out like the three figures beside it, plus its switch. */
+.studio-availability {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 0.75rem;
+}
+
+.studio-availability > span,
+.studio-availability > strong {
+  grid-column: 1;
+}
+
+.studio-availability strong {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.studio-availability__dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-live);
+}
+
+.studio-availability.is-off .studio-availability__dot {
+  background: var(--st-muted);
+}
+
+/* Same size and motion as the inspector's switch. Its own class name, because the
+   old editor's `.studio-switch` label styles in base.css would stretch it. */
+.studio-availability__switch {
+  position: relative;
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  width: 36px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--st-line-strong);
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.studio-availability__switch::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--st-text-2);
+  content: "";
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.studio-availability__switch[aria-checked="true"] {
+  background: var(--st-live);
+}
+
+.studio-availability__switch[aria-checked="true"]::after {
+  background: var(--st-bg);
+  transform: translateX(14px);
+}
+
+.studio-availability__switch:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* Navbar and Footer tabs --------------------------------------------------------------- */
+
+/* Each previews one part of the site-wide settings alone, so the block is only as
+   tall as that part instead of standing in for a whole page. */
+.studio-settings-preview--part {
+  min-height: 0;
+}
+
+.studio-settings-preview__label {
+  margin: 0;
+  padding: 2rem clamp(1.25rem, calc(4 * var(--vw)), 4rem) 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--f-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.studio-settings-preview__label:first-child {
+  padding-top: 0.5rem;
+}
+
+/* The uploaded resume, shown as one A4 page. The browser's PDF viewer lays itself
+   out as if the preview were not zoomed and crops the page's right edge, so the
+   frame cancels the zoom and takes the scaled width directly. */
+.studio-resume-preview {
+  display: block;
+  zoom: calc(1 / var(--preview-zoom, 1));
+  width: min(100%, calc(900px * var(--preview-zoom, 1)));
+  aspect-ratio: 210 / 297;
+  margin: 0 auto;
+  border: 0;
+  background: #fff;
+}
+
+/* Narrow windows -------------------------------------------------------------------- */
+
+@media (max-width: 1500px) {
+  .studio-topbar__state span {
+    display: none;
+  }
+}
+
+/* Too narrow for the tabs to share the bar: they drop to a row of their own. */
+@media (max-width: 1380px) {
+  .studio-topbar {
+    flex-wrap: wrap;
+  }
+
+  .studio-topbar__brand {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .studio-tabs {
+    order: 3;
+    flex-basis: 100%;
+    margin: 0 calc(-1 * var(--st-gutter));
+    padding: 0 var(--st-gutter);
+    border-top: 1px solid var(--st-line);
+  }
+
+  .studio-tabs a {
+    min-height: 40px;
+  }
+}
+
+/* Below this the inspector would squeeze the preview too far, so the two stack and
+   the page scrolls as a whole instead of each pane scrolling on its own. */
+@media (max-width: 960px) {
+  .studio-shell {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .studio-settings__columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio-settings__columns > div {
+    overflow-y: visible;
+  }
+
+  .studio-main {
+    overflow: visible;
+  }
+
+  .studio-editor__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .studio-canvas__viewport {
+    height: min(70dvh, 640px);
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .studio-settings__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .studio-canvas__topbar > span {
+    display: none;
+  }
+
+  .studio-canvas__topbar {
+    justify-content: flex-end;
+  }
+}

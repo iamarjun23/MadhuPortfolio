@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-/* The phone preview has to be a real iframe. Every responsive rule on this site
-   is an `@media (max-width: ...)` query, and those resolve against the browser
-   window - narrowing a <div> to phone width leaves all of them in force, which
-   is why the old preview showed desktop styling squeezed into a narrow column.
-   An iframe carries its own viewport, so at 390px the frame resolves exactly
-   the rules a phone resolves.
+/* The phone preview has to be a real iframe, because a phone does not get a
+   reflowed page: the public layout pins its viewport to the 1280px design width,
+   so a phone lays out the desktop artboard and scales it down to its screen. The
+   frame is that viewport - 1280px wide and phone-shaped, zoomed to phone size by
+   its CSS - so width breakpoints stay in desktop mode, `vh` and
+   `orientation: portrait` read as they do on a phone, and the page scrolls
+   inside the frame rather than the pane.
 
    The page still renders from this React tree, through a portal into the
    frame's document. That is what keeps click-to-edit alive: React dispatches
@@ -16,16 +17,50 @@ import { createPortal } from "react-dom";
    editor's handler above the frame still receives clicks landing inside it. */
 
 const STYLE_MARK = "data-studio-preview-style";
+const TOUCH_SCREEN = /\(hover:\s*none\)\s+and\s+\(pointer:\s*coarse\)/;
+const MOUSE = /\(hover:\s*hover\)\s+and\s+\(pointer:\s*fine\)/;
+
+/* A phone's touch-only rules are part of how the page looks there, but the frame
+   sits in a desktop browser and reports a mouse. Its copy of the styles is
+   rewritten so the touch rules always apply and the mouse-only ones never do. */
+function applyPhoneRules(rules: CSSRuleList) {
+  for (const rule of rules) {
+    if (isMediaRule(rule)) {
+      rule.media.mediaText = rule.media.mediaText
+        .replace(TOUCH_SCREEN, "all")
+        .replace(MOUSE, "not all");
+    }
+    if (isGroupingRule(rule)) applyPhoneRules(rule.cssRules);
+  }
+}
+
+// By shape, not `instanceof`: these rules belong to the frame's realm, whose
+// classes are not the host's.
+function isMediaRule(rule: CSSRule): rule is CSSMediaRule {
+  return "media" in rule && "conditionText" in rule;
+}
+
+function isGroupingRule(rule: CSSRule): rule is CSSGroupingRule {
+  return "cssRules" in rule;
+}
 
 function syncStyles(frameDoc: Document) {
   frameDoc.head.querySelectorAll(`[${STYLE_MARK}]`).forEach((node) => node.remove());
   /* Cloned rather than re-linked by href: a dev server serves its CSS as inline
      <style> tags, which have no href to copy. */
-  document.head.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
-    const clone = node.cloneNode(true) as HTMLElement;
-    clone.setAttribute(STYLE_MARK, "");
-    frameDoc.head.appendChild(clone);
-  });
+  document.head
+    .querySelectorAll<HTMLLinkElement | HTMLStyleElement>('link[rel="stylesheet"], style')
+    .forEach((node) => {
+      const clone = node.cloneNode(true) as HTMLLinkElement | HTMLStyleElement;
+      clone.setAttribute(STYLE_MARK, "");
+      const rewrite = () => {
+        if (clone.sheet) applyPhoneRules(clone.sheet.cssRules);
+      };
+      // A linked sheet has no rules to read until it has loaded; an inline one has them at once.
+      clone.addEventListener("load", rewrite);
+      frameDoc.head.appendChild(clone);
+      if (clone.localName === "style") rewrite();
+    });
 }
 
 // The font variables and the light/dark switch both live on the host's <html>.

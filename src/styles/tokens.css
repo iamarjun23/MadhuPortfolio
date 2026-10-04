@@ -1,6 +1,11 @@
 :root {
   color-scheme: dark;
 
+  /* Stands in for 1vw. Below 1280px the public layout zooms the whole page down
+     and pins this to 12.8px (1vw of the 1280px design), since a raw vw would
+     shrink a second time on top of the zoom. */
+  --vw: 1vw;
+
   --ember-400: #ff9a3d;
   --ember-500: #ff6a00;
   --ember-600: #ff4d00;
@@ -63,6 +68,8 @@
   --d-muted: #8d8d8d;
 
   --caps: 0.16em;
+  /* One size for every section title (About, Impact, Work, Praise, Experience, Room, Contact). */
+  --fs-section: clamp(2.25rem, calc(3.9 * var(--vw)), 3.4rem);
   --r-sm: 4px;
   --r-md: 6px;
   --r-lg: 10px;

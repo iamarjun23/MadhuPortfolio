@@ -1,17 +1,31 @@
 import Link from "next/link";
 import { MediaImage } from "@/components/public/MediaImage";
+import { SectionTimeline } from "@/components/public/SectionTimeline";
+import type { TimelinePosition } from "@/lib/section-timeline";
 import type { Room } from "@/schemas";
 
-export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
+export function DrawingRoomTeaser({
+  data,
+  timeline,
+}: Readonly<{ data: Room; timeline?: TimelinePosition }>) {
   const teaser = data.teaser;
 
   return (
     <section className="section" id="drawing-room">
       <div className="wrap">
+        <SectionTimeline label={data.teaser.eyebrow} position={timeline} />
         <div className="drawing-teaser">
+          {teaser.image && (
+            <MediaImage
+              className="drawing-teaser__backdrop"
+              src={teaser.image.url}
+              alt=""
+              fill
+              sizes="30vw"
+            />
+          )}
           <div className="drawing-teaser__copy">
-            <span className="slate">{teaser.eyebrow}</span>
-            <p className="drawing-teaser__kicker">{teaser.kicker}</p>
+            <p className="drawing-teaser__kicker">{teaser.stamp}</p>
             <h2>
               {teaser.heading} <em>{teaser.headingAccent}</em>
             </h2>
@@ -20,24 +34,18 @@ export function DrawingRoomTeaser({ data }: Readonly<{ data: Room }>) {
               {teaser.ctaLabel} <span aria-hidden="true">↗</span>
             </Link>
           </div>
-          <Link
-            className="drawing-teaser__archive"
-            href="/room"
-            aria-label="Open the Drawing Room"
-          >
-            {teaser.image && (
-              <MediaImage
-                className="drawing-teaser__image"
-                src={teaser.image.url}
-                alt={teaser.image.alt}
-                fill
-                sizes="(max-width: 560px) 20rem, 32vw"
-              />
-            )}
-            <span className="drawing-teaser__stamp">{teaser.stamp}</span>
-            <span className="drawing-teaser__note">{teaser.note}</span>
-            <b>{teaser.invitation}</b>
-            <i>{teaser.invitationNote}</i>
+          <Link className="drawing-teaser__archive" href="/room" aria-label="Open the Drawing Room">
+            <span className="drawing-teaser__photo">
+              {teaser.image && (
+                <MediaImage
+                  className="drawing-teaser__image"
+                  src={teaser.image.url}
+                  alt={teaser.image.alt}
+                  fill
+                  sizes="(max-width: 560px) 14rem, 22rem"
+                />
+              )}
+            </span>
           </Link>
         </div>
       </div>

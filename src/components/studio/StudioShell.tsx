@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Rail } from "@/components/studio/Rail";
 import { Toast } from "@/components/studio/Toast";
 import { Topbar } from "@/components/studio/Topbar";
@@ -14,7 +14,6 @@ type StudioShellProps = Readonly<{
 }>;
 
 export function StudioShell({ children, shellData, publicSiteUrl }: StudioShellProps) {
-  const [railOpen, setRailOpen] = useState(false);
   const setHasUnpublishedChanges = useStudioStore((state) => state.setHasUnpublishedChanges);
   const { blocked: uploadBlocked } = useUploadBlock();
 
@@ -34,18 +33,10 @@ export function StudioShell({ children, shellData, publicSiteUrl }: StudioShellP
 
   return (
     <div className="studio-shell">
-      <Rail badges={shellData.badges} open={railOpen} onClose={() => setRailOpen(false)} />
-      <div className="studio-shell__body">
-        <Topbar onMenu={() => setRailOpen(true)} publicSiteUrl={publicSiteUrl} />
-        <main className="studio-main">{children}</main>
-      </div>
-      <button
-        className={`studio-scrim ${railOpen ? "is-visible" : ""}`}
-        type="button"
-        aria-label="Close navigation"
-        tabIndex={railOpen ? 0 : -1}
-        onClick={() => setRailOpen(false)}
-      />
+      <Topbar publicSiteUrl={publicSiteUrl}>
+        <Rail />
+      </Topbar>
+      <main className="studio-main">{children}</main>
       <Toast />
     </div>
   );

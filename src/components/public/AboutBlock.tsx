@@ -2,13 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
+import { SectionTimeline } from "@/components/public/SectionTimeline";
 import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
+import type { TimelinePosition } from "@/lib/section-timeline";
 import type { About } from "@/schemas";
 
 export function AboutBlock({
   data,
   fallbackImage = null,
-}: Readonly<{ data: About; fallbackImage?: FallbackImage }>) {
+  timeline,
+}: Readonly<{ data: About; fallbackImage?: FallbackImage; timeline?: TimelinePosition }>) {
   const sectionRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -42,6 +45,7 @@ export function AboutBlock({
   return (
     <section className="section" id="about" ref={sectionRef}>
       <div className={`wrap about${hasPortrait ? "" : " about--no-portrait"}`}>
+        <SectionTimeline label={data.eyebrow} position={timeline} />
         {/* The portrait photo is the subject of this section, so it fills the
             frame whenever there is one. A portrait video no longer replaces it:
             with both set the video plays as a clip inset into the corner, and it
@@ -88,10 +92,6 @@ export function AboutBlock({
           </div>
         ) : null}
         <div className="about__text">
-          <span className="slate">
-            <b className="slate__index">01</b>
-            {data.eyebrow}
-          </span>
           <h2>{data.heading}</h2>
           {data.paragraphs.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>

@@ -11,7 +11,6 @@ const defaultBrand = {
 const defaultNavigation = {
   captionPrefix: "—",
   drawingRoomCaption: "The Drawing Room",
-  resumeCaption: "Resume",
   workLabel: "Work",
   drawingRoomLabel: "Drawing Room",
   resumeLabel: "Resume",
@@ -35,8 +34,6 @@ const defaultFooter = {
   exploreHeading: "Explore",
   selectedWorkLabel: "Selected work",
   experienceLabel: "Experience",
-  drawingRoomLabel: "Drawing Room",
-  contactHeading: "Get in touch",
   copyrightPrefix: "©",
   closingLine: "Stories shaped in Bengaluru",
 };
@@ -76,7 +73,6 @@ export const SettingsSchema = z.object({
         .object({
           captionPrefix: z.string().max(20).default(defaultNavigation.captionPrefix),
           drawingRoomCaption: z.string().max(40).default(defaultNavigation.drawingRoomCaption),
-          resumeCaption: z.string().max(40).default(defaultNavigation.resumeCaption),
           workLabel: z.string().max(30).default(defaultNavigation.workLabel),
           drawingRoomLabel: z.string().max(40).default(defaultNavigation.drawingRoomLabel),
           resumeLabel: z.string().max(30).default(defaultNavigation.resumeLabel),
@@ -101,8 +97,6 @@ export const SettingsSchema = z.object({
           exploreHeading: z.string().max(40).default(defaultFooter.exploreHeading),
           selectedWorkLabel: z.string().max(40).default(defaultFooter.selectedWorkLabel),
           experienceLabel: z.string().max(40).default(defaultFooter.experienceLabel),
-          drawingRoomLabel: z.string().max(40).default(defaultFooter.drawingRoomLabel),
-          contactHeading: z.string().max(40).default(defaultFooter.contactHeading),
           copyrightPrefix: z.string().max(20).default(defaultFooter.copyrightPrefix),
           closingLine: z.string().max(100).default(defaultFooter.closingLine),
         })

@@ -17,6 +17,8 @@ export const ExperienceSchema = z.object({
   scenesLabel: z.string().max(30).default("scenes"),
   previousLabel: z.string().max(40).default("Previous scene"),
   nextLabel: z.string().max(40).default("Next scene"),
+  playLabel: z.string().max(40).default("Play reel"),
+  pauseLabel: z.string().max(40).default("Pause reel"),
   roles: z
     .array(
       z.object({

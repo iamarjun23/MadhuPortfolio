@@ -3,6 +3,7 @@ import { flagRepeatedIds } from "./item-id";
 import { ImageUrlSchema } from "./media";
 
 export const ImpactSchema = z.object({
+  eyebrow: z.string().max(40).default("Impact"),
   heading: z.string().max(80).default("In the room with"),
   collaboratorsLabel: z.string().max(60).default("selected collaborators"),
   detailLabel: z.string().max(60).default("Selected collaboration"),

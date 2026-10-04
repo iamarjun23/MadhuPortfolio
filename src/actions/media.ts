@@ -162,12 +162,19 @@ export async function finishUpload(key: string): Promise<FinishUploadResult> {
   }
 }
 
-export async function deleteMedia(mediaId: string): Promise<DeleteMediaResult> {
+/* Looked up by address because that is all a draft holds of a file: the editing
+   panel can then delete any photo it shows, not only one uploaded in this visit. */
+export async function deleteMediaByUrl(url: string): Promise<DeleteMediaResult> {
   try {
     await requireOwner();
-    const media = await getDb().media.findUnique({ where: { id: mediaId } });
+    const media = await getDb().media.findFirst({ where: { url } });
 
-    if (!media) return { ok: false, error: "This upload no longer exists." };
+    if (!media) {
+      return {
+        ok: false,
+        error: "This file was not uploaded here, so there is nothing to delete. Remove it instead.",
+      };
+    }
     if (!isMediaUploadConfigured()) return { ok: false, error: "Uploads are not configured." };
 
     /* Marked first, outside the removal's transaction so a failure cannot roll the
@@ -184,12 +191,12 @@ export async function deleteMedia(mediaId: string): Promise<DeleteMediaResult> {
       await getDb().media.update({ where: { id: media.id }, data: { deletingAt: null } });
       return {
         ok: false,
-        error: `Still used by ${describePlaces(places)}. Remove it there first, then delete the file.`,
+        error: `Still used by ${describePlaces(places)}. Remove it from the page, save and publish first; the unused file can then be cleared from Settings.`,
       };
     }
     return { ok: true };
   } catch (error) {
-    console.error(`Deleting the upload ${mediaId} failed`, error);
+    console.error("Deleting an upload failed", error);
     return { ok: false, error: "Could not delete this upload. Please try again." };
   }
 }

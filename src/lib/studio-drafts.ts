@@ -1,18 +1,5 @@
 import { Status } from "@/generated/prisma/client";
 import {
-  AboutSchema,
-  ClientsSchema,
-  ContactSchema,
-  ExperienceSchema,
-  HeroSchema,
-  ImpactSchema,
-  PraiseSchema,
-  ResumeSchema,
-  RoomSchema,
-  SettingsSchema,
-  WorkSchema,
-} from "@/schemas";
-import {
   getAbout,
   getClients,
   getContact,
@@ -26,21 +13,10 @@ import {
   getSettings,
   getWork,
 } from "@/lib/content";
+import { sectionSchemas } from "@/lib/section-schemas";
 import type { SectionKey } from "@/lib/sections";
 
-export const sectionSchemas = {
-  hero: HeroSchema,
-  about: AboutSchema,
-  impact: ImpactSchema,
-  clients: ClientsSchema,
-  work: WorkSchema,
-  praise: PraiseSchema,
-  resume: ResumeSchema,
-  experience: ExperienceSchema,
-  room: RoomSchema,
-  contact: ContactSchema,
-  settings: SettingsSchema,
-};
+export { sectionSchemas };
 
 /* The draft row's `updatedAt` as the editor is about to load it. Sent back with
    the save so a write can be refused when the row moved in between; null means

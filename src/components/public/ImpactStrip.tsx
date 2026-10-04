@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
+import { SectionTimeline } from "@/components/public/SectionTimeline";
+import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
 import { realImage } from "@/lib/placeholders";
+import type { TimelinePosition } from "@/lib/section-timeline";
 import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
-import { useDialogFocus } from "@/lib/use-dialog-focus";
 import type { Impact } from "@/schemas";
 
 /* The stand-in on a collaborator tile that has no photo yet: the first letter of
@@ -58,8 +60,10 @@ export function ImpactStrip({
   data,
   onSelectCollaborator,
   onMoveCollaborator,
+  timeline,
 }: Readonly<{
   data: Impact;
+  timeline?: TimelinePosition;
   /* Studio's admin preview: a click opens the collaborator's editor instead of
      the photo pop-up, and a card can be dragged onto another to reorder.
      Both work in indexes into `data.worked`. */
@@ -109,14 +113,38 @@ export function ImpactStrip({
     };
   }, [activeIndex]);
   const collaborators = data.worked;
+  /* A phone has no hover to warm a photo before its tap, so once the strip is on screen
+     every pop-up photo is fetched in the background (the originals are small: ~20-40KB each). */
+  useEffect(() => {
+    if (!visible || onSelectCollaborator) return;
+    for (const person of collaborators) {
+      const image = realImage(person.image);
+      if (image) preloadViewerPhoto(image.url);
+    }
+  }, [visible, onSelectCollaborator, collaborators]);
   const activePerson = activeIndex !== null ? collaborators[activeIndex] : undefined;
   const activeImage = activePerson ? realImage(activePerson.image) : null;
-  const previewRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(previewRef, Boolean(activePerson && activeImage));
+  // Only collaborators with a photo open in the viewer, so only they are stepped through.
+  const viewable = collaborators.flatMap((person, index) => {
+    const image = realImage(person.image);
+    return image ? [{ index, image, person }] : [];
+  });
+  const activeSlot = viewable.findIndex((entry) => entry.index === activeIndex);
+  const stepActive = (direction: 1 | -1) =>
+    setActiveIndex(
+      viewable[(activeSlot + direction + viewable.length) % viewable.length]?.index ?? null,
+    );
+  const toViewerItem = (entry: (typeof viewable)[number]): ViewerItem => ({
+    kind: "photo",
+    title: entry.person.name,
+    subtitle: entry.person.context,
+    thumbnail: entry.image.url,
+  });
 
   return (
     <section className="impact" ref={ref}>
       <div className="wrap">
+        <SectionTimeline label={data.eyebrow} position={timeline} />
         <div className="impact__panel">
           <div className="impact__stats">
             {data.stats.map((stat) => (
@@ -222,54 +250,28 @@ export function ImpactStrip({
               })}
             </div>
           </div>
-          {activePerson && activeImage ? (
-            <>
-              {/* Same pop-up as the Drawing Room's photo viewer (the mood-player styles). */}
-              <div
-                className="mood-player__scrim"
-                aria-hidden="true"
-                onClick={() => setActiveIndex(null)}
+          {activePerson && activeImage && activeSlot >= 0 ? (
+            <MediaViewer
+              item={toViewerItem(viewable[activeSlot]!)}
+              next={
+                viewable.length > 1
+                  ? toViewerItem(viewable[(activeSlot + 1) % viewable.length]!)
+                  : null
+              }
+              index={activeSlot}
+              total={viewable.length}
+              onStep={stepActive}
+              onClose={() => setActiveIndex(null)}
+            >
+              {/* Nominal size only: the CSS lets the photo take its own natural shape. */}
+              <MediaImage
+                src={activeImage.url}
+                alt={activeImage.alt}
+                width={1600}
+                height={1200}
+                sizes={PHOTO_VIEWER_SIZES}
               />
-              <div
-                className="mood-player mood-player--photo"
-                role="dialog"
-                aria-modal="true"
-                aria-label={`${activePerson.name} preview`}
-                ref={previewRef}
-                tabIndex={-1}
-              >
-                <button
-                  type="button"
-                  className="mood-player__close"
-                  onClick={() => setActiveIndex(null)}
-                  aria-label="Close"
-                >
-                  &times;
-                </button>
-                <div className="mood-player__media mood-player__media--photo">
-                  {/* Nominal size only: the CSS lets the photo take its own natural shape. */}
-                  <MediaImage
-                    src={activeImage.url}
-                    alt={activeImage.alt}
-                    width={1600}
-                    height={1200}
-                    sizes={PHOTO_VIEWER_SIZES}
-                  />
-                </div>
-                <div className="mood-player__copy">
-                  <span className="mood-player__source">
-                    <i aria-hidden="true" />
-                    Photograph
-                  </span>
-                  <small>{data.detailLabel}</small>
-                  <h3>{activePerson.name}</h3>
-                  {activePerson.context ? <p>{activePerson.context}</p> : null}
-                  <span className="mood-player__hint" aria-hidden="true">
-                    Esc to close
-                  </span>
-                </div>
-              </div>
-            </>
+            </MediaViewer>
           ) : null}
         </div>
       </div>

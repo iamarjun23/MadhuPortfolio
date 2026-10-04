@@ -375,26 +375,15 @@ export const sectionData = {
       },
     ],
   }),
-  resume: ResumeSchema.parse({
-    intro: "Every role, tool and credit so far. Read it here or take a copy with you.",
-    seo: {
-      title: "Resume",
-      description: "The resume of N Madhu Kumar, video editor based in Bengaluru.",
-    },
-  }),
+  resume: ResumeSchema.parse({}),
   room: RoomSchema.parse({
     teaser: {
       eyebrow: "Off the clock",
-      kicker: "A small side door in the portfolio",
       heading: "There's more in the",
       headingAccent: "cutting room.",
-      description:
-        "Not a reel. A living shelf of bike rides, half-finished thoughts, frames worth keeping, and the things that feed the work when the timeline is closed.",
+      description: "Bike rides, frames worth keeping and the ideas that feed the work.",
       ctaLabel: "Open the Drawing Room",
       stamp: "Private archive",
-      note: "01 / The reel between reels",
-      invitation: "YOU'RE INVITED",
-      invitationNote: "Open when curious",
     },
     intro:
       "A living mood board of my off-clock ideas and experiments. Grab anything and move it around — arrange the room however you like.",
@@ -591,7 +580,6 @@ export const sectionData = {
   }),
   contact: ContactSchema.parse({
     availableForFreelance: true,
-    availabilityLabel: "Available for freelance ·",
     footerStatus: "Available for freelance",
     projectCtaLabel: "Book a call",
     callbackCtaLabel: "Request a callback",

@@ -1,86 +1,44 @@
 import Link from "next/link";
-import { getStudioDashboardData } from "@/lib/studio";
-import { studioHref } from "@/lib/studio-nav";
+import { AvailabilityCard } from "@/components/studio/AvailabilityCard";
+import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
+import { ShareImage } from "@/components/studio/ShareImage";
+import { Status } from "@/generated/prisma/client";
+import { getContact, getResume, getSettings, getWork } from "@/lib/content";
+import { type DraftPart, partEdited } from "@/lib/draft-diff";
+import { publishChecks } from "@/lib/publish-checks";
+import { type SectionKey, sectionKeys } from "@/lib/sections";
+import { getRecentActivity, getSectionRows, getStorageUsage } from "@/lib/studio";
+import { getStudioDraftVersion } from "@/lib/studio-drafts";
+import { studioHref, studioTabs } from "@/lib/studio-nav";
 
-const sections = [
+/* The settings editors with no tab of their own. Between them and the Navbar and
+   Footer tabs every key of the settings draft is covered, so an edit anywhere in
+   it shows up as "Edited" on exactly one row of this page. */
+const siteDetails: ReadonlyArray<{
+  href: string;
+  label: string;
+  detail: string;
+  part: DraftPart;
+}> = [
   {
-    href: studioHref("/hero"),
-    number: "01",
-    label: "Hero",
-    detail: "Headline, buttons and film-frame labels",
-    media: "1 background video + poster",
+    href: studioHref("/settings?open=seo"),
+    label: "Google and sharing",
+    detail: "Page title, description and share image",
+    part: { only: ["seo"] },
   },
   {
-    href: studioHref("/about"),
-    number: "02",
-    label: "About",
-    detail: "Your story, current status and tools",
-    media: "1 portrait photo + optional video",
-  },
-  {
-    href: studioHref("/impact"),
-    number: "03",
-    label: "Impact",
-    detail: "Numbers strip and collaborators",
-    media: "1 photo per collaborator",
-  },
-  {
-    href: studioHref("/clients"),
-    number: "04",
-    label: "Clients",
-    detail: "Marquee of companies you have worked with",
-    media: "Optional logo per company",
-  },
-  {
-    href: studioHref("/work"),
-    number: "05",
-    label: "Work",
-    detail: "Project cards grouped into filter categories",
-    media: "Link per project · optional cover or video",
-  },
-  {
-    href: studioHref("/praise"),
-    number: "06",
-    label: "Praise",
-    detail: "Testimonials and who said them",
-    media: "Optional photo per person",
-  },
-  {
-    href: studioHref("/experience"),
-    number: "07",
-    label: "Experience",
-    detail: "One scene per role, with dates and location",
-    media: "One scene photo per role",
-  },
-  {
-    href: studioHref("/resume"),
-    number: "08",
-    label: "Resume",
-    detail: "The /resume page the menu links to",
-    media: "1 PDF",
-  },
-  {
-    href: studioHref("/room"),
-    number: "09",
-    label: "Drawing Room",
-    detail: "Pinboard of polaroids, notes and quotes",
-    media: "Polaroid photos · reel cover or video",
-  },
-  {
-    href: studioHref("/contact"),
-    number: "10",
-    label: "Contact",
-    detail: "Invitation, contact details and social links",
-    media: "No uploads",
+    href: studioHref("/settings?open=site.brand"),
+    label: "Brand",
+    detail: "The wordmark in the navbar and footer",
+    part: { only: ["site.brand"] },
   },
   {
     href: studioHref("/settings"),
-    number: "11",
-    label: "Site & Navigation",
-    detail: "Brand wordmark, menu, footer, SEO and theme",
-    media: "1 social share photo",
+    label: "Look and domain",
+    detail: "Motion, stand-in photo, owner name and domain",
+    part: { only: ["appearance", "fallbackImage", "domain", "site.ownerName"] },
   },
-] as const;
+];
 
 function getRelativeTime(date: Date) {
   const minutes = Math.floor(Math.max(0, Date.now() - date.getTime()) / 60000);
@@ -90,128 +48,195 @@ function getRelativeTime(date: Date) {
   return hours < 24 ? `${hours}h ago` : `${Math.floor(hours / 24)}d ago`;
 }
 
-export default async function StudioPage() {
-  const dashboard = await getStudioDashboardData();
-  const readiness = [
-    {
-      href: studioHref("/work"),
-      label: "Selected work",
-      detail:
-        dashboard.workItems > 0 ? `${dashboard.workItems} videos ready` : "Add your first video",
-      ready: dashboard.workItems > 0,
-    },
-    {
-      href: studioHref("/praise"),
-      label: "Praise",
-      detail:
-        dashboard.testimonials > 0
-          ? `${dashboard.testimonials} testimonials ready`
-          : "Optional · add when quotes arrive",
-      ready: dashboard.testimonials > 0,
-    },
-    {
-      href: studioHref("/settings"),
-      label: "Site & navigation",
-      detail: "Review menu, footer, SEO, and domain",
-      ready: true,
-    },
-  ] as const;
+function formatStorage(bytes: number) {
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+}
+
+function StatusPill({ edited }: Readonly<{ edited: boolean }>) {
+  return (
+    <span className={`studio-settings__pill${edited ? " is-edited" : ""}`}>
+      {edited ? "Edited" : "Live"}
+    </span>
+  );
+}
+
+export default async function StudioMenuPage() {
+  const [activity, rows, storage, contact, contactVersion, settings, resume, work] =
+    await Promise.all([
+      getRecentActivity(),
+      getSectionRows(),
+      getStorageUsage(),
+      getContact(Status.DRAFT),
+      getStudioDraftVersion("contact"),
+      getSettings(Status.DRAFT),
+      getResume(Status.DRAFT),
+      getWork(Status.DRAFT),
+    ]);
+
+  const drafts = rows.filter((row) => row.status === Status.DRAFT);
+  const isEdited = (section: SectionKey, part?: DraftPart) => partEdited(rows, section, part);
+  const sections = studioTabs.flatMap((tab) =>
+    tab.section
+      ? [
+          {
+            ...tab,
+            edited: isEdited(tab.section, tab.part),
+            savedAt: drafts.find((draft) => draft.key === tab.section)?.updatedAt,
+          },
+        ]
+      : [],
+  );
+  const details = siteDetails.map((item) => ({
+    ...item,
+    edited: isEdited("settings", item.part),
+  }));
+  const editedCount = [...sections, ...details].filter((item) => item.edited).length;
+  const lastPublished = rows
+    .filter((row) => row.status === Status.PUBLISHED)
+    .reduce<Date | null>(
+      (latest, row) => (latest && latest > row.updatedAt ? latest : row.updatedAt),
+      null,
+    );
+  const checks = publishChecks({
+    resume,
+    settings,
+    work,
+    contact,
+    drafts: sectionKeys.flatMap((key) => {
+      const draft = drafts.find((row) => row.key === key);
+      return draft ? [{ key, data: draft.data }] : [];
+    }),
+  });
+  const { title, description, ogImage } = settings.seo;
 
   return (
-    <section className="studio-page studio-dashboard" aria-labelledby="studio-dashboard-title">
-      <div className="studio-dashboard__intro">
-        <div>
-          <span className="slate">Today in the Studio</span>
-          <h1 id="studio-dashboard-title">What needs attention?</h1>
+    <section className="studio-page studio-settings" aria-labelledby="studio-menu-title">
+      <div className="studio-settings__head">
+        <header className="studio-settings__intro">
+          <span className="slate">{settings.domain || "Whole site"}</span>
+          <h1 id="studio-menu-title">Menu</h1>
           <p>
-            Jump straight to unfinished content, review recent changes, or open any page section.
-            Save drafts while you work and publish only when the full site is ready.
+            {editedCount === 0
+              ? "Everything here is live."
+              : `${editedCount} ${editedCount === 1 ? "part has" : "parts have"} changes waiting for Publish.`}
           </p>
-        </div>
-        <div className="studio-dashboard__actions">
-          <Link className="studio-dashboard__site-link" href={studioHref("/work")}>
-            Edit selected work <span aria-hidden="true">→</span>
-          </Link>
-          <a className="studio-dashboard__view-link" href={process.env.PUBLIC_SITE_URL || "/"} target="_blank" rel="noreferrer">
-            View live site <span aria-hidden="true">↗</span>
-          </a>
+        </header>
+
+        <div className="studio-settings__tiles">
+          <AvailabilityCard contact={contact} version={contactVersion} />
+          <div className="studio-settings__tile">
+            <span>Not live yet</span>
+            <strong>{editedCount === 0 ? "Nothing" : `${editedCount} edited`}</strong>
+          </div>
+          <div className="studio-settings__tile">
+            <span>Last published</span>
+            <strong>
+              {lastPublished ? (
+                <time dateTime={lastPublished.toISOString()}>{getRelativeTime(lastPublished)}</time>
+              ) : (
+                "Never"
+              )}
+            </strong>
+          </div>
+          <div className="studio-settings__tile">
+            <span>{`Storage · ${storage.files} ${storage.files === 1 ? "file" : "files"}`}</span>
+            <strong>{formatStorage(storage.bytes)}</strong>
+          </div>
         </div>
       </div>
 
-      <dl className="studio-stats">
+      <div className="studio-settings__columns">
         <div>
-          <dt>Site status</dt>
-          <dd>{dashboard.hasUnpublishedChanges ? "Needs publish" : "Up to date"}</dd>
+          <section className="studio-settings__card" aria-labelledby="sections-title">
+            <h2 id="sections-title">Sections</h2>
+            <ol className="studio-settings__sections">
+              {sections.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href}>
+                    <span>
+                      {item.label}
+                      {item.edited && item.savedAt ? (
+                        <small>{` · saved ${getRelativeTime(item.savedAt).toLowerCase()}`}</small>
+                      ) : null}
+                    </span>
+                    <StatusPill edited={item.edited} />
+                    <b aria-hidden="true">&rsaquo;</b>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
-        <div>
-          <dt>Work pieces</dt>
-          <dd>{dashboard.workItems}</dd>
-        </div>
-        <div>
-          <dt>Testimonials</dt>
-          <dd>{dashboard.testimonials}</dd>
-        </div>
-      </dl>
 
-      <section className="studio-dashboard-grid" aria-label="Studio priorities and activity">
         <div>
-          <span className="slate">Content readiness</span>
-          <h2>Finish the essentials.</h2>
-          <div className="studio-readiness">
-            {readiness.map((item) => (
-              <Link href={item.href} key={item.href}>
-                <i className={item.ready ? "is-ready" : undefined} aria-hidden="true" />
-                <span>
-                  <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
-                </span>
-                <b aria-hidden="true">→</b>
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div>
-          <span className="slate">Recent activity</span>
-          <h2>Latest saved drafts.</h2>
-          {dashboard.activity.length > 0 ? (
-            <ul className="studio-activity">
-              {dashboard.activity.map((item) => (
-                <li key={item.id}>
-                  <span>{item.message}</span>
-                  <time dateTime={item.createdAt.toISOString()}>
-                    {getRelativeTime(item.createdAt)}
-                  </time>
+          <section className="studio-settings__card" aria-labelledby="checks-title">
+            <h2 id="checks-title">Before you publish</h2>
+            <ul className="studio-settings__checks">
+              {checks.map((check) => (
+                <li key={check.label} className={check.ok ? undefined : "needs-fix"}>
+                  <i aria-hidden="true" />
+                  <span>{check.label}</span>
+                  {check.ok ? null : <Link href={studioHref(check.path)}>Fix</Link>}
                 </li>
               ))}
             </ul>
-          ) : (
-            <p>No draft activity yet. Open a section below to start editing.</p>
-          )}
-        </div>
-      </section>
+          </section>
 
-      <section className="studio-section-map" aria-labelledby="studio-section-map-title">
-        <header>
-          <div>
-            <span className="slate">All editable content</span>
-            <h2 id="studio-section-map-title">Open a page section.</h2>
-          </div>
-          <span>{sections.length} editable sections</span>
-        </header>
-        <div>
-          {sections.map((section) => (
-            <Link href={section.href} key={section.href}>
-              <i>{section.number}</i>
-              <span>
-                <strong>{section.label}</strong>
-                <small>{section.detail}</small>
-                <small className="studio-section-map__media">{section.media}</small>
-              </span>
-              <b aria-hidden="true">→</b>
-            </Link>
-          ))}
+          <section className="studio-settings__card" aria-labelledby="activity-title">
+            <h2 id="activity-title">Recent changes</h2>
+            {activity.length > 0 ? (
+              <ul className="studio-activity">
+                {activity.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.message}</span>
+                    <time dateTime={item.createdAt.toISOString()}>
+                      {getRelativeTime(item.createdAt)}
+                    </time>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>Nothing saved yet. Pick a section to start editing.</p>
+            )}
+          </section>
         </div>
-      </section>
+
+        <div>
+          <section className="studio-settings__card" aria-labelledby="site-details-title">
+            <h2 id="site-details-title">Site details</h2>
+            <ul className="studio-settings__links">
+              {details.map((item) => (
+                <li key={item.href}>
+                  <Link href={item.href}>
+                    <span>
+                      <strong>{item.label}</strong>
+                      <small>{item.detail}</small>
+                    </span>
+                    <StatusPill edited={item.edited} />
+                    <b aria-hidden="true">&rsaquo;</b>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="studio-settings__caption">How a shared link looks</p>
+            <Link className="studio-settings__share" href={studioHref("/settings?open=seo")}>
+              {ogImage ? (
+                <ShareImage url={ogImage.url} />
+              ) : (
+                <span className="studio-settings__share-empty">No share image yet</span>
+              )}
+              <span>
+                <small>{settings.domain}</small>
+                <strong>{title || "No page title yet"}</strong>
+                <small>{description || "No description yet"}</small>
+              </span>
+            </Link>
+          </section>
+
+          <SettingsDangerZone />
+        </div>
+      </div>
     </section>
   );
 }

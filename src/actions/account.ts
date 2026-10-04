@@ -1,6 +1,6 @@
 "use server";
 
-import { requireOwner } from "@/auth";
+import { requireOwner, signOut } from "@/auth";
 import { getDb } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
@@ -30,4 +30,9 @@ export async function changePassword(
     console.error("changePassword failed", error);
     return { ok: false, error: "Could not change the password. Please try again." };
   }
+}
+
+/** Ends the Studio session and returns to the sign-in page. */
+export async function logout() {
+  await signOut({ redirectTo: "/login" });
 }

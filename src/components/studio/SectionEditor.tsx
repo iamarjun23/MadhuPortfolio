@@ -17,19 +17,35 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Crosshair,
+  ExternalLink,
+  GripVertical,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { saveDraft } from "@/actions/save-draft";
 import { Dropzone, type UploadEndpoint } from "@/components/studio/Dropzone";
 import { MediaPreview } from "@/components/studio/MediaPreview";
+import { PreviewFit } from "@/components/studio/PreviewFit";
 import { PreviewFrame } from "@/components/studio/PreviewFrame";
 import { SaveBar } from "@/components/studio/SaveBar";
-import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
+import { StudioIcon } from "@/components/studio/StudioIcon";
 import { StudioLandingPreview } from "@/components/studio/StudioLandingPreview";
 import { orderAllProjects } from "@/components/public/WorkConsole";
 import { WorkSchema } from "@/schemas";
+import { maxAtPath } from "@/lib/field-limits";
 import { estimateFocalPoint } from "@/lib/focal-point";
+import { isPlaceholderImageSrc } from "@/lib/placeholders";
+import { sectionSchemas } from "@/lib/section-schemas";
 import type { SectionKey } from "@/lib/sections";
 import {
   describeField,
@@ -40,7 +56,7 @@ import {
 } from "@/lib/studio-labels";
 import { studioSectionLabels } from "@/lib/studio-nav";
 import { reelSourceLabel, resolveReel } from "@/lib/reel";
-import { useStudioStore } from "@/stores/studio-store";
+import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 type EditorValue = string | number | boolean | null | EditorObject | EditorValue[];
 type EditorObject = { [key: string]: EditorValue };
@@ -304,16 +320,6 @@ function findPreviewPath(
   return matches[0]?.path ?? null;
 }
 
-/* Reads a path as a breadcrumb of human labels, so "lanes.0.projects.2.image"
-   becomes "Categories / Category 1 / Projects / Project 3 / Project cover photo". */
-function pathLabel(path: readonly (string | number)[]) {
-  return path.map((_, index) => fieldLabel(path.slice(0, index + 1))).join(" / ");
-}
-
-function parentLabel(path: readonly (string | number)[]) {
-  return path.length > 1 ? pathLabel(path.slice(0, -1)) : "";
-}
-
 function emptyFromTemplate(
   value: EditorValue,
   path: readonly (string | number)[] = [],
@@ -342,8 +348,8 @@ function emptyFromTemplate(
         : key === "position"
           ? null
           : key === "href" && typeof entry === "string"
-          ? null
-          : emptyFromTemplate(entry, [...path, key]);
+            ? null
+            : emptyFromTemplate(entry, [...path, key]);
   }
   return result;
 }
@@ -351,7 +357,7 @@ function emptyFromTemplate(
 function itemTitle(value: EditorValue, fallback: string) {
   if (!isEditorObject(value)) return fallback;
 
-  for (const key of ["title", "name", "company", "label", "caption", "kicker", "id"]) {
+  for (const key of ["title", "name", "company", "label", "caption", "kicker"]) {
     const entry = value[key];
     if (typeof entry === "string" && entry) return entry;
   }
@@ -455,7 +461,7 @@ function SortableRow({ id, children }: Readonly<{ id: string; children: React.Re
         {...attributes}
         {...listeners}
       >
-        <span aria-hidden="true">::</span>
+        <GripVertical aria-hidden="true" />
       </button>
       {children}
     </li>
@@ -477,6 +483,8 @@ type ValueEditorProps = Readonly<{
 function splitHint(hint: string): Readonly<{ lead: string; rest: string }> {
   for (let i = 20; i < hint.length - 1; i += 1) {
     if (hint[i] !== "." || hint[i - 1] === "." || !/\s/.test(hint[i + 1] ?? "")) continue;
+    // "e.g." and "i.e." carry a full stop of their own that ends nothing.
+    if (/\b(e\.g|i\.e)$/.test(hint.slice(0, i))) continue;
     const rest = hint.slice(i + 1).trim();
     if (rest.length < 24) break;
     return { lead: hint.slice(0, i + 1), rest };
@@ -484,15 +492,11 @@ function splitHint(hint: string): Readonly<{ lead: string; rest: string }> {
   return { lead: hint, rest: "" };
 }
 
-function FieldHint({
-  id,
-  hint,
-  className = "studio-field__hint",
-}: Readonly<{ id: string; hint?: string; className?: string }>) {
+function FieldHint({ id, hint }: Readonly<{ id: string; hint?: string }>) {
   if (!hint) return null;
   const { lead, rest } = splitHint(hint);
   return (
-    <div className={className} id={id}>
+    <div className="studio-ins-hint" id={id}>
       {lead}
       {rest ? (
         <details className="studio-hint-more">
@@ -504,115 +508,213 @@ function FieldHint({
   );
 }
 
-function ScalarEditor({ value, label, path, onChange }: ValueEditorProps) {
-  const key = String(path[path.length - 1] ?? "");
-  const options = optionsForPath(path);
-  const id = `studio-${path.join("-")}`;
-  const hintId = `${id}-hint`;
-  const { hint } = describeField(path);
-  const describedBy = hint ? hintId : undefined;
+function isMultiline(text: string, key: string) {
+  return (
+    text.length > 74 ||
+    /description|approach|paragraph|quote|headline|sub|intro|tagline|text/i.test(key)
+  );
+}
 
-  if (typeof value === "boolean") {
+/* A folded field: what it is and what it holds, with its editor one click away.
+   An empty one says "Add" instead, so what a section can still take shows at a
+   glance without every box being open. */
+function FieldRow({
+  label,
+  value,
+  thumbnail,
+  isEmpty,
+  leadsOn,
+  onClick,
+}: Readonly<{
+  label: string;
+  value: string;
+  thumbnail?: string;
+  isEmpty: boolean;
+  /** Opens a list or group rather than an editor. */
+  leadsOn?: boolean;
+  onClick: () => void;
+}>) {
+  if (isEmpty) {
     return (
-      <div className="studio-switch-field">
-        <label className="studio-switch" htmlFor={id}>
-          <span>{label}</span>
-          <input
-            id={id}
-            type="checkbox"
-            checked={value}
-            aria-describedby={describedBy}
-            onChange={(event) => onChange(path, event.target.checked)}
-          />
-        </label>
-        <FieldHint id={hintId} hint={hint} />
-      </div>
+      <button
+        className="studio-ins-row studio-ins-row--empty"
+        type="button"
+        aria-label={`Add ${label}`}
+        onClick={onClick}
+      >
+        <span className="studio-ins-row__text">
+          <b>{label}</b>
+        </span>
+        <em>Add</em>
+      </button>
     );
   }
+
+  return (
+    <button className="studio-ins-row" type="button" onClick={onClick}>
+      {thumbnail ? (
+        <span className="studio-ins-row__icon" aria-hidden="true">
+          {/* An address the editor typed, so it cannot go through next/image. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={thumbnail} alt="" />
+        </span>
+      ) : null}
+      <span className="studio-ins-row__text">
+        <small>{label}</small>
+        <b>{value}</b>
+      </span>
+      {leadsOn ? (
+        <ChevronRight className="studio-ins-row__cue" aria-hidden="true" />
+      ) : (
+        <Pencil className="studio-ins-row__cue" aria-hidden="true" />
+      )}
+    </button>
+  );
+}
+
+/* The one field being edited: its name, what it does on the page, the control,
+   and its limit beside the way out. */
+function FieldCard({
+  label,
+  optional,
+  hint,
+  hintId,
+  meta,
+  onDone,
+  children,
+}: Readonly<{
+  label: string;
+  optional?: boolean;
+  hint?: string;
+  hintId: string;
+  meta?: React.ReactNode;
+  onDone: () => void;
+  children: React.ReactNode;
+}>) {
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, []);
+
+  return (
+    <section className="studio-ins-card" ref={ref} aria-label={label}>
+      <header>
+        <h4>{label}</h4>
+        {optional ? <em>Optional</em> : null}
+      </header>
+      <FieldHint id={hintId} hint={hint} />
+      {children}
+      <footer>
+        <span className="studio-ins-card__meta">{meta}</span>
+        <button className="studio-ins-btn studio-ins-btn--primary" type="button" onClick={onDone}>
+          Done
+        </button>
+      </footer>
+    </section>
+  );
+}
+
+type ControlRowProps = Readonly<{ id: string; label: string; hint?: string }>;
+
+/* A switch or a short choice is one click either way, so it is used right in its
+   row instead of being opened first. */
+function SwitchRow({
+  id,
+  label,
+  hint,
+  checked,
+  onChange,
+}: ControlRowProps & Readonly<{ checked: boolean; onChange: (checked: boolean) => void }>) {
+  return (
+    <label className="studio-ins-row studio-ins-row--control" htmlFor={id}>
+      <span className="studio-ins-row__text">
+        <b>{label}</b>
+        {hint ? <small>{splitHint(hint).lead}</small> : null}
+      </span>
+      <input
+        id={id}
+        className="studio-ins-switch"
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+    </label>
+  );
+}
+
+function SelectRow({
+  id,
+  label,
+  hint,
+  value,
+  options,
+  onChange,
+}: ControlRowProps &
+  Readonly<{ value: string; options: readonly string[]; onChange: (value: string) => void }>) {
+  return (
+    <label className="studio-ins-row studio-ins-row--control" htmlFor={id}>
+      <span className="studio-ins-row__text">
+        <b>{label}</b>
+        {hint ? <small>{splitHint(hint).lead}</small> : null}
+      </span>
+      <select id={id} value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option || "None"}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function TextEditor({
+  value,
+  label,
+  path,
+  onChange,
+  max,
+}: Pick<ValueEditorProps, "value" | "label" | "path" | "onChange"> & Readonly<{ max?: number }>) {
+  const describedBy = `studio-${path.join("-")}-hint`;
 
   if (typeof value === "number") {
     return (
-      <label className="studio-field" htmlFor={id}>
-        <span>{label}</span>
-        <input
-          id={id}
-          type="number"
-          value={value}
-          step="any"
-          aria-describedby={describedBy}
-          onChange={(event) => onChange(path, Number(event.target.value))}
-        />
-        <FieldHint id={hintId} hint={hint} />
-      </label>
+      <input
+        type="number"
+        value={value}
+        step="any"
+        aria-label={label}
+        aria-describedby={describedBy}
+        autoFocus
+        onChange={(event) => onChange(path, Number(event.target.value))}
+      />
     );
   }
 
-  if (value === null) {
-    return (
-      <label className="studio-field" htmlFor={id}>
-        <span>{label}</span>
-        <input
-          id={id}
-          value=""
-          placeholder="Not set"
-          aria-describedby={describedBy}
-          onChange={(event) => onChange(path, event.target.value || null)}
-        />
-        <FieldHint id={hintId} hint={hint ?? "Empty. Type a value to set it."} />
-      </label>
-    );
-  }
+  const text = typeof value === "string" ? value : "";
+  const set = (next: string) => onChange(path, value === null ? next || null : next);
 
-  if (typeof value !== "string") return null;
-
-  if (options) {
-    return (
-      <label className="studio-field" htmlFor={id}>
-        <span>{label}</span>
-        <select
-          id={id}
-          value={value}
-          aria-describedby={describedBy}
-          onChange={(event) => onChange(path, event.target.value || null)}
-        >
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option || "None"}
-            </option>
-          ))}
-        </select>
-        <FieldHint id={hintId} hint={hint} />
-      </label>
-    );
-  }
-
-  const multiline =
-    value.length > 74 ||
-    /description|approach|paragraph|quote|headline|sub|intro|tagline|text/i.test(key);
-  return (
-    <label className="studio-field" htmlFor={id}>
-      <span>
-        {label}
-        {key === "sub" || key === "description" ? <b>{value.length} characters</b> : null}
-      </span>
-      {multiline ? (
-        <textarea
-          id={id}
-          value={value}
-          rows={Math.min(6, Math.max(3, Math.ceil(value.length / 68)))}
-          aria-describedby={describedBy}
-          onChange={(event) => onChange(path, event.target.value)}
-        />
-      ) : (
-        <input
-          id={id}
-          value={value}
-          aria-describedby={describedBy}
-          onChange={(event) => onChange(path, event.target.value)}
-        />
-      )}
-      <FieldHint id={hintId} hint={hint} />
-    </label>
+  return isMultiline(text, String(path.at(-1) ?? "")) ? (
+    <textarea
+      value={text}
+      rows={Math.min(6, Math.max(3, Math.ceil(text.length / 44)))}
+      maxLength={max}
+      aria-label={label}
+      aria-describedby={describedBy}
+      autoFocus
+      onChange={(event) => set(event.target.value)}
+    />
+  ) : (
+    <input
+      value={text}
+      maxLength={max}
+      aria-label={label}
+      aria-describedby={describedBy}
+      autoFocus
+      onChange={(event) => set(event.target.value)}
+    />
   );
 }
 
@@ -622,7 +724,6 @@ type MediaConfig = Readonly<{
   isVideo?: boolean;
   isDocument?: boolean;
   isOptional?: boolean;
-  isUrlOnly?: boolean;
 }>;
 
 function mediaKindOf(config: MediaConfig | undefined): MediaKindLabel {
@@ -769,25 +870,16 @@ function mediaSummary(value: EditorValue, path: readonly (string | number)[]) {
     if (hasMedia(field.value)) counts[kind].filled += 1;
   }
 
+  /* Only what is there is listed: a row reading "no photo yet · no video yet"
+     for every optional slot buried the one thing that was set. */
   const parts = (["photo", "video", "document"] as const)
-    .filter((kind) => counts[kind].total > 0)
-    .map((kind) => {
-      const { filled } = counts[kind];
-      return filled === 0 ? `no ${kind} yet` : `${filled} ${kind}${filled > 1 ? "s" : ""}`;
-    });
+    .filter((kind) => counts[kind].filled > 0)
+    .map((kind) => `${counts[kind].filled} ${kind}${counts[kind].filled > 1 ? "s" : ""}`);
 
-  if (links.length > 0) {
-    const filled = links.filter((link) => typeof link.value === "string" && link.value).length;
-    parts.push(
-      filled === 0
-        ? "no video link yet"
-        : filled === 1
-          ? "video link set"
-          : `${filled} video links`,
-    );
-  }
+  const filledLinks = links.filter((link) => typeof link.value === "string" && link.value).length;
+  if (filledLinks > 0) parts.push(filledLinks === 1 ? "video link" : `${filledLinks} video links`);
 
-  return parts.join(" · ");
+  return parts.length > 0 ? parts.join(" · ") : "No photo or video yet";
 }
 
 function setOptionalString(object: EditorObject, key: string, value: string): EditorObject {
@@ -797,41 +889,41 @@ function setOptionalString(object: EditorObject, key: string, value: string): Ed
   return next;
 }
 
+const mediaFallbackHints: Record<MediaKindLabel, string> = {
+  photo: "An image that appears in this part of the page.",
+  video: "A video that plays in this part of the page.",
+  document: "A file visitors can view and download.",
+};
+
+/* The address a media field actually shows. A leftover placeholder counts as
+   nothing, the same way the page treats it. */
+function storedMediaUrl(value: EditorValue) {
+  return isEditorObject(value) && typeof value.url === "string" && !isPlaceholderImageSrc(value.url)
+    ? value.url
+    : "";
+}
+
 function MediaEditor({
   value,
   label,
   path,
   onChange,
   uploadEnabled,
-  showBreadcrumb,
   parent,
-}: ValueEditorProps & { showBreadcrumb?: boolean; parent?: EditorObject }) {
+}: ValueEditorProps & { parent?: EditorObject }) {
   const pushToast = useStudioStore((state) => state.pushToast);
   const config = getMediaConfig(value, path);
   if (!config) return null;
 
   const kind = mediaKindOf(config);
-  const spec = mediaSpecs[kind];
-  const { hint } = describeField(path);
-  const breadcrumb = showBreadcrumb ? parentLabel(path) : "";
-
+  const id = `studio-${path.join("-")}`;
   const object = isEditorObject(value) ? value : {};
-  const url = config.isUrlOnly
-    ? typeof value === "string"
-      ? value
-      : ""
-    : typeof object.url === "string"
-      ? object.url
-      : "";
+  const url = typeof object.url === "string" ? object.url : "";
   const alt = typeof object.alt === "string" ? object.alt : "";
   const poster = typeof object.poster === "string" ? object.poster : "";
   const duotone = object.duotone === true;
 
   const setUrl = (nextUrl: string) => {
-    if (config.isUrlOnly) {
-      onChange(path, nextUrl || null);
-      return;
-    }
     if (!nextUrl && (!config.isVideo || config.isOptional)) {
       onChange(path, null);
       return;
@@ -864,161 +956,122 @@ function MediaEditor({
   };
 
   return (
-    <fieldset className={`studio-object studio-media-field studio-media-field--${kind}`}>
-      <legend>
-        <span className={`studio-media-badge studio-media-badge--${kind}`}>{spec.badge}</span>
-        <span className="studio-media-field__name">{label}</span>
-        {config.isOptional ? <em className="studio-media-field__flag">Optional</em> : null}
-      </legend>
-      {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
-      <FieldHint
-        id={`studio-${path.join("-")}-field-hint`}
-        className="studio-media-field__hint"
-        hint={
-          hint ??
-          (kind === "video"
-            ? "A video that plays in this part of the page."
-            : kind === "document"
-              ? "A file visitors can view and download."
-              : "An image that appears in this part of the page.")
-        }
-      />
-      <p className="studio-media-field__spec">
-        {spec.accepts}
-        {url ? null : <span> · nothing uploaded yet</span>}
-      </p>
+    <>
       <Dropzone
         endpoint={config.endpoint}
-        label={spec.action}
+        label={label}
         value={url || undefined}
         enabled={uploadEnabled}
         onUploaded={(upload) => {
           setUrl(upload.url);
           if (supportsFocalPoint) void autoDetectFocalPoint(upload.url);
         }}
-        onDeleted={() => setUrl("")}
+        onRemoved={() => setUrl("")}
       />
-      {supportsFocalPoint && url ? (
-        <div className="studio-focal-field">
-          <span className="studio-focal-field__label">Crop focus</span>
-          <button
-            type="button"
-            className="studio-focal-picker"
-            style={{ backgroundImage: `url(${url})` }}
-            onClick={pickFocalPoint}
-            aria-label="Click where the crop should centre on this photo"
-          >
-            <span
-              className="studio-focal-picker__marker"
-              style={{ left: `${focalX * 100}%`, top: `${focalY * 100}%` }}
-              aria-hidden="true"
-            />
-          </button>
-          <div className="studio-focal-field__actions">
-            <button type="button" onClick={() => void autoDetectFocalPoint(url)}>
-              Auto-detect
-            </button>
-            <button type="button" onClick={() => setFocal(0.5, 0.5)}>
-              Reset to centre
-            </button>
-          </div>
-          <FieldHint
-            id={`studio-${path.join("-")}-focal-hint`}
-            hint="Click the part of the photo that matters most - a face, say - so a narrow tile crops around it instead of the middle. Auto-detect guesses the busiest spot for you."
-          />
-        </div>
-      ) : null}
-      <label className="studio-field" htmlFor={`studio-${path.join("-")}-url`}>
-        <span>{kind === "video" ? "Video address" : "Photo address"}</span>
+      {config.acceptsAlt && url ? (
         <input
-          id={`studio-${path.join("-")}-url`}
-          type="url"
-          value={url}
-          placeholder="https://"
-          aria-describedby={`studio-${path.join("-")}-url-hint`}
-          onChange={(event) => setUrl(event.target.value)}
+          value={alt}
+          aria-label="Describe the photo"
+          placeholder="Describe the photo, for people who cannot see it"
+          onChange={(event) => onChange(path, { ...object, url, alt: event.target.value })}
         />
-        <FieldHint
-          id={`studio-${path.join("-")}-url-hint`}
-          hint={`Filled in for you when you upload above. Clear it to remove this ${kind}.`}
-        />
-      </label>
-      {config.acceptsAlt ? (
-        <label className="studio-field" htmlFor={`studio-${path.join("-")}-alt`}>
-          <span>Alt text (describe the photo)</span>
+      ) : null}
+      <details className="studio-ins-more">
+        <summary>
+          More options
+          <ChevronDown aria-hidden="true" />
+        </summary>
+        <label className="studio-ins-sub" htmlFor={`${id}-url`}>
+          <span>Use a link instead</span>
           <input
-            id={`studio-${path.join("-")}-alt`}
-            value={alt}
-            placeholder="e.g. Madhu at the edit desk, mid-cut"
-            aria-describedby={`studio-${path.join("-")}-alt-hint`}
-            onChange={(event) => onChange(path, { ...object, url, alt: event.target.value })}
+            id={`${id}-url`}
+            type="url"
+            value={url}
+            placeholder="https://"
+            onChange={(event) => setUrl(event.target.value)}
           />
-          <FieldHint
-            id={`studio-${path.join("-")}-alt-hint`}
-            hint="Read aloud by screen readers and shown if the photo fails to load. Say what is in the picture."
-          />
+          <small>
+            For a {kind === "document" ? "file" : kind} that already lives on another site.
+            Uploading fills this in for you.
+          </small>
         </label>
-      ) : null}
-      {config.isVideo && !config.isUrlOnly ? (
-        <>
-          <Dropzone
-            endpoint="videoPoster"
-            label="Upload poster"
-            value={poster || undefined}
-            enabled={uploadEnabled}
-            onUploaded={(upload) => onChange(path, setOptionalString(object, "poster", upload.url))}
-            onDeleted={() => onChange(path, setOptionalString(object, "poster", ""))}
-          />
-          <label className="studio-field" htmlFor={`studio-${path.join("-")}-poster`}>
-            <span>Poster photo address</span>
-            <input
-              id={`studio-${path.join("-")}-poster`}
-              type="url"
-              value={poster}
-              placeholder="https://"
-              aria-describedby={`studio-${path.join("-")}-poster-hint`}
-              onChange={(event) =>
-                onChange(path, setOptionalString(object, "poster", event.target.value))
-              }
-            />
-            <FieldHint
-              id={`studio-${path.join("-")}-poster-hint`}
-              hint="A still shown while the video loads, or if it cannot play - ideally the video's first frame, so the switch is seamless. Keep it small (a WebP or AVIF around 100KB): it is the first thing visitors see."
-            />
-          </label>
-          <div className="studio-switch-field">
-            <label className="studio-switch" htmlFor={`studio-${path.join("-")}-duotone`}>
-              <span>Duotone tint</span>
-              <input
-                id={`studio-${path.join("-")}-duotone`}
-                type="checkbox"
-                checked={duotone}
-                aria-describedby={`studio-${path.join("-")}-duotone-hint`}
-                onChange={(event) => onChange(path, { ...object, duotone: event.target.checked })}
+        {supportsFocalPoint && url ? (
+          <div className="studio-ins-sub">
+            <span>Crop focus</span>
+            <button
+              type="button"
+              className="studio-focal-picker"
+              style={{ backgroundImage: `url(${url})` }}
+              onClick={pickFocalPoint}
+              aria-label="Click where the crop should centre on this photo"
+            >
+              <span
+                className="studio-focal-picker__marker"
+                style={{ left: `${focalX * 100}%`, top: `${focalY * 100}%` }}
+                aria-hidden="true"
               />
-            </label>
-            <FieldHint
-              id={`studio-${path.join("-")}-duotone-hint`}
-              hint="Washes the video in the site's orange-and-black treatment. Turn it off to show the original colours."
-            />
+            </button>
+            <div className="studio-drop__actions">
+              <button
+                className="studio-ins-btn"
+                type="button"
+                onClick={() => void autoDetectFocalPoint(url)}
+              >
+                <Crosshair aria-hidden="true" />
+                Auto-detect
+              </button>
+              <button className="studio-ins-btn" type="button" onClick={() => setFocal(0.5, 0.5)}>
+                Reset to centre
+              </button>
+            </div>
+            <small>
+              Click the part of the photo that matters most, so a narrow tile crops around it
+              instead of the middle.
+            </small>
           </div>
-        </>
-      ) : null}
-    </fieldset>
+        ) : null}
+        {config.isVideo ? (
+          <>
+            <div className="studio-ins-sub">
+              <span>Poster photo</span>
+              <Dropzone
+                endpoint="videoPoster"
+                label={`${label} poster`}
+                value={poster || undefined}
+                enabled={uploadEnabled}
+                onUploaded={(upload) =>
+                  onChange(path, setOptionalString(object, "poster", upload.url))
+                }
+                onRemoved={() => onChange(path, setOptionalString(object, "poster", ""))}
+              />
+              <small>
+                The still shown while the video loads - ideally its first frame, and small (around
+                100KB).
+              </small>
+            </div>
+            <SwitchRow
+              id={`${id}-duotone`}
+              label="Duotone tint"
+              hint="Washes the video in the site's orange-and-black treatment."
+              checked={duotone}
+              onChange={(checked) => onChange(path, { ...object, duotone: checked })}
+            />
+          </>
+        ) : null}
+      </details>
+    </>
   );
 }
 
 /* The counterpart to MediaEditor for a project that lives on someone else's
-   site - a YouTube video or a LinkedIn post: same card shape and Video badge,
-   but the address itself is the asset, so it gets a live thumbnail where one
-   exists, a way to replace it, and a way to clear it. */
+   site - a YouTube video or a LinkedIn post: the address itself is the asset, so
+   it gets a live thumbnail where one exists, and a way to clear it. */
 function LinkEditor({
   value,
   label,
   path,
   onChange,
-  showBreadcrumb,
-}: ValueEditorProps & { showBreadcrumb?: boolean }) {
+}: Pick<ValueEditorProps, "value" | "label" | "path" | "onChange">) {
   const url = typeof value === "string" ? value : "";
   const reel = resolveReel({ href: url || null });
   // A fetched thumbnail can fail where a computed YouTube one never does.
@@ -1026,82 +1079,63 @@ function LinkEditor({
   // broken one gets a fresh attempt.
   const [failedThumbUrl, setFailedThumbUrl] = useState<string | null>(null);
   const thumbnail = reel.thumbnailCanFail && failedThumbUrl === url ? null : reel.thumbnail;
-  const { hint } = describeField(path);
-  const breadcrumb = showBreadcrumb ? parentLabel(path) : "";
-  const inputId = `studio-${path.join("-")}-link`;
 
   return (
-    <fieldset className="studio-object studio-media-field studio-media-field--video studio-link-field">
-      <legend>
-        <span className="studio-media-badge studio-media-badge--video">Video</span>
-        <span className="studio-media-field__name">{label}</span>
-      </legend>
-      {breadcrumb ? <p className="studio-media-field__where">{breadcrumb}</p> : null}
-      <FieldHint id={`${inputId}-field-hint`} className="studio-media-field__hint" hint={hint} />
-      <div className="studio-link-field__preview">
-        {reel.playable ? (
-          <MediaPreview
-            label={label}
-            source={{
-              kind: "embed",
-              thumbnail,
-              embed: reel.embed,
-              href: url,
-              alt: `Preview of the linked ${reelSourceLabel(reel.kind).toLocaleLowerCase()}`,
-            }}
-            onError={reel.thumbnailCanFail ? () => setFailedThumbUrl(url) : undefined}
-          />
-        ) : (
-          <p>
-            {url
-              ? "That is not a YouTube, Instagram or LinkedIn address, so there is no thumbnail and no in-page player. The link still opens from the pop-up."
-              : "No link yet. Paste a YouTube, Instagram or LinkedIn address below and its preview appears here."}
-          </p>
-        )}
-      </div>
-      <label className="studio-field" htmlFor={inputId}>
-        <span>{url ? "Change the link" : "Paste the YouTube, Instagram or LinkedIn link"}</span>
-        <input
-          id={inputId}
-          type="url"
-          value={url}
-          placeholder="https://youtu.be/..."
-          aria-describedby={`${inputId}-hint`}
-          onChange={(event) => onChange(path, event.target.value || null)}
+    <>
+      <input
+        type="url"
+        value={url}
+        aria-label={label}
+        aria-describedby={`studio-${path.join("-")}-hint`}
+        placeholder="Paste a YouTube, Instagram or LinkedIn link"
+        autoFocus
+        onChange={(event) => onChange(path, event.target.value || null)}
+      />
+      {reel.playable ? (
+        <MediaPreview
+          label={label}
+          source={{
+            kind: "embed",
+            thumbnail,
+            embed: reel.embed,
+            href: url,
+            alt: `Preview of the linked ${reelSourceLabel(reel.kind).toLocaleLowerCase()}`,
+          }}
+          onError={reel.thumbnailCanFail ? () => setFailedThumbUrl(url) : undefined}
         />
-        <FieldHint
-          id={`${inputId}-hint`}
-          hint="Paste a new address over the old one to swap the reel. A YouTube video, an Instagram reel and a LinkedIn post all bring their own thumbnail; the card and the pop-up follow it straight away."
-        />
-      </label>
-      {reel.thumbnailCanFail ? (
-        <p className="studio-media-field__spec">
-          {reelSourceLabel(reel.kind)}s publish no still at an address we can look up, so this one
-          is fetched and may not arrive. Upload a <b>Cover photo</b> below and the card uses that
-          instead - the way a YouTube link supplies its own.
+      ) : url ? (
+        <p className="studio-ins-note">
+          That is not a YouTube, Instagram or LinkedIn address, so there is no thumbnail and no
+          in-page player. The link still opens from the pop-up.
         </p>
       ) : null}
-      <div className="studio-link-field__actions">
-        {url ? (
-          <a href={url} target="_blank" rel="noreferrer">
-            Open the link to check it <span aria-hidden="true">&#8599;</span>
+      {reel.thumbnailCanFail ? (
+        <p className="studio-ins-note">
+          {reelSourceLabel(reel.kind)}s publish no still we can look up, so this one is fetched and
+          may not arrive. Add a cover photo and the card uses that instead.
+        </p>
+      ) : null}
+      {url ? (
+        <div className="studio-drop__actions">
+          <a className="studio-ins-btn" href={url} target="_blank" rel="noreferrer">
+            <ExternalLink aria-hidden="true" />
+            Open link
           </a>
-        ) : null}
-        {reel.kind === "none" ? null : <em>{reelSourceLabel(reel.kind)}</em>}
-        {url ? (
-          <button type="button" onClick={() => onChange(path, null)}>
-            Clear link
+          <button className="studio-ins-btn" type="button" onClick={() => onChange(path, null)}>
+            <Trash2 aria-hidden="true" />
+            Remove link
           </button>
-        ) : null}
-      </div>
-    </fieldset>
+        </div>
+      ) : null}
+    </>
   );
 }
 
 /* ---------------------------------------------------------------------------
-   The panel on the right shows one level at a time: a list of plain-language
-   rows, and a trail back to where you came from. Lists of entries - projects,
-   polaroids, testimonials - are managed as rows you can add to, copy and delete,
+   The panel on the right shows one level at a time, and nothing is open until it
+   is asked for: every field is a row saying what it holds, or "Add" when it is
+   empty, and clicking one opens just that field. Lists of entries - projects,
+   polaroids, testimonials - are rows you can add to, copy, reorder and delete,
    and you step into an entry to edit its own fields.
 --------------------------------------------------------------------------- */
 
@@ -1111,7 +1145,11 @@ type InspectorViewProps = Readonly<{
   onNavigate: (path: readonly (string | number)[]) => void;
   templateFor: (path: readonly (string | number)[]) => EditorValue | undefined;
   uploadEnabled: boolean;
-  focusKey: string | null;
+  /** The field whose editor is open; in a list of words, the entry to point out. */
+  openKey: string | null;
+  onOpen: (key: string | null) => void;
+  /** The most a field may hold: characters for text, entries for a list. */
+  maxFor: (path: readonly (string | number)[]) => number | undefined;
 }>;
 
 function itemNounFor(path: readonly (string | number)[]) {
@@ -1119,11 +1157,12 @@ function itemNounFor(path: readonly (string | number)[]) {
   return doc.itemLabel ?? (doc.label.endsWith("s") ? doc.label.slice(0, -1) : doc.label);
 }
 
-/* "4 projects" / "3 fields": what a row leads to, before you open it. */
-function contentsLabel(value: EditorValue, path: readonly (string | number)[]) {
+/* "4 of 20 projects" / "3 fields": what a row leads to, before you open it. */
+function contentsLabel(value: EditorValue, path: readonly (string | number)[], max?: number) {
   if (Array.isArray(value)) {
     const noun = itemNounFor(path).toLowerCase();
     const plural = /[^aeiou]y$/.test(noun) ? `${noun.slice(0, -1)}ies` : `${noun}s`;
+    if (max !== undefined) return `${value.length} of ${max} ${plural}`;
     return `${value.length} ${value.length === 1 ? noun : plural}`;
   }
   if (isEditorObject(value)) {
@@ -1133,48 +1172,76 @@ function contentsLabel(value: EditorValue, path: readonly (string | number)[]) {
   return "";
 }
 
+/* Set elsewhere: card positions and the "All work" order by dragging in the
+   preview, a photo's crop focus by clicking the photo in its own card, the
+   freelance switch on the Menu page. */
+const hiddenKeys = new Set([
+  "id",
+  "position",
+  "allOrder",
+  "focalX",
+  "focalY",
+  "availableForFreelance",
+]);
+
 function GroupView({
   value,
   path,
   onChange,
   onNavigate,
   uploadEnabled,
-  focusKey,
+  openKey,
+  onOpen,
+  maxFor,
 }: InspectorViewProps & { value: EditorObject }) {
-  const focusRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    focusRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [focusKey]);
-
   return (
-    <div className="studio-ins-fields">
+    <div className="studio-ins-rows">
       {Object.entries(value)
-        // Card positions and the "All work" order are set by dragging in the preview.
-        .filter(([key]) => key !== "id" && key !== "position" && key !== "allOrder")
+        .filter(([key]) => !hiddenKeys.has(key))
         .map(([key, entry]) => {
           const childPath = [...path, key];
-          const label = fieldLabel(childPath);
-          const isFocused = focusKey === key;
-          const isLink = isVideoLinkField(entry, childPath);
-          const isMedia = getMediaConfig(entry, childPath) !== undefined;
+          const { label, hint } = describeField(childPath);
+          const id = `studio-${childPath.join("-")}`;
+          const hintId = `${id}-hint`;
+          const isOpen = openKey === key;
+          const toggle = () => onOpen(isOpen ? null : key);
+          const close = () => onOpen(null);
 
-          if (isLink || isMedia) {
+          if (isVideoLinkField(entry, childPath)) {
+            const url = typeof entry === "string" ? entry : "";
+            if (isOpen) {
+              return (
+                <FieldCard key={key} label={label} hint={hint} hintId={hintId} onDone={close}>
+                  <LinkEditor value={entry} label={label} path={childPath} onChange={onChange} />
+                </FieldCard>
+              );
+            }
+            const reel = resolveReel({ href: url || null });
             return (
-              <div
-                className={`studio-ins-field${isFocused ? " is-focused" : ""}`}
+              <FieldRow
                 key={key}
-                ref={isFocused ? focusRef : undefined}
-              >
-                {isLink ? (
-                  <LinkEditor
-                    value={entry}
-                    label={label}
-                    path={childPath}
-                    onChange={onChange}
-                    uploadEnabled={uploadEnabled}
-                  />
-                ) : (
+                label={label}
+                value={`${reelSourceLabel(reel.kind)} · ${url.replace(/^https?:\/\/(www\.)?/, "")}`}
+                thumbnail={reel.thumbnailCanFail ? undefined : (reel.thumbnail ?? undefined)}
+                isEmpty={!url}
+                onClick={toggle}
+              />
+            );
+          }
+
+          const media = getMediaConfig(entry, childPath);
+          if (media) {
+            const kind = mediaKindOf(media);
+            if (isOpen) {
+              return (
+                <FieldCard
+                  key={key}
+                  label={label}
+                  optional={media.isOptional}
+                  hint={hint ?? mediaFallbackHints[kind]}
+                  hintId={hintId}
+                  onDone={close}
+                >
                   <MediaEditor
                     value={entry}
                     label={label}
@@ -1183,44 +1250,94 @@ function GroupView({
                     uploadEnabled={uploadEnabled}
                     parent={value}
                   />
-                )}
-              </div>
+                </FieldCard>
+              );
+            }
+            const url = storedMediaUrl(entry);
+            return (
+              <FieldRow
+                key={key}
+                label={label}
+                value={`${mediaSpecs[kind].badge} added`}
+                thumbnail={kind === "photo" && url ? url : undefined}
+                isEmpty={!url}
+                onClick={toggle}
+              />
+            );
+          }
+
+          if (typeof entry === "boolean") {
+            return (
+              <SwitchRow
+                key={key}
+                id={id}
+                label={label}
+                hint={hint}
+                checked={entry}
+                onChange={(checked) => onChange(childPath, checked)}
+              />
             );
           }
 
           if (Array.isArray(entry) || isEditorObject(entry)) {
-            const { hint } = describeField(childPath);
+            const isList = Array.isArray(entry);
             return (
-              <button
-                className="studio-ins-nav"
-                type="button"
+              <FieldRow
                 key={key}
+                label={label}
+                value={contentsLabel(entry, childPath, isList ? maxFor(childPath) : undefined)}
+                isEmpty={isList && entry.length === 0}
+                leadsOn
                 onClick={() => onNavigate(childPath)}
-              >
-                <span className="studio-ins-nav__text">
-                  <b>{label}</b>
-                  <small>{hint ?? "Open this to edit what is inside."}</small>
-                </span>
-                <span className="studio-ins-nav__count">{contentsLabel(entry, childPath)}</span>
-                <i aria-hidden="true">&#8250;</i>
-              </button>
+              />
             );
           }
 
-          return (
-            <div
-              className={`studio-ins-field${isFocused ? " is-focused" : ""}`}
-              key={key}
-              ref={isFocused ? focusRef : undefined}
-            >
-              <ScalarEditor
-                value={entry}
+          const options = optionsForPath(childPath);
+          if (options && (typeof entry === "string" || (entry === null && options.includes("")))) {
+            return (
+              <SelectRow
+                key={key}
+                id={id}
                 label={label}
-                path={childPath}
-                onChange={onChange}
-                uploadEnabled={uploadEnabled}
+                hint={hint}
+                value={entry ?? ""}
+                options={options}
+                onChange={(next) => onChange(childPath, next || null)}
               />
-            </div>
+            );
+          }
+
+          const text = entry === null ? "" : String(entry);
+          const max = typeof entry === "number" ? undefined : maxFor(childPath);
+          if (isOpen) {
+            return (
+              <FieldCard
+                key={key}
+                label={label}
+                hint={hint}
+                hintId={hintId}
+                meta={
+                  max === undefined ? null : (
+                    <span className={text.length >= max * 0.9 ? "is-near" : undefined}>
+                      {text.length} / {max}
+                    </span>
+                  )
+                }
+                onDone={close}
+              >
+                <TextEditor
+                  value={entry}
+                  label={label}
+                  path={childPath}
+                  onChange={onChange}
+                  max={max}
+                />
+              </FieldCard>
+            );
+          }
+          return (
+            <FieldRow key={key} label={label} value={text} isEmpty={text === ""} onClick={toggle} />
           );
         })}
     </div>
@@ -1233,14 +1350,15 @@ function ListView({
   onChange,
   onNavigate,
   templateFor,
-  focusKey,
+  openKey,
+  maxFor,
 }: InspectorViewProps & { value: EditorValue[] }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
-  const doc = describeField(path);
+  const [triedWhenFull, setTriedWhenFull] = useState(false);
   const itemNoun = itemNounFor(path);
   const noun = itemNoun.toLowerCase();
   const template = templateFor(path);
@@ -1252,6 +1370,9 @@ function ListView({
   /* The six tiles on an Instagram card are a fixed set the schema counts, so the
      panel lets you recolour them but not add a seventh or drop one. */
   const isFixedLength = path.at(-1) === "tiles";
+  const max = maxFor(path);
+  const itemMax = maxFor([...path, 0]);
+  const isFull = max !== undefined && value.length >= max;
   /* Entries without an id of their own (collaborators, stats) are sorted by
      position instead, so every list of entries can be dragged into order. */
   const sortableIds = value.map((item, index) =>
@@ -1261,6 +1382,10 @@ function ListView({
 
   const addItem = () => {
     if (nextItem === undefined) return;
+    if (isFull) {
+      setTriedWhenFull(true);
+      return;
+    }
     onChange(path, [...value, nextItem]);
     if (!isTextList) onNavigate([...path, value.length]);
   };
@@ -1268,6 +1393,10 @@ function ListView({
   const copyItem = (index: number) => {
     const item = value[index];
     if (item === undefined) return;
+    if (isFull) {
+      setTriedWhenFull(true);
+      return;
+    }
     onChange(path, [...value.slice(0, index + 1), withFreshIds(item), ...value.slice(index + 1)]);
   };
 
@@ -1281,7 +1410,14 @@ function ListView({
 
   const rows = value.map((item, index) => {
     const title = itemTitle(item, `${itemNoun} ${index + 1}`);
-    const summary = mediaSummary(item, [...path, index]);
+    /* An entry that holds a list of its own (a category and its projects) is
+       summed up by that list; counting every photo inside it reads as noise. */
+    const nested = isEditorObject(item)
+      ? Object.entries(item).find(([, entry]) => Array.isArray(entry))
+      : undefined;
+    const summary = nested
+      ? contentsLabel(nested[1], [...path, index, nested[0]])
+      : mediaSummary(item, [...path, index]);
     const key = isEditorObject(item) && typeof item.id === "string" ? item.id : `${noun}-${index}`;
 
     const body =
@@ -1296,7 +1432,7 @@ function ListView({
               type="button"
               onClick={() => deleteItem(index)}
             >
-              Yes, delete
+              Delete
             </button>
             <button className="studio-ins-btn" type="button" onClick={() => setConfirmIndex(null)}>
               Keep it
@@ -1322,18 +1458,20 @@ function ListView({
             <input
               className="studio-ins-item__input"
               value={String(item)}
+              maxLength={itemMax}
               aria-label={`${itemNoun} ${index + 1}`}
               onChange={(event) => onChange([...path, index], event.target.value)}
             />
           )}
           {isFixedLength ? null : (
             <button
-              className="studio-ins-tool studio-ins-tool--danger"
+              className="studio-ins-icon studio-ins-icon--danger"
               type="button"
               aria-label={`Delete ${noun} ${index + 1}`}
+              title="Delete"
               onClick={() => setConfirmIndex(index)}
             >
-              Delete
+              <Trash2 aria-hidden="true" />
             </button>
           )}
         </>
@@ -1344,33 +1482,27 @@ function ListView({
             type="button"
             onClick={() => onNavigate([...path, index])}
           >
-            <span className="studio-ins-item__text">
-              <b>{title}</b>
-              <small>
-                {`${itemNoun} ${index + 1}`}
-                {summary === "Text only" ? "" : ` · ${summary}`}
-              </small>
-            </span>
-            <i aria-hidden="true">&#8250;</i>
+            <b>{title}</b>
+            <small>{summary === "Text only" ? `${itemNoun} ${index + 1}` : summary}</small>
           </button>
-          <div className="studio-ins-item__tools">
-            <button
-              className="studio-ins-tool"
-              type="button"
-              aria-label={`Duplicate ${noun} ${index + 1}`}
-              onClick={() => copyItem(index)}
-            >
-              Duplicate
-            </button>
-            <button
-              className="studio-ins-tool studio-ins-tool--danger"
-              type="button"
-              aria-label={`Delete ${noun} ${index + 1}`}
-              onClick={() => setConfirmIndex(index)}
-            >
-              Delete
-            </button>
-          </div>
+          <button
+            className="studio-ins-icon"
+            type="button"
+            aria-label={`Duplicate ${noun} ${index + 1}`}
+            title="Duplicate"
+            onClick={() => copyItem(index)}
+          >
+            <Copy aria-hidden="true" />
+          </button>
+          <button
+            className="studio-ins-icon studio-ins-icon--danger"
+            type="button"
+            aria-label={`Delete ${noun} ${index + 1}`}
+            title="Delete"
+            onClick={() => setConfirmIndex(index)}
+          >
+            <Trash2 aria-hidden="true" />
+          </button>
         </>
       );
 
@@ -1383,12 +1515,7 @@ function ListView({
     }
 
     return (
-      <li
-        className={`studio-ins-item${isTextList ? " studio-ins-item--text" : ""}${
-          focusKey === String(index) ? " is-focused" : ""
-        }`}
-        key={key}
-      >
+      <li className={`studio-ins-item${openKey === String(index) ? " is-focused" : ""}`} key={key}>
         {body}
       </li>
     );
@@ -1396,12 +1523,6 @@ function ListView({
 
   return (
     <div className="studio-ins-collection">
-      {doc.hint ? <p className="studio-ins-note">{doc.hint}</p> : null}
-      {isSortable ? (
-        <p className="studio-ins-note studio-ins-note--quiet">
-          Drag the <b>::</b> handle to change the order these appear in on the page.
-        </p>
-      ) : null}
       {value.length > 0 ? (
         <ol className="studio-ins-list">
           {isSortable ? (
@@ -1426,23 +1547,37 @@ function ListView({
         </ol>
       ) : (
         <p className="studio-ins-empty">
-          Nothing here yet. Add the first {noun} and it appears in the preview on the left.
+          Nothing here yet. Add the first {noun} and it appears in the preview.
         </p>
       )}
+      <div className="studio-ins-listfoot">
+        <span>
+          {value.length}
+          {max === undefined ? "" : ` of ${max}`}
+          {isSortable ? " · drag the handle to reorder" : ""}
+        </span>
+        {isFixedLength || nextItem === undefined ? null : (
+          <button className="studio-ins-btn" type="button" onClick={addItem}>
+            <Plus aria-hidden="true" />
+            Add {noun}
+          </button>
+        )}
+      </div>
+      {isFull && triedWhenFull ? (
+        <p className="studio-ins-note studio-ins-note--warn" role="status">
+          This list is full at {max}. Delete one to add another.
+        </p>
+      ) : null}
       {isFixedLength ? (
-        <p className="studio-ins-note studio-ins-note--quiet">
+        <p className="studio-ins-note">
           This grid always holds {value.length} tiles. Change their colours above; they cannot be
           added to or removed.
         </p>
       ) : nextItem === undefined ? (
-        <p className="studio-ins-note studio-ins-note--quiet">
+        <p className="studio-ins-note">
           New entries here copy the shape of an existing one, and there is none left to copy.
         </p>
-      ) : (
-        <button className="studio-ins-add" type="button" onClick={addItem}>
-          <span aria-hidden="true">+</span> Add {noun}
-        </button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1454,13 +1589,11 @@ function ItemActions({
   path,
   onChange,
   onNavigate,
-}: Readonly<{
-  data: EditorObject;
-  path: readonly (string | number)[];
-  onChange: (path: readonly (string | number)[], value: EditorValue) => void;
-  onNavigate: (path: readonly (string | number)[]) => void;
-}>) {
+  maxFor,
+}: Pick<InspectorViewProps, "path" | "onChange" | "onNavigate" | "maxFor"> &
+  Readonly<{ data: EditorObject }>) {
   const [confirming, setConfirming] = useState(false);
+  const [triedWhenFull, setTriedWhenFull] = useState(false);
   const index = path.at(-1);
   const parentPath = path.slice(0, -1);
   const parent = valueAtPath(data, parentPath);
@@ -1469,6 +1602,8 @@ function ItemActions({
 
   const noun = itemNounFor(parentPath).toLowerCase();
   const item = parent[index];
+  const max = maxFor(parentPath);
+  const isFull = max !== undefined && parent.length >= max;
 
   if (confirming)
     return (
@@ -1487,7 +1622,7 @@ function ItemActions({
                 onNavigate(parentPath);
               }}
             >
-              Yes, delete
+              Delete
             </button>
             <button className="studio-ins-btn" type="button" onClick={() => setConfirming(false)}>
               Keep it
@@ -1504,6 +1639,10 @@ function ItemActions({
         type="button"
         onClick={() => {
           if (item === undefined) return;
+          if (isFull) {
+            setTriedWhenFull(true);
+            return;
+          }
           onChange(parentPath, [
             ...parent.slice(0, index + 1),
             withFreshIds(item),
@@ -1512,85 +1651,43 @@ function ItemActions({
           onNavigate([...parentPath, index + 1]);
         }}
       >
-        Duplicate this {noun}
+        <Copy aria-hidden="true" />
+        Duplicate
       </button>
       <button
         className="studio-ins-btn studio-ins-btn--danger"
         type="button"
         onClick={() => setConfirming(true)}
       >
-        Delete this {noun}
+        <Trash2 aria-hidden="true" />
+        Delete {noun}
       </button>
+      {isFull && triedWhenFull ? (
+        <p className="studio-ins-note studio-ins-note--warn" role="status">
+          This list is full at {max}. Delete one to add another.
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function InspectorBody({
-  data,
-  path,
-  onChange,
-  onNavigate,
-  templateFor,
-  uploadEnabled,
-  focusKey,
-}: InspectorViewProps & { data: EditorObject }) {
-  const value = path.length === 0 ? data : valueAtPath(data, path);
-  if (value === undefined) return null;
+function InspectorBody({ data, ...view }: InspectorViewProps & { data: EditorObject }) {
+  const value = view.path.length === 0 ? data : valueAtPath(data, view.path);
 
-  const label = fieldLabel(path);
-  const shared = { path, onChange, onNavigate, templateFor, uploadEnabled, focusKey };
-
-  if (Array.isArray(value)) return <ListView value={value} {...shared} />;
-
-  if (isVideoLinkField(value, path))
-    return (
-      <div className="studio-ins-fields">
-        <LinkEditor
-          value={value}
-          label={label}
-          path={path}
-          onChange={onChange}
-          uploadEnabled={uploadEnabled}
-        />
-      </div>
-    );
-
-  if (getMediaConfig(value, path)) {
-    const parentValue = path.length > 0 ? valueAtPath(data, path.slice(0, -1)) : undefined;
-    return (
-      <div className="studio-ins-fields">
-        <MediaEditor
-          value={value}
-          label={label}
-          path={path}
-          onChange={onChange}
-          uploadEnabled={uploadEnabled}
-          parent={parentValue !== undefined && isEditorObject(parentValue) ? parentValue : undefined}
-        />
-      </div>
-    );
-  }
-
-  if (isEditorObject(value))
-    return (
-      <>
-        <GroupView value={value} {...shared} />
-        <ItemActions data={data} path={path} onChange={onChange} onNavigate={onNavigate} />
-      </>
-    );
+  if (Array.isArray(value)) return <ListView value={value} {...view} />;
+  if (value === undefined || !isEditorObject(value)) return null;
 
   return (
-    <div className="studio-ins-fields">
-      <div className="studio-ins-field">
-        <ScalarEditor
-          value={value}
-          label={label}
-          path={path}
-          onChange={onChange}
-          uploadEnabled={uploadEnabled}
-        />
-      </div>
-    </div>
+    <>
+      <GroupView value={value} {...view} />
+      <ItemActions
+        data={data}
+        path={view.path}
+        onChange={view.onChange}
+        onNavigate={view.onNavigate}
+        maxFor={view.maxFor}
+      />
+    </>
   );
 }
 
@@ -1601,6 +1698,10 @@ type SectionEditorProps = Readonly<{
   uploadEnabled: boolean;
   contactData: unknown;
   settingsData: unknown;
+  /** The draft resume PDF's address, which decides whether the navbar preview shows a Resume link. */
+  resumeUrl?: string | null;
+  /** Where the panel opens, e.g. `["site", "footer"]`; an unknown path falls back to the top. */
+  initialPath?: readonly (string | number)[];
 }>;
 
 export function SectionEditor({
@@ -1610,6 +1711,8 @@ export function SectionEditor({
   uploadEnabled,
   contactData,
   settingsData,
+  resumeUrl,
+  initialPath = [],
 }: SectionEditorProps) {
   const router = useRouter();
   const [savedData, setSavedData] = useState(() => normalizeObject(data));
@@ -1620,11 +1723,12 @@ export function SectionEditor({
      that follows a save re-renders this component without remounting it - the
      `version` prop would still be the one the page first loaded. */
   const versionRef = useRef(version);
-  const [activePath, setActivePath] = useState<readonly (string | number)[]>([]);
-  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [activePath, setActivePath] = useState<readonly (string | number)[]>(initialPath);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
-  const [inspectorTab, setInspectorTab] = useState<"content" | "media">("content");
-  const [mediaEntryFilter, setMediaEntryFilter] = useState("all");
+  // Whole section in view by default; the other choice fits the width and scrolls.
+  const [previewWhole, setPreviewWhole] = useState(true);
+  const [previewScale, setPreviewScale] = useState(1);
   const { formState, handleSubmit, reset, setValue } = useForm<{ data: unknown }>({
     defaultValues: { data: savedData },
   });
@@ -1633,6 +1737,9 @@ export function SectionEditor({
   const pushToast = useStudioStore((state) => state.pushToast);
   const registerDraftHandlers = useStudioStore((state) => state.registerDraftHandlers);
   const previewData = useDeferredValue(currentData);
+  const { blocked: uploadBlocked, label: uploadLabel } = useUploadBlock();
+  const schema = sectionSchemas[section];
+  const maxFor = (path: readonly (string | number)[]) => maxAtPath(schema, path);
 
   const updateValue = useCallback(
     (path: readonly (string | number)[], value: EditorValue) => {
@@ -1655,10 +1762,31 @@ export function SectionEditor({
     [setValue],
   );
 
-  const openPath = useCallback((path: readonly (string | number)[]) => {
-    setActivePath(path);
-    setFocusKey(null);
-  }, []);
+  /* Moving the panel unmounts the open card, and an upload card that unmounts
+     abandons its upload - so the panel stays where it is until the file lands. */
+  const holdForUpload = () => {
+    if (!uploadBlocked) return false;
+    pushToast(`${uploadLabel ?? "A file"} is still uploading. Wait for it to finish.`, "info");
+    return true;
+  };
+
+  /* Shows `path` in the panel. The panel only shows groups and lists, so a path
+     that ends on something narrower - a photo, a link, a single word - shows its
+     parent with that row opened. */
+  const showInPanel = (path: readonly (string | number)[]) => {
+    if (holdForUpload()) return;
+    let target = path;
+    let key: string | null = null;
+    while (target.length > 0) {
+      const value = valueAtPath(currentData, target);
+      if (Array.isArray(value)) break;
+      if (value !== undefined && isEditorObject(value) && !getMediaConfig(value, target)) break;
+      key = String(target.at(-1));
+      target = target.slice(0, -1);
+    }
+    setActivePath(target);
+    setOpenKey(key);
+  };
 
   /* A new list entry copies the shape of one that already exists. When the list
      has been emptied, the last saved draft still remembers that shape. */
@@ -1727,111 +1855,27 @@ export function SectionEditor({
 
   const selectedPath =
     activePath.length === 0 || valueAtPath(currentData, activePath) !== undefined ? activePath : [];
-  const parentOf = (path: readonly (string | number)[]) => {
-    const parentValue = valueAtPath(currentData, path.slice(0, -1));
-    return parentValue !== undefined && isEditorObject(parentValue) ? parentValue : undefined;
-  };
-  const mediaFields = collectMediaFields(currentData);
-  const fieldsOfKind = (kind: MediaKindLabel) =>
-    mediaFields.filter((field) => mediaKindOf(getMediaConfig(field.value, field.path)) === kind);
-  const photoFields = fieldsOfKind("photo");
-  const videoFields = fieldsOfKind("video");
-  const documentFields = fieldsOfKind("document");
-  const linkFields = collectLinkFields(currentData);
-  const assetCount = mediaFields.length + linkFields.length;
-  const assetGroups = [
-    {
-      key: "photo",
-      kind: "photo" as const,
-      title: "Photos",
-      note: mediaSpecs.photo.accepts,
-      fields: photoFields,
-      isLink: false,
-    },
-    {
-      key: "video",
-      kind: "video" as const,
-      title: "Videos",
-      note: mediaSpecs.video.accepts,
-      fields: videoFields,
-      isLink: false,
-    },
-    {
-      key: "document",
-      kind: "document" as const,
-      title: "Files",
-      note: mediaSpecs.document.accepts,
-      fields: documentFields,
-      isLink: false,
-    },
-    {
-      key: "link",
-      kind: "video" as const,
-      title: "Video links",
-      note: "Hosted on YouTube - paste a link, nothing is uploaded",
-      fields: linkFields,
-      isLink: true,
-    },
-  ].filter((group) => group.fields.length > 0);
+  /* A list entry is named by what it holds ("Jar app launch film"), a group or
+     list by its label. */
+  const nameAt = (path: readonly (string | number)[]) =>
+    typeof path.at(-1) === "number"
+      ? itemTitle(valueAtPath(currentData, path) ?? null, fieldLabel(path))
+      : fieldLabel(path);
 
-  /* Every media field sits directly on the entry it belongs to (a project, a
-     picture, ...), so dropping the field's own key off its path names that
-     entry. Grouping by that path turns a flat wall of uploads into one row per
-     entry the editor can filter down to. */
-  const mediaEntries: { key: string; path: readonly (string | number)[]; label: string }[] = [];
-  const mediaEntryKeys = new Set<string>();
-  const addableEntryArrays: { key: string; path: readonly (string | number)[]; label: string }[] =
-    [];
-  const addableEntryArrayKeys = new Set<string>();
-
-  for (const field of [...mediaFields, ...linkFields]) {
-    const entryPath = field.path.slice(0, -1);
-    const entryKey = JSON.stringify(entryPath);
-    const arrayPath = entryPath.slice(0, -1);
-    const arrayKey = JSON.stringify(arrayPath);
-    const containerPath = arrayPath.slice(0, -1);
-    const container = (containerPath.length ? valueAtPath(currentData, containerPath) : null) ?? null;
-    const containerLabel = isEditorObject(container) ? itemTitle(container, "") : "";
-
-    if (!mediaEntryKeys.has(entryKey)) {
-      mediaEntryKeys.add(entryKey);
-      const title = itemTitle(
-        valueAtPath(currentData, entryPath) ?? null,
-        fieldLabel(entryPath),
-      );
-      mediaEntries.push({
-        key: entryKey,
-        path: entryPath,
-        label: containerLabel ? `${containerLabel} · ${title}` : title,
-      });
-    }
-
-    if (!addableEntryArrayKeys.has(arrayKey) && Array.isArray(valueAtPath(currentData, arrayPath))) {
-      addableEntryArrayKeys.add(arrayKey);
-      addableEntryArrays.push({ key: arrayKey, path: arrayPath, label: containerLabel });
-    }
-  }
-
-  function addMediaEntry(arrayPath: readonly (string | number)[]) {
-    const current = valueAtPath(currentData, arrayPath);
-    if (!Array.isArray(current)) return;
-    const next = blankItem(arrayPath, templateFor(arrayPath));
-    if (next === undefined) return;
-    updateValue(arrayPath, [...current, next]);
-    setMediaEntryFilter(JSON.stringify([...arrayPath, current.length]));
-  }
-
-  const scopedAssetGroups =
-    mediaEntryFilter === "all"
-      ? assetGroups
-      : assetGroups
-          .map((group) => ({
-            ...group,
-            fields: group.fields.filter(
-              (field) => JSON.stringify(field.path.slice(0, -1)) === mediaEntryFilter,
-            ),
-          }))
-          .filter((group) => group.fields.length > 0);
+  /* Two drafts are edited from more than one tab, and the preview shows only the
+     part the panel is in: where the tab opened it, until it steps into a group.
+     The Drawing Room's "Room entrance" tab opens on the teaser group and previews
+     the home-page invitation; anywhere else in that draft previews the /room page.
+     The site-wide settings preview the navbar or the footer alone on their tabs. */
+  const previewPath = selectedPath.length === 0 ? initialPath : selectedPath;
+  const roomEntrance = section === "room" && previewPath[0] === "teaser";
+  const sitePart = section === "settings" && previewPath[0] === "site" ? previewPath[1] : null;
+  const settingsView = sitePart === "navigation" || sitePart === "footer" ? sitePart : "all";
+  const previewNote = roomEntrance
+    ? describeField(["teaser"]).hint
+    : settingsView !== "all"
+      ? describeField(["site", settingsView]).hint
+      : undefined;
 
   const preview = (
     <StudioLandingPreview
@@ -1839,12 +1883,12 @@ export function SectionEditor({
       data={previewData}
       contactData={contactData}
       settingsData={settingsData}
+      roomView={roomEntrance ? "entrance" : "page"}
+      settingsView={settingsView}
+      resumeUrl={resumeUrl}
       onWorkProjectSelect={(laneLabel, projectId) => {
         const path = findWorkProjectPath(currentData, laneLabel, projectId);
-        if (!path) return;
-        setActivePath(path);
-        setFocusKey(null);
-        setInspectorTab("content");
+        if (path) showInPanel(path);
       }}
       onWorkProjectMove={(laneLabel, projectId, position) => {
         const path = findWorkProjectPath(currentDataRef.current, laneLabel, projectId);
@@ -1869,10 +1913,7 @@ export function SectionEditor({
         );
       }}
       onCollaboratorSelect={(index) => {
-        if (index < 0) return;
-        setActivePath(["worked", index]);
-        setFocusKey(null);
-        setInspectorTab("content");
+        if (index >= 0) showInPanel(["worked", index]);
       }}
       onCollaboratorMove={(from, to) => {
         const worked = currentDataRef.current.worked;
@@ -1885,73 +1926,65 @@ export function SectionEditor({
   return (
     <section
       className={`studio-page studio-editor studio-editor--${section}`}
-      aria-labelledby="studio-section-title"
+      aria-label={`${studioSectionLabels[section]} editor`}
     >
-      <div className="studio-editor__heading">
-        <div>
-          <span className="slate">Visual editor</span>
-          <h1 id="studio-section-title">{studioSectionLabels[section]}</h1>
-          <p>{sectionDocs[section].summary}</p>
-          <p className="studio-editor__media-note">
-            <span className="studio-media-badge studio-media-badge--info">Uploads</span>
-            {sectionDocs[section].media}
-          </p>
-        </div>
-        <div className="studio-device-switch" aria-label="Preview device">
-          <button
-            className={previewDevice === "desktop" ? "is-active" : ""}
-            type="button"
-            aria-pressed={previewDevice === "desktop"}
-            onClick={() => setPreviewDevice("desktop")}
-          >
-            Desktop
-          </button>
-          <button
-            className={previewDevice === "mobile" ? "is-active" : ""}
-            type="button"
-            aria-pressed={previewDevice === "mobile"}
-            onClick={() => setPreviewDevice("mobile")}
-          >
-            Mobile
-          </button>
-        </div>
-      </div>
-      <ol className="studio-howto" aria-label="How to edit this section">
-        <li>
-          <b>1</b>
-          <span>
-            <strong>Pick what to change.</strong> Click any text in the preview on the left and the
-            panel opens it, or work down the <em>Content</em> list on the right.
-          </span>
-        </li>
-        <li>
-          <b>2</b>
-          <span>
-            <strong>Add, copy or delete entries.</strong> Rows with an arrow open a list. Use
-            <em>Add</em> for a new one, <em>Duplicate</em> to copy an existing one, and
-            <em>Delete</em> to remove it. Every upload sits together under{" "}
-            <em>Photos &amp; video</em>.
-          </span>
-        </li>
-        <li>
-          <b>3</b>
-          <span>
-            <strong>Save, then publish.</strong> <em>Save section</em> stores a private draft.
-            Nothing changes on the live site until you press <em>Publish</em> in the top bar.
-          </span>
-        </li>
-      </ol>
       <div className="studio-editor__layout">
         <section
           className={`studio-canvas studio-canvas--${previewDevice}`}
           aria-label="Landing-page preview"
         >
           <header className="studio-canvas__topbar">
-            <span>Click any visible text to edit it</span>
-            <span>Live draft</span>
+            <span>{previewNote ?? sectionDocs[section].summary}</span>
+            <div className="studio-canvas__tools">
+              <output aria-label="Preview zoom">{Math.round(previewScale * 100)}%</output>
+              <div className="studio-device-switch" role="group" aria-label="Preview size">
+                <button
+                  className={previewWhole ? "is-active" : ""}
+                  type="button"
+                  aria-pressed={previewWhole}
+                  title="Show the whole section at once"
+                  onClick={() => setPreviewWhole(true)}
+                >
+                  Fit
+                </button>
+                <button
+                  className={previewWhole ? "" : "is-active"}
+                  type="button"
+                  aria-pressed={!previewWhole}
+                  title="Fill the width and scroll down the section"
+                  onClick={() => setPreviewWhole(false)}
+                >
+                  Full width
+                </button>
+              </div>
+              <div className="studio-device-switch" role="group" aria-label="Preview device">
+                <button
+                  className={previewDevice === "desktop" ? "is-active" : ""}
+                  type="button"
+                  aria-label="Desktop"
+                  title="Desktop"
+                  aria-pressed={previewDevice === "desktop"}
+                  onClick={() => setPreviewDevice("desktop")}
+                >
+                  <StudioIcon name="desktop" />
+                </button>
+                <button
+                  className={previewDevice === "mobile" ? "is-active" : ""}
+                  type="button"
+                  aria-label="Mobile"
+                  title="Mobile"
+                  aria-pressed={previewDevice === "mobile"}
+                  onClick={() => setPreviewDevice("mobile")}
+                >
+                  <StudioIcon name="mobile" />
+                </button>
+              </div>
+            </div>
           </header>
           <div
-            className="studio-canvas__viewport studio-canvas__viewport--editable"
+            className={`studio-canvas__viewport studio-canvas__viewport--editable${
+              previewWhole ? " studio-canvas__viewport--fit" : ""
+            }`}
             onSubmitCapture={(event) => event.preventDefault()}
             onClickCapture={(event) => {
               /* Not `instanceof HTMLElement`: on the mobile preview the click
@@ -1967,6 +2000,21 @@ export function SectionEditor({
                  controls that are themselves editor hooks (work-board cards,
                  collaborator tiles), marked with data-studio-hooks. */
               if (target.closest("input, select, textarea")) return;
+
+              /* An entry that names its own place in the draft opens directly:
+                 two companies can share a name, which matching on text cannot
+                 tell apart. Its own click still runs, so a filmstrip thumb
+                 switches the scene as well as opening its role. */
+              const entry = target.closest<HTMLElement>("[data-studio-path]");
+              if (entry) {
+                showInPanel(
+                  (entry.dataset.studioPath ?? "")
+                    .split(".")
+                    .map((segment) => (/^\d+$/.test(segment) ? Number(segment) : segment)),
+                );
+                return;
+              }
+
               const control = target.closest("a, button");
               if (control?.tagName === "BUTTON" && control.closest("[data-studio-hooks]")) return;
               if (control) {
@@ -1986,19 +2034,23 @@ export function SectionEditor({
               }
 
               const path = findPreviewPath(currentData, candidates);
-              if (!path) return;
+              /* A tab that owns one part of a shared draft (the navbar, the
+                 footer, the room entrance) stays on it: the wordmark shows in
+                 both bars but belongs to neither, so a click on it there must
+                 not carry the panel and the preview off to another part. */
+              if (!path || !initialPath.every((segment, index) => path[index] === segment)) return;
               event.preventDefault();
               event.stopPropagation();
-              setActivePath(path.slice(0, -1));
-              setFocusKey(String(path.at(-1)));
-              setInspectorTab("content");
+              showInPanel(path);
             }}
           >
-            {previewDevice === "mobile" ? (
-              <PreviewFrame title="Mobile preview">{preview}</PreviewFrame>
-            ) : (
-              preview
-            )}
+            <PreviewFit device={previewDevice} whole={previewWhole} onScale={setPreviewScale}>
+              {previewDevice === "mobile" ? (
+                <PreviewFrame title="Mobile preview">{preview}</PreviewFrame>
+              ) : (
+                preview
+              )}
+            </PreviewFit>
           </div>
         </section>
         <aside className="studio-ins" aria-label="Editing panel">
@@ -2010,171 +2062,65 @@ export function SectionEditor({
               </div>
               <SaveBar />
             </div>
-            <div className="studio-ins__tabs" role="tablist" aria-label="Panel view">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={inspectorTab === "content"}
-                className={inspectorTab === "content" ? "is-active" : ""}
-                onClick={() => setInspectorTab("content")}
-              >
-                Content
-              </button>
-              {assetCount > 0 ? (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={inspectorTab === "media"}
-                  className={inspectorTab === "media" ? "is-active" : ""}
-                  onClick={() => setInspectorTab("media")}
-                >
-                  Photos &amp; video <span>{assetCount}</span>
-                </button>
-              ) : null}
-            </div>
           </header>
-          {inspectorTab === "media" && assetCount > 0 ? (
-            <div className="studio-ins__body studio-ins-media">
-              <p className="studio-ins-note">
-                Every photo and video this section uses, in one place. Uploads say the file size
-                they accept; video links are YouTube addresses you paste. Nothing reaches the live
-                site until you save and publish.
-              </p>
-              {mediaEntries.length > 1 || addableEntryArrays.length > 0 ? (
-                <div className="studio-media-toolbar">
-                  {mediaEntries.length > 1 ? (
-                    <label className="studio-media-toolbar__filter">
-                      <span>Show</span>
-                      <select
-                        value={mediaEntryFilter}
-                        onChange={(event) => setMediaEntryFilter(event.target.value)}
+          {selectedPath.length > 0 ? (
+            <nav className="studio-ins__trail" aria-label="Where you are">
+              <button
+                className="studio-ins-icon"
+                type="button"
+                aria-label="Back"
+                title="Back"
+                onClick={() => showInPanel(selectedPath.slice(0, -1))}
+              >
+                <ChevronLeft aria-hidden="true" />
+              </button>
+              <ol>
+                <li>
+                  <button type="button" onClick={() => showInPanel([])}>
+                    {studioSectionLabels[section]}
+                  </button>
+                </li>
+                {selectedPath.map((_, index) => {
+                  const crumbPath = selectedPath.slice(0, index + 1);
+                  const isCurrent = index === selectedPath.length - 1;
+                  return (
+                    <li key={crumbPath.join("-")}>
+                      <button
+                        type="button"
+                        onClick={() => showInPanel(crumbPath)}
+                        disabled={isCurrent}
+                        aria-current={isCurrent ? "step" : undefined}
                       >
-                        <option value="all">Everything ({assetCount})</option>
-                        {mediaEntries.map((entry) => (
-                          <option key={entry.key} value={entry.key}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  ) : null}
-                  {addableEntryArrays.map((entry) => (
-                    <button
-                      key={entry.key}
-                      type="button"
-                      className="studio-ins-add studio-ins-add--compact"
-                      onClick={() => addMediaEntry(entry.path)}
-                    >
-                      <span aria-hidden="true">+</span> Add {itemNounFor(entry.path).toLowerCase()}
-                      {entry.label ? ` to ${entry.label}` : ""}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-              {scopedAssetGroups.map((group) => (
-                <section className="studio-media-group" key={group.key}>
-                  <h3>
-                    <span className={`studio-media-badge studio-media-badge--${group.kind}`}>
-                      {mediaSpecs[group.kind].badge}
-                    </span>
-                    {group.title}
-                    <em>{group.note}</em>
-                  </h3>
-                  {group.fields.map(({ path, value }) =>
-                    group.isLink ? (
-                      <LinkEditor
-                        key={path.join("-")}
-                        value={value}
-                        label={fieldLabel(path)}
-                        path={path}
-                        onChange={updateValue}
-                        uploadEnabled={uploadEnabled}
-                        showBreadcrumb
-                      />
-                    ) : (
-                      <MediaEditor
-                        key={path.join("-")}
-                        value={value}
-                        label={fieldLabel(path)}
-                        path={path}
-                        onChange={updateValue}
-                        uploadEnabled={uploadEnabled}
-                        showBreadcrumb
-                        parent={parentOf(path)}
-                      />
-                    ),
-                  )}
-                </section>
-              ))}
-            </div>
-          ) : (
-            <>
-              <nav className="studio-ins__trail" aria-label="Where you are">
-                <button
-                  className="studio-ins__back"
-                  type="button"
-                  disabled={selectedPath.length === 0}
-                  onClick={() => openPath(selectedPath.slice(0, -1))}
-                >
-                  <span aria-hidden="true">&#8249;</span> Back
-                </button>
-                <ol>
-                  <li>
-                    <button
-                      type="button"
-                      onClick={() => openPath([])}
-                      disabled={selectedPath.length === 0}
-                    >
-                      All fields
-                    </button>
-                  </li>
-                  {selectedPath.map((_, index) => {
-                    const crumbPath = selectedPath.slice(0, index + 1);
-                    const isCurrent = index === selectedPath.length - 1;
-                    return (
-                      <li key={crumbPath.join("-")}>
-                        <button
-                          type="button"
-                          onClick={() => openPath(crumbPath)}
-                          disabled={isCurrent}
-                          aria-current={isCurrent ? "step" : undefined}
-                        >
-                          {fieldLabel(crumbPath)}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </nav>
-              <div className="studio-ins__body">
-                <div className="studio-ins__title">
-                  <h3>
-                    {selectedPath.length === 0
-                      ? "Everything in this section"
-                      : fieldLabel(selectedPath)}
-                  </h3>
-                  <p>
-                    {selectedPath.length === 0
-                      ? "Type in any box to change the words. A row with an arrow opens a list you can add to, reorder or delete from."
-                      : (describeField(selectedPath).hint ??
-                        "The preview on the left updates as you type.")}
-                  </p>
-                </div>
-                <InspectorBody
-                  data={currentData}
-                  path={selectedPath}
-                  onChange={updateValue}
-                  onNavigate={openPath}
-                  templateFor={templateFor}
-                  uploadEnabled={uploadEnabled}
-                  focusKey={focusKey}
-                />
-              </div>
-            </>
-          )}
+                        {nameAt(crumbPath)}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </nav>
+          ) : null}
+          <div className="studio-ins__body">
+            <p className="studio-ins__lead">
+              {selectedPath.length === 0
+                ? "Click a row to edit it, or click anything on the page to jump straight to it."
+                : (describeField(selectedPath).hint ?? "The preview updates as you type.")}
+            </p>
+            <InspectorBody
+              data={currentData}
+              path={selectedPath}
+              onChange={updateValue}
+              onNavigate={showInPanel}
+              templateFor={templateFor}
+              uploadEnabled={uploadEnabled}
+              openKey={openKey}
+              onOpen={(key) => {
+                if (!holdForUpload()) setOpenKey(key);
+              }}
+              maxFor={maxFor}
+            />
+          </div>
         </aside>
       </div>
-      {section === "settings" ? <SettingsDangerZone /> : null}
     </section>
   );
 }

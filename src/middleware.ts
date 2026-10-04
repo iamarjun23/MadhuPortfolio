@@ -4,6 +4,10 @@ import type { NextRequest } from "next/server";
 
 // On Vercel this deployment serves only the studio (see DEPLOYMENT.md), at the bare path instead
 // of /studio, so /login, /api/*, Next's own assets, and old /studio links must NOT get re-prefixed.
+//
+// Kept as `middleware.ts` despite Next 16's deprecation warning: `proxy.ts` only runs on the Node.js
+// runtime, and OpenNext's Cloudflare adapter marks Node.js middleware experimental and unmaintained.
+// This file compiles to edge middleware, which the Worker build supports. Rename it once it does.
 const STUDIO_PASSTHROUGH = ["/login", "/api", "/_next", "/favicon.ico", "/studio"];
 
 export default async function middleware(req: NextRequest) {

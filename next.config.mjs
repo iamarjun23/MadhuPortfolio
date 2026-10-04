@@ -77,7 +77,8 @@ const nextConfig = {
       `img-src 'self' data: blob: ${imageHosts} ${mediaUrl}`,
       `media-src 'self' blob: ${videoHosts} ${mediaUrl}`,
       // A reel card plays a YouTube video, an Instagram reel or a LinkedIn post
-      // in place, on both the work board and the Drawing Room pinboard. The resume PDF is framed from R2.
+      // in place, on both the work board and the Drawing Room pinboard. The menu's Resume link
+      // fetches the PDF's download copy from R2 in a hidden frame.
       `frame-src 'self' https://www.youtube-nocookie.com https://www.linkedin.com https://www.instagram.com ${mediaUrl}`,
       // The studio PUTs uploads straight to R2 through a signed URL (actions/media.ts).
       "connect-src 'self' https://cloudflareinsights.com https://*.r2.cloudflarestorage.com",
@@ -95,7 +96,11 @@ const nextConfig = {
     ];
   },
   async redirects() {
-    const redirects = [{ source: "/admin/:path*", destination: "/studio/:path*", permanent: false }];
+    const redirects = [
+      { source: "/admin/:path*", destination: "/studio/:path*", permanent: false },
+      // The resume page is gone; the menu's Resume link opens the PDF itself.
+      { source: "/resume", destination: "/", permanent: true },
+    ];
 
     // Old `/api/media/<key>` links (share previews scrapers cached, pages not yet revalidated) now
     // live on R2's custom domain.
@@ -113,7 +118,11 @@ const nextConfig = {
     const studioUrl = process.env.VERCEL ? undefined : process.env.STUDIO_URL;
     if (studioUrl) {
       // The studio host serves its own routes at the bare path (no /studio segment), so drop it here.
-      redirects.push({ source: "/studio/:path*", destination: `${studioUrl}/:path*`, permanent: false });
+      redirects.push({
+        source: "/studio/:path*",
+        destination: `${studioUrl}/:path*`,
+        permanent: false,
+      });
       for (const source of ["/login", "/api/auth/:path*"]) {
         redirects.push({ source, destination: `${studioUrl}${source}`, permanent: false });
       }

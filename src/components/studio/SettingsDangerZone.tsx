@@ -45,8 +45,8 @@ export function SettingsDangerZone() {
   };
 
   /* Asked for rather than run on load: this reads every section's JSON to work
-     out what is referenced, which is not worth doing on every visit to Settings
-     for a panel that is usually just passed over. */
+     out what is referenced, which is not worth doing on every visit to the Menu
+     page for a row that is usually just passed over. */
   const checkUnused = useCallback(async () => {
     setIsChecking(true);
     const result = await getUnusedMedia();
@@ -101,13 +101,16 @@ export function SettingsDangerZone() {
   };
 
   return (
-    <>
-      <section className="studio-account-card" aria-labelledby="password-title">
-        <div>
-          <span className="slate">Account</span>
-          <h2 id="password-title">Change password</h2>
-          <p>Update the password used to sign in to the Studio.</p>
-        </div>
+    <section className="studio-settings__card" aria-labelledby="maintenance-title">
+      <h2 id="maintenance-title">Account and maintenance</h2>
+
+      <details className="studio-maintenance__row">
+        <summary>
+          <span>
+            <strong>Change password</strong>
+            <small>The password used to sign in to the Studio.</small>
+          </span>
+        </summary>
         <form onSubmit={submitPasswordChange} className="studio-account-card__form">
           <label className="studio-field" htmlFor="current-password">
             <span>Current password</span>
@@ -132,66 +135,58 @@ export function SettingsDangerZone() {
               required
             />
           </label>
-          <button
-            type="submit"
-            className="button button--primary"
-            disabled={isChangingPassword}
-          >
+          <button type="submit" className="studio-ins-btn" disabled={isChangingPassword}>
             {isChangingPassword ? "Changing..." : "Change password"}
           </button>
         </form>
-      </section>
+      </details>
 
-      <section className="studio-danger-zone" aria-labelledby="danger-zone-title">
-        <div>
-          <span className="slate">Danger zone</span>
-          <h2 id="danger-zone-title">Revert drafts</h2>
-          <p>Replace all drafts with the content currently live on the site.</p>
-        </div>
-        <button
-          type="button"
-          className="studio-danger-zone__button"
-          onClick={revertDrafts}
-          disabled={isReverting || Boolean(dirtySection) || uploadBlocked}
-        >
-          {isReverting ? "Reverting..." : "Revert to last published"}
-        </button>
-      </section>
-
-      <section className="studio-danger-zone" aria-labelledby="unused-media-title">
-        <div>
-          <span className="slate">Storage</span>
-          <h2 id="unused-media-title">Unused uploads</h2>
-          <p>
+      <div className="studio-maintenance__row">
+        <span>
+          <strong>Unused uploads</strong>
+          <small>
             {unused === null
-              ? "Uploads stay in storage even when nothing points at them - an abandoned draft, or a photo that was later replaced. Check for any that no draft and no published section uses."
+              ? "Files that no draft and no published section uses."
               : unused.count === 0
                 ? "Every stored file is used by a draft or by the live site."
-                : `${unused.count} file${unused.count === 1 ? "" : "s"} (${formatBytes(unused.bytes)}) ${unused.count === 1 ? "is" : "are"} stored but used by no draft and by no published section. Files added in the last day are left alone, so anything uploaded but not yet saved is safe.`}
-          </p>
-        </div>
+                : `${unused.count} file${unused.count === 1 ? "" : "s"} (${formatBytes(unused.bytes)}) ${unused.count === 1 ? "is" : "are"} used by nothing. Files added in the last day are left alone.`}
+          </small>
+        </span>
         {unused === null || unused.count === 0 ? (
           <button
             type="button"
-            className="studio-danger-zone__button"
+            className="studio-ins-btn"
             onClick={() => void checkUnused()}
             disabled={isChecking || uploadBlocked}
           >
-            {isChecking ? "Checking..." : "Check for unused files"}
+            {isChecking ? "Checking..." : "Check"}
           </button>
         ) : (
           <button
             type="button"
-            className="studio-danger-zone__button"
+            className="studio-ins-btn studio-ins-btn--danger"
             onClick={() => void removeUnused()}
             disabled={isSweeping || uploadBlocked}
           >
-            {isSweeping
-              ? "Removing..."
-              : `Remove ${unused.count} unused file${unused.count === 1 ? "" : "s"}`}
+            {isSweeping ? "Removing..." : `Remove ${unused.count}`}
           </button>
         )}
-      </section>
-    </>
+      </div>
+
+      <div className="studio-maintenance__row">
+        <span>
+          <strong>Revert drafts</strong>
+          <small>Replace every draft with what is live on the site.</small>
+        </span>
+        <button
+          type="button"
+          className="studio-ins-btn studio-ins-btn--danger"
+          onClick={revertDrafts}
+          disabled={isReverting || Boolean(dirtySection) || uploadBlocked}
+        >
+          {isReverting ? "Reverting..." : "Revert"}
+        </button>
+      </div>
+    </section>
   );
 }

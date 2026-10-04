@@ -1,23 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { studioHome, studioNavGroups, studioSectionLabels, type StudioBadgeCounts } from "@/lib/studio-nav";
+import { studioHome, studioHref, studioSectionLabels, studioTabs } from "@/lib/studio-nav";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
-type RailProps = Readonly<{
-  badges: StudioBadgeCounts;
-  open: boolean;
-  onClose: () => void;
-}>;
-
-function isCurrentPath(pathname: string, href: string) {
-  return href === studioHome ? pathname === href : pathname.startsWith(`${href}/`);
-}
-
-export function Rail({ badges, open, onClose }: RailProps) {
+export function Rail() {
   const pathname = usePathname();
+  const search = useSearchParams().toString();
+  const here = search ? `${pathname}?${search}` : pathname;
+  /* The Menu page links into the settings draft (search, brand, look and domain).
+     Those editors have no tab of their own, so they stay under Menu - unlike the
+     navbar and footer groups of the same draft, which do. */
+  const onSiteDetails =
+    pathname === studioHref("/settings") && !studioTabs.some((tab) => tab.href === here);
   const router = useRouter();
   const dirtySection = useStudioStore((state) => state.dirtySection);
   const saveDraft = useStudioStore((state) => state.saveDraft);
@@ -35,104 +32,53 @@ export function Rail({ badges, open, onClose }: RailProps) {
     ? (studioSectionLabels[dirtySection as keyof typeof studioSectionLabels] ?? dirtySection)
     : "";
 
-  const blockedByUpload = () => {
-    if (!uploadBlocked) return false;
-    pushToast(`${uploadLabel} is still uploading. Wait for it to finish.`, "info");
-    return true;
-  };
-
   const leave = (href: string) => {
     setPendingHref(null);
-    onClose();
     router.push(href);
   };
 
   const saveThenLeave = async (href: string) => {
-    if (blockedByUpload()) return;
+    if (uploadBlocked) {
+      pushToast(`${uploadLabel} is still uploading. Wait for it to finish.`, "info");
+      return;
+    }
     await saveDraft();
     if (useStudioStore.getState().dirtySection) return;
     leave(href);
   };
 
   return (
-    <aside className={`studio-rail ${open ? "is-open" : ""}`} aria-label="Studio navigation">
-      <div className="studio-rail__brand">
-        <Link
-          className="studio-rail__home"
-          href={studioHome}
-          onClick={(event) => {
-            if (uploadBlocked) {
-              event.preventDefault();
-              blockedByUpload();
-              return;
-            }
-            if (dirtySection) {
-              event.preventDefault();
-              setPendingHref(studioHome);
-              return;
-            }
-            onClose();
-          }}
-        >
-          <span>madhu.edit</span>
-          <small>Content studio</small>
-        </Link>
-        <button
-          className="studio-icon-button studio-rail__close"
-          type="button"
-          onClick={onClose}
-          aria-label="Close navigation"
-        >
-          <span aria-hidden="true">x</span>
-        </button>
-      </div>
-      <nav>
-        {studioNavGroups.map((group) => (
-          <section className="studio-rail__group" key={group.label} aria-label={group.label}>
-            <h2>
-              <span>{group.label}</span>
-              <b>{String(group.items.length).padStart(2, "0")}</b>
-            </h2>
-            <ul>
-              {group.items.map((item, index) => {
-                const current = isCurrentPath(pathname, item.href);
-                const badge = item.badge ? badges[item.badge] : undefined;
+    <nav className="studio-tabs" aria-label="Sections">
+      <ol>
+        {studioTabs.map((tab) => {
+          const current = here === tab.href || (tab.href === studioHome && onSiteDetails);
 
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={current ? "page" : undefined}
-                      onClick={(event) => {
-                        if (uploadBlocked && !current) {
-                          event.preventDefault();
-                          blockedByUpload();
-                          return;
-                        }
-                        if (dirtySection && !current) {
-                          event.preventDefault();
-                          setPendingHref(item.href);
-                          return;
-                        }
-                        onClose();
-                      }}
-                    >
-                      <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>
-                      <span>
-                        <strong>{item.label}</strong>
-                        {item.detail ? <small>{item.detail}</small> : null}
-                      </span>
-                      {badge !== undefined ? <em>{badge}</em> : null}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
-      </nav>
+          return (
+            <li key={tab.href} className={tab.page ? "studio-tabs__page" : undefined}>
+              <Link
+                href={tab.href}
+                aria-current={current ? "page" : undefined}
+                onClick={(event) => {
+                  if (current) return;
+                  if (uploadBlocked) {
+                    event.preventDefault();
+                    pushToast(`${uploadLabel} is still uploading. Wait for it to finish.`, "info");
+                    return;
+                  }
+                  if (dirtySection) {
+                    event.preventDefault();
+                    setPendingHref(tab.href);
+                  }
+                }}
+              >
+                {tab.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
       {pendingHref ? (
-        <div className="studio-rail__guard" role="alertdialog" aria-label="Unsaved changes">
+        <div className="studio-tabs__guard" role="alertdialog" aria-label="Unsaved changes">
           <p>
             <b>{dirtyLabel}</b> has changes you have not saved. Leaving now loses them.
           </p>
@@ -164,6 +110,6 @@ export function Rail({ badges, open, onClose }: RailProps) {
           </div>
         </div>
       ) : null}
-    </aside>
+    </nav>
   );
 }

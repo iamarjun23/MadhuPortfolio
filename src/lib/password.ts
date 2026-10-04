@@ -47,10 +47,12 @@ export async function hashPassword(password: string) {
 
 const LEGACY_BCRYPT_PREFIX = /^\$2[aby]\$/;
 
+/** True for a hash this code would no longer produce: legacy bcrypt, or an older iteration count. */
+export function needsRehash(stored: string) {
+  return !stored.startsWith(`${ALGORITHM}$${ITERATIONS}$`);
+}
+
 export async function verifyPassword(password: string, stored: string) {
-  // ponytail: accounts hashed by the pre-migration bcrypt flow never get rehashed here,
-  // so they pay bcrypt's CPU cost on every login. Rehash to the pbkdf2 format on a
-  // successful legacy login (in auth.ts, where the DB write already happens) if that cost matters.
   if (LEGACY_BCRYPT_PREFIX.test(stored)) {
     const { compare } = await import("bcryptjs");
     return compare(password, stored);

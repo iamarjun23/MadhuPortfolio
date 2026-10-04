@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isTimeZone } from "@/lib/contact-links";
 import { ExternalLinkSchema } from "./links";
 
 // Empty means no number. Otherwise international, since a WhatsApp link needs the
@@ -12,6 +13,9 @@ const PhoneSchema = z.union([
     .refine((phone) => /^\d{8,15}$/.test(phone.replace(/\D/g, "")), "Use 8 to 15 digits."),
 ]);
 
+// Stands in for the WhatsApp number until the real one is entered in the Studio.
+export const placeholderWhatsapp = "+91 98765 43210";
+
 export const ContactSchema = z.object({
   eyebrow: z.string().max(40).default("Let's talk"),
   heading: z.string().max(100).default("Whatever you're making, let's"),
@@ -23,24 +27,27 @@ export const ContactSchema = z.object({
       "Podcast, campaign, event or documentary — if it needs to move people, I'd love to cut it.",
     ),
   projectCtaLabel: z.string().max(40).default("Start a project"),
+  emailNote: z.string().max(80).default("Best for briefs, footage links and budgets."),
+  callbackHeading: z.string().max(60).default("Rather talk it through?"),
+  callbackNote: z.string().max(120).default("Leave your number and a good time to call."),
   callbackCtaLabel: z.string().max(40).default("Request a callback"),
-  bestForLabel: z.string().max(30).default("Best for"),
-  bestFor: z.string().max(120).default("Podcasts · campaigns · events · documentaries"),
-  availabilityHeading: z.string().max(30).default("Availability"),
-  locationLabel: z.string().max(30).default("Based in"),
   availableForFreelance: z.boolean().default(true),
-  availabilityLabel: z.string().max(30).default("Available for freelance ·"),
+  // The one availability line: navbar, contact card and footer all show it.
   footerStatus: z.string().max(60),
   email: z.email(),
   location: z.string().max(80),
+  // Drives the "3:40 pm in Bengaluru" clock on the contact card.
+  timeZone: z
+    .string()
+    .default("Asia/Kolkata")
+    .refine(isTimeZone, "Use a time zone name like Asia/Kolkata."),
   phone: PhoneSchema.optional(),
   socials: z.object({
     linkedin: ExternalLinkSchema.nullable(),
     instagram: ExternalLinkSchema.nullable(),
     youtube: ExternalLinkSchema.nullable(),
-    // A number, not a link: the footer icon turns it into a wa.me chat link. The
-    // default is a placeholder until the real number is entered in the Studio.
-    whatsapp: PhoneSchema.default("+91 98765 43210"),
+    // A number, not a link: the footer icon turns it into a wa.me chat link.
+    whatsapp: PhoneSchema.default(placeholderWhatsapp),
   }),
   footerTagline: z.string().max(160),
 });

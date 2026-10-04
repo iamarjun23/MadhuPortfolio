@@ -10,7 +10,6 @@ import { Hero } from "@/components/public/Hero";
 import { ImpactStrip } from "@/components/public/ImpactStrip";
 import { MoodBoard } from "@/components/public/MoodBoard";
 import { Nav } from "@/components/public/Nav";
-import { ResumePage } from "@/components/public/ResumePage";
 import { Testimonials } from "@/components/public/Testimonials";
 import { WorkConsole } from "@/components/public/WorkConsole";
 import type { SectionKey } from "@/lib/sections";
@@ -33,6 +32,12 @@ type StudioLandingPreviewProps = Readonly<{
   data: unknown;
   contactData: unknown;
   settingsData: unknown;
+  /** Which of the Drawing Room's two places to show: its home-page invitation or the /room page. */
+  roomView?: "entrance" | "page";
+  /** Which part of the site-wide settings to show: the navbar alone, the footer alone, or both. */
+  settingsView?: "navigation" | "footer" | "all";
+  /** The draft resume PDF, so the navbar preview shows its Resume link only when the site would. */
+  resumeUrl?: string | null;
   onWorkProjectSelect?: (laneLabel: string, projectId: string) => void;
   onWorkProjectMove?: (
     laneLabel: string,
@@ -57,6 +62,9 @@ export function StudioLandingPreview({
   data,
   contactData,
   settingsData,
+  roomView = "page",
+  settingsView = "all",
+  resumeUrl,
   onWorkProjectSelect,
   onWorkProjectMove,
   onWorkProjectReorder,
@@ -95,7 +103,11 @@ export function StudioLandingPreview({
     }
     case "clients": {
       const parsed = ClientsSchema.safeParse(data);
-      return parsed.success ? <ClientsMarquee data={parsed.data} /> : <PreviewUnavailable />;
+      return parsed.success ? (
+        <ClientsMarquee data={parsed.data} editable />
+      ) : (
+        <PreviewUnavailable />
+      );
     }
     case "work": {
       const parsed = WorkSchema.safeParse(data);
@@ -120,14 +132,25 @@ export function StudioLandingPreview({
     case "experience": {
       const parsed = ExperienceSchema.safeParse(data);
       return parsed.success ? (
-        <Experience data={parsed.data} fallbackImage={fallbackImage} autoPlay={false} />
+        <Experience data={parsed.data} fallbackImage={fallbackImage} autoPlay={false} editable />
       ) : (
         <PreviewUnavailable />
       );
     }
     case "resume": {
-      const parsed = ResumeSchema.safeParse(data);
-      return parsed.success ? <ResumePage data={parsed.data} /> : <PreviewUnavailable />;
+      const url = ResumeSchema.safeParse(data).data?.pdf?.url;
+      // The browser's own PDF viewer, without its toolbar, fitted to the frame's width.
+      return url ? (
+        <iframe
+          className="studio-resume-preview"
+          src={`${url}#toolbar=0&view=FitH`}
+          title="Resume PDF preview"
+        />
+      ) : (
+        <div className="studio-live-preview__unavailable" role="status">
+          No resume PDF yet - the menu hides its Resume link until one is uploaded.
+        </div>
+      );
     }
     case "room": {
       const parsed = RoomSchema.safeParse(data);
@@ -135,14 +158,11 @@ export function StudioLandingPreview({
       if (!parsed.success || !contact.success) return <PreviewUnavailable />;
 
       // The teaser lives on the home page, the pinboard on its own /room page - two
-      // different places a visitor sees this section. Both run here, stacked, so a
-      // field like the teaser's invitation photo has somewhere to show up at all.
-      return (
-        <div className="studio-room-preview">
-          <DrawingRoomTeaser data={parsed.data} />
-          <p className="studio-room-preview__divider">The Drawing Room page (/room)</p>
-          <MoodBoard data={parsed.data} fallbackImage={fallbackImage} contact={contact.data} />
-        </div>
+      // different places a visitor sees this section, so each is previewed on its own.
+      return roomView === "entrance" ? (
+        <DrawingRoomTeaser data={parsed.data} />
+      ) : (
+        <MoodBoard data={parsed.data} fallbackImage={fallbackImage} contact={contact.data} />
       );
     }
     case "contact": {
@@ -154,9 +174,34 @@ export function StudioLandingPreview({
       const contact = ContactSchema.safeParse(contactData);
       if (!parsed.success || !contact.success) return <PreviewUnavailable />;
 
+      // The bar changes its caption on the Drawing Room page, so both versions are shown.
+      if (settingsView === "navigation") {
+        return (
+          <div className="studio-settings-preview studio-settings-preview--part">
+            <p className="studio-settings-preview__label">On the home page</p>
+            <Nav contact={contact.data} settings={parsed.data} resumeUrl={resumeUrl} />
+            <p className="studio-settings-preview__label">On the Drawing Room page</p>
+            <Nav
+              contact={contact.data}
+              settings={parsed.data}
+              resumeUrl={resumeUrl}
+              previewPath="/room"
+            />
+          </div>
+        );
+      }
+
+      if (settingsView === "footer") {
+        return (
+          <div className="studio-settings-preview studio-settings-preview--part">
+            <Footer contact={contact.data} settings={parsed.data} />
+          </div>
+        );
+      }
+
       return (
         <div className="studio-settings-preview">
-          <Nav contact={contact.data} settings={parsed.data} />
+          <Nav contact={contact.data} settings={parsed.data} resumeUrl={resumeUrl} />
           <div className="studio-settings-preview__middle">
             <span>Page content</span>
             <p>Navigation above · footer below</p>

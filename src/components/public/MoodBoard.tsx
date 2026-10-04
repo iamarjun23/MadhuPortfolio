@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { HOME_SCROLL_KEY, RESTORE_HOME_SCROLL_KEY } from "@/components/public/Nav";
 import { MediaImage } from "@/components/public/MediaImage";
 import { preconnectReelHosts, ReelEmbed } from "@/components/public/ReelEmbed";
+import { pageZoom } from "@/lib/page-zoom";
 import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
 import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
-import { reelBadge, reelSourceLabel, resolveReel } from "@/lib/reel";
-import { useDialogFocus } from "@/lib/use-dialog-focus";
+import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
+import { type ReelKind, reelBadge, resolveReel } from "@/lib/reel";
 import type { Contact, Room } from "@/schemas";
 
 type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage; contact: Contact }>;
@@ -133,95 +134,73 @@ function cardContent(card: Room["cards"][number], fallbackImage: FallbackImage) 
 
 type ViewableCard = VideoCard | Extract<RoomCard, { type: "polaroid" }>;
 
-/* Opens whatever a card holds, full size: a reel plays in place, a photo is shown
-   whole. Portrait media (Instagram, LinkedIn, photos) sits beside its caption so
-   the frame is never lost in a wide, empty box. */
-function CardViewer({
-  card,
-  fallbackImage,
-  onClose,
-}: Readonly<{ card: ViewableCard; fallbackImage: FallbackImage; onClose: () => void }>) {
-  const reel = card.type === "video" ? resolveReel(card) : null;
-  const photo =
-    card.type === "polaroid" ? imageOrFallback(card.image, fallbackImage, card.caption) : null;
-  const kind = reel ? reel.kind : "photo";
-  const source = reel ? reelSourceLabel(reel.kind) : "Photograph";
-  const outbound = card.type === "video" ? card.href : null;
-  const dialogRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(dialogRef, true);
+function outboundLabel(kind: ReelKind) {
+  if (kind === "instagram") return "Watch on Instagram";
+  if (kind === "youtube") return "Watch on YouTube";
+  if (kind === "linkedin") return "View on LinkedIn";
+  return "Open original";
+}
 
+/* A card's text for the viewer's panel and its "Up next" card. */
+function viewerItem(card: ViewableCard, fallbackImage: FallbackImage): ViewerItem {
+  const base = { title: card.caption, subtitle: card.subCaption };
+  if (card.type === "polaroid") {
+    const photo = imageOrFallback(card.image, fallbackImage, card.caption);
+    return { ...base, kind: "photo", thumbnail: photo?.url ?? null };
+  }
+  const reel = resolveReel(card);
+  return {
+    ...base,
+    kind: reel.kind,
+    thumbnail: reel.thumbnail,
+    cta: card.href ? { href: card.href, label: outboundLabel(reel.kind) } : null,
+  };
+}
+
+/* Opens whatever a card holds, full size: a reel plays in place, a photo is shown whole. */
+function cardMedia(card: ViewableCard, fallbackImage: FallbackImage) {
+  if (card.type === "polaroid") {
+    const photo = imageOrFallback(card.image, fallbackImage, card.caption);
+    return photo ? (
+      // Nominal size only: the CSS lets the photo take its own natural shape.
+      <MediaImage
+        src={photo.url}
+        alt={photo.alt}
+        width={1600}
+        height={1200}
+        sizes={PHOTO_VIEWER_SIZES}
+      />
+    ) : null;
+  }
+  const reel = resolveReel(card);
+  if (reel.file) {
+    return (
+      <video
+        key={reel.file}
+        src={reel.file}
+        poster={reel.poster ?? undefined}
+        controls
+        autoPlay
+        playsInline
+      />
+    );
+  }
+  if (reel.embed) {
+    return (
+      <ReelEmbed
+        key={reel.embed}
+        src={reel.embed}
+        title={`${card.caption} video`}
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
+        still={reel.thumbnail}
+        stillSizes="220px"
+      />
+    );
+  }
   return (
-    <>
-      <div className="mood-player__scrim" aria-hidden="true" onClick={onClose} />
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        className={`mood-player mood-player--${kind}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`${card.caption} preview`}
-      >
-        <button
-          className="mood-player__close"
-          type="button"
-          onClick={onClose}
-          aria-label="Close preview"
-        >
-          &times;
-        </button>
-        <div className={`mood-player__media mood-player__media--${kind}`}>
-          {photo ? (
-            // Nominal size only: the CSS lets the photo take its own natural shape.
-            <MediaImage
-              src={photo.url}
-              alt={photo.alt}
-              width={1600}
-              height={1200}
-              sizes={PHOTO_VIEWER_SIZES}
-            />
-          ) : reel?.file ? (
-            <video
-              src={reel.file}
-              poster={reel.poster ?? undefined}
-              controls
-              autoPlay
-              playsInline
-            />
-          ) : reel?.embed ? (
-            <ReelEmbed
-              key={reel.embed}
-              src={reel.embed}
-              title={`${card.caption} video`}
-              allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
-              still={reel.thumbnail}
-              stillSizes="220px"
-            />
-          ) : (
-            <div className="mood-player__unavailable">
-              <span>This card has no video that can play here yet.</span>
-            </div>
-          )}
-        </div>
-        <div className="mood-player__copy">
-          <span className="mood-player__source">
-            <i aria-hidden="true" />
-            {source}
-          </span>
-          <small>{card.tag}</small>
-          <h3>{card.caption}</h3>
-          {card.subCaption ? <p>{card.subCaption}</p> : null}
-          {outbound ? (
-            <a className="mood-player__cta" href={outbound} target="_blank" rel="noreferrer">
-              {reel?.kind === "instagram" ? "Watch on Instagram" : "Open original"}{" "}
-              <span aria-hidden="true">&#8599;</span>
-            </a>
-          ) : null}
-          <span className="mood-player__hint" aria-hidden="true">
-            Esc to close
-          </span>
-        </div>
-      </div>
-    </>
+    <div className="mood-player__unavailable">
+      <span>This card has no video that can play here yet.</span>
+    </div>
   );
 }
 
@@ -239,6 +218,7 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     fx: number;
     fy: number;
     rot: number;
+    zoom: number;
     boardLeft: number;
     boardTop: number;
     boardWidth: number;
@@ -261,9 +241,8 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
      the drag has finished. Without this the pop-up opened every time a reel card
      was moved. */
   const draggedRatherThanClicked = useRef(false);
-  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [moveAnnouncement, setMoveAnnouncement] = useState("");
-  const canReposition = data.allowDrag && isDesktopLayout;
+  const canReposition = data.allowDrag;
 
   const reset = useCallback(() => setPositions({}), []);
   /* Cards are dealt one to a cell of a notional grid, which cell they get
@@ -307,15 +286,6 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     // eslint-disable-next-line react-hooks/set-state-in-effect
     shuffle();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const desktopQuery = window.matchMedia("(min-width: 821px)");
-    const updateLayout = () => setIsDesktopLayout(desktopQuery.matches);
-
-    updateLayout();
-    desktopQuery.addEventListener("change", updateLayout);
-    return () => desktopQuery.removeEventListener("change", updateLayout);
   }, []);
 
   useEffect(() => {
@@ -369,22 +339,25 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     const card = event.currentTarget;
     const rect = card.getBoundingClientRect();
     const boardRect = board.getBoundingClientRect();
+    // Rects and the pointer are in screen pixels; the board's own sizes are not zoomed.
+    const zoom = pageZoom(board);
     dragRef.current = {
       id,
       node: card,
-      grabX: event.clientX - rect.left,
-      grabY: event.clientY - rect.top,
+      grabX: (event.clientX - rect.left) / zoom,
+      grabY: (event.clientY - rect.top) / zoom,
       fx: position.fx,
       fy: position.fy,
       rot: position.rot,
+      zoom,
       boardLeft: boardRect.left,
       boardTop: boardRect.top,
       boardWidth: board.clientWidth,
       boardHeight: board.clientHeight,
       cardWidth: card.offsetWidth,
       cardHeight: card.offsetHeight,
-      grabStartX: rect.left - boardRect.left,
-      grabStartY: rect.top - boardRect.top,
+      grabStartX: (rect.left - boardRect.left) / zoom,
+      grabStartY: (rect.top - boardRect.top) / zoom,
       moved: false,
     };
     setDragged(id);
@@ -400,11 +373,17 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     // here was invisible anyway - it just cut the card off mid-drag.
     const x = Math.max(
       0,
-      Math.min(drag.boardWidth - drag.cardWidth, event.clientX - drag.boardLeft - drag.grabX),
+      Math.min(
+        drag.boardWidth - drag.cardWidth,
+        (event.clientX - drag.boardLeft) / drag.zoom - drag.grabX,
+      ),
     );
     const y = Math.max(
       0,
-      Math.min(drag.boardHeight - drag.cardHeight, event.clientY - drag.boardTop - drag.grabY),
+      Math.min(
+        drag.boardHeight - drag.cardHeight,
+        (event.clientY - drag.boardTop) / drag.zoom - drag.grabY,
+      ),
     );
     if (Math.abs(x - drag.grabStartX) + Math.abs(y - drag.grabStartY) > 4) drag.moved = true;
     drag.fx = x / Math.max(1, drag.boardWidth);
@@ -457,6 +436,11 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     const photo = imageOrFallback(card.image, fallbackImage, card.caption);
     if (photo) preloadViewerPhoto(photo.url);
   }
+
+  const viewable = data.cards.filter(isViewable);
+  const playingIndex = playing ? viewable.findIndex((card) => card.id === playing.id) : -1;
+  const stepPlaying = (direction: 1 | -1) =>
+    setPlaying(viewable[(playingIndex + direction + viewable.length) % viewable.length] ?? null);
 
   function openCard(card: RoomCard) {
     if (!isViewable(card)) return;
@@ -548,8 +532,21 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
           })}
         </div>
       </section>
-      {playing ? (
-        <CardViewer card={playing} fallbackImage={fallbackImage} onClose={() => setPlaying(null)} />
+      {playing && playingIndex >= 0 ? (
+        <MediaViewer
+          item={viewerItem(playing, fallbackImage)}
+          next={
+            viewable.length > 1
+              ? viewerItem(viewable[(playingIndex + 1) % viewable.length]!, fallbackImage)
+              : null
+          }
+          index={playingIndex}
+          total={viewable.length}
+          onStep={stepPlaying}
+          onClose={() => setPlaying(null)}
+        >
+          {cardMedia(playing, fallbackImage)}
+        </MediaViewer>
       ) : null}
       <section className="room-close">
         <span className="slate">{data.closeEyebrow}</span>
