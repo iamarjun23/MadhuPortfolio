@@ -10,3 +10,11 @@ export function previewScale(pane: Size, content: Size, whole: boolean) {
   const scale = whole ? Math.min(byWidth, pane.height / content.height) : byWidth;
   return scale > 0 ? Math.min(1, scale) : 1;
 }
+
+/* Left to itself the preview shows the whole section, unless that would cost it
+   more than a tenth of the size it gets from fitting the width alone: a tall
+   section shrunk further than that gets hard to read and click, so it scrolls
+   instead. */
+export function wholeIsReadable(pane: Size, content: Size) {
+  return previewScale(pane, content, true) >= 0.9 * previewScale(pane, content, false);
+}

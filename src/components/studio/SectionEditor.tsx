@@ -54,7 +54,7 @@ import {
   sectionDocs,
   type MediaKindLabel,
 } from "@/lib/studio-labels";
-import { studioSectionLabels } from "@/lib/studio-nav";
+import { studioSectionLabels, studioTabFor } from "@/lib/studio-nav";
 import { reelSourceLabel, resolveReel } from "@/lib/reel";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
@@ -724,6 +724,8 @@ type MediaConfig = Readonly<{
   isVideo?: boolean;
   isDocument?: boolean;
   isOptional?: boolean;
+  /** A video whose duotone tint is set on another field. */
+  sharesTint?: boolean;
 }>;
 
 function mediaKindOf(config: MediaConfig | undefined): MediaKindLabel {
@@ -740,6 +742,16 @@ function getMediaConfig(
   const arrayKey = path[path.length - 3];
   if (key === "bgVideo" && isEditorObject(value)) {
     return { endpoint: "heroVideo", acceptsAlt: false, isVideo: true };
+  }
+  // The phone cut takes its tint from the main video, so it has no switch of its own.
+  if (key === "bgVideoMobile" && (value === null || isEditorObject(value))) {
+    return {
+      endpoint: "heroVideo",
+      acceptsAlt: false,
+      isVideo: true,
+      isOptional: true,
+      sharesTint: true,
+    };
   }
   if (key === "portraitVideo" && (value === null || isEditorObject(value))) {
     return { endpoint: "heroVideo", acceptsAlt: false, isVideo: true, isOptional: true };
@@ -1049,13 +1061,15 @@ function MediaEditor({
                 100KB).
               </small>
             </div>
-            <SwitchRow
-              id={`${id}-duotone`}
-              label="Duotone tint"
-              hint="Washes the video in the site's orange-and-black treatment."
-              checked={duotone}
-              onChange={(checked) => onChange(path, { ...object, duotone: checked })}
-            />
+            {config.sharesTint ? null : (
+              <SwitchRow
+                id={`${id}-duotone`}
+                label="Duotone tint"
+                hint="Washes the video in the site's orange-and-black treatment."
+                checked={duotone}
+                onChange={(checked) => onChange(path, { ...object, duotone: checked })}
+              />
+            )}
           </>
         ) : null}
       </details>
@@ -1174,7 +1188,7 @@ function contentsLabel(value: EditorValue, path: readonly (string | number)[], m
 
 /* Set elsewhere: card positions and the "All work" order by dragging in the
    preview, a photo's crop focus by clicking the photo in its own card, the
-   freelance switch on the Menu page. */
+   freelance switch on the Studio page. */
 const hiddenKeys = new Set([
   "id",
   "position",
@@ -1194,152 +1208,152 @@ function GroupView({
   onOpen,
   maxFor,
 }: InspectorViewProps & { value: EditorObject }) {
+  const entries = Object.entries(value).filter(([key]) => !hiddenKeys.has(key));
+  /* At the top of a section the small labels ("Next scene" button text and the
+     like) go last, under a caption of their own, so the panel opens on what the
+     section is about: its headline, its list of projects. */
+  const isWording = ([key]: [string, EditorValue]) => path.length === 0 && key.endsWith("Label");
+  const wording = entries.filter(isWording);
+  const row = ([key, entry]: [string, EditorValue]) => {
+    const childPath = [...path, key];
+    const { label, hint } = describeField(childPath);
+    const id = `studio-${childPath.join("-")}`;
+    const hintId = `${id}-hint`;
+    const isOpen = openKey === key;
+    const toggle = () => onOpen(isOpen ? null : key);
+    const close = () => onOpen(null);
+
+    if (isVideoLinkField(entry, childPath)) {
+      const url = typeof entry === "string" ? entry : "";
+      if (isOpen) {
+        return (
+          <FieldCard key={key} label={label} hint={hint} hintId={hintId} onDone={close}>
+            <LinkEditor value={entry} label={label} path={childPath} onChange={onChange} />
+          </FieldCard>
+        );
+      }
+      const reel = resolveReel({ href: url || null });
+      return (
+        <FieldRow
+          key={key}
+          label={label}
+          value={`${reelSourceLabel(reel.kind)} · ${url.replace(/^https?:\/\/(www\.)?/, "")}`}
+          thumbnail={reel.thumbnailCanFail ? undefined : (reel.thumbnail ?? undefined)}
+          isEmpty={!url}
+          onClick={toggle}
+        />
+      );
+    }
+
+    const media = getMediaConfig(entry, childPath);
+    if (media) {
+      const kind = mediaKindOf(media);
+      if (isOpen) {
+        return (
+          <FieldCard
+            key={key}
+            label={label}
+            optional={media.isOptional}
+            hint={hint ?? mediaFallbackHints[kind]}
+            hintId={hintId}
+            onDone={close}
+          >
+            <MediaEditor
+              value={entry}
+              label={label}
+              path={childPath}
+              onChange={onChange}
+              uploadEnabled={uploadEnabled}
+              parent={value}
+            />
+          </FieldCard>
+        );
+      }
+      const url = storedMediaUrl(entry);
+      return (
+        <FieldRow
+          key={key}
+          label={label}
+          value={`${mediaSpecs[kind].badge} added`}
+          thumbnail={kind === "photo" && url ? url : undefined}
+          isEmpty={!url}
+          onClick={toggle}
+        />
+      );
+    }
+
+    if (typeof entry === "boolean") {
+      return (
+        <SwitchRow
+          key={key}
+          id={id}
+          label={label}
+          hint={hint}
+          checked={entry}
+          onChange={(checked) => onChange(childPath, checked)}
+        />
+      );
+    }
+
+    if (Array.isArray(entry) || isEditorObject(entry)) {
+      const isList = Array.isArray(entry);
+      return (
+        <FieldRow
+          key={key}
+          label={label}
+          value={contentsLabel(entry, childPath, isList ? maxFor(childPath) : undefined)}
+          isEmpty={isList && entry.length === 0}
+          leadsOn
+          onClick={() => onNavigate(childPath)}
+        />
+      );
+    }
+
+    const options = optionsForPath(childPath);
+    if (options && (typeof entry === "string" || (entry === null && options.includes("")))) {
+      return (
+        <SelectRow
+          key={key}
+          id={id}
+          label={label}
+          hint={hint}
+          value={entry ?? ""}
+          options={options}
+          onChange={(next) => onChange(childPath, next || null)}
+        />
+      );
+    }
+
+    const text = entry === null ? "" : String(entry);
+    const max = typeof entry === "number" ? undefined : maxFor(childPath);
+    if (isOpen) {
+      return (
+        <FieldCard
+          key={key}
+          label={label}
+          hint={hint}
+          hintId={hintId}
+          meta={
+            max === undefined ? null : (
+              <span className={text.length >= max * 0.9 ? "is-near" : undefined}>
+                {text.length} / {max}
+              </span>
+            )
+          }
+          onDone={close}
+        >
+          <TextEditor value={entry} label={label} path={childPath} onChange={onChange} max={max} />
+        </FieldCard>
+      );
+    }
+    return <FieldRow key={key} label={label} value={text} isEmpty={text === ""} onClick={toggle} />;
+  };
+
   return (
     <div className="studio-ins-rows">
-      {Object.entries(value)
-        .filter(([key]) => !hiddenKeys.has(key))
-        .map(([key, entry]) => {
-          const childPath = [...path, key];
-          const { label, hint } = describeField(childPath);
-          const id = `studio-${childPath.join("-")}`;
-          const hintId = `${id}-hint`;
-          const isOpen = openKey === key;
-          const toggle = () => onOpen(isOpen ? null : key);
-          const close = () => onOpen(null);
-
-          if (isVideoLinkField(entry, childPath)) {
-            const url = typeof entry === "string" ? entry : "";
-            if (isOpen) {
-              return (
-                <FieldCard key={key} label={label} hint={hint} hintId={hintId} onDone={close}>
-                  <LinkEditor value={entry} label={label} path={childPath} onChange={onChange} />
-                </FieldCard>
-              );
-            }
-            const reel = resolveReel({ href: url || null });
-            return (
-              <FieldRow
-                key={key}
-                label={label}
-                value={`${reelSourceLabel(reel.kind)} · ${url.replace(/^https?:\/\/(www\.)?/, "")}`}
-                thumbnail={reel.thumbnailCanFail ? undefined : (reel.thumbnail ?? undefined)}
-                isEmpty={!url}
-                onClick={toggle}
-              />
-            );
-          }
-
-          const media = getMediaConfig(entry, childPath);
-          if (media) {
-            const kind = mediaKindOf(media);
-            if (isOpen) {
-              return (
-                <FieldCard
-                  key={key}
-                  label={label}
-                  optional={media.isOptional}
-                  hint={hint ?? mediaFallbackHints[kind]}
-                  hintId={hintId}
-                  onDone={close}
-                >
-                  <MediaEditor
-                    value={entry}
-                    label={label}
-                    path={childPath}
-                    onChange={onChange}
-                    uploadEnabled={uploadEnabled}
-                    parent={value}
-                  />
-                </FieldCard>
-              );
-            }
-            const url = storedMediaUrl(entry);
-            return (
-              <FieldRow
-                key={key}
-                label={label}
-                value={`${mediaSpecs[kind].badge} added`}
-                thumbnail={kind === "photo" && url ? url : undefined}
-                isEmpty={!url}
-                onClick={toggle}
-              />
-            );
-          }
-
-          if (typeof entry === "boolean") {
-            return (
-              <SwitchRow
-                key={key}
-                id={id}
-                label={label}
-                hint={hint}
-                checked={entry}
-                onChange={(checked) => onChange(childPath, checked)}
-              />
-            );
-          }
-
-          if (Array.isArray(entry) || isEditorObject(entry)) {
-            const isList = Array.isArray(entry);
-            return (
-              <FieldRow
-                key={key}
-                label={label}
-                value={contentsLabel(entry, childPath, isList ? maxFor(childPath) : undefined)}
-                isEmpty={isList && entry.length === 0}
-                leadsOn
-                onClick={() => onNavigate(childPath)}
-              />
-            );
-          }
-
-          const options = optionsForPath(childPath);
-          if (options && (typeof entry === "string" || (entry === null && options.includes("")))) {
-            return (
-              <SelectRow
-                key={key}
-                id={id}
-                label={label}
-                hint={hint}
-                value={entry ?? ""}
-                options={options}
-                onChange={(next) => onChange(childPath, next || null)}
-              />
-            );
-          }
-
-          const text = entry === null ? "" : String(entry);
-          const max = typeof entry === "number" ? undefined : maxFor(childPath);
-          if (isOpen) {
-            return (
-              <FieldCard
-                key={key}
-                label={label}
-                hint={hint}
-                hintId={hintId}
-                meta={
-                  max === undefined ? null : (
-                    <span className={text.length >= max * 0.9 ? "is-near" : undefined}>
-                      {text.length} / {max}
-                    </span>
-                  )
-                }
-                onDone={close}
-              >
-                <TextEditor
-                  value={entry}
-                  label={label}
-                  path={childPath}
-                  onChange={onChange}
-                  max={max}
-                />
-              </FieldCard>
-            );
-          }
-          return (
-            <FieldRow key={key} label={label} value={text} isEmpty={text === ""} onClick={toggle} />
-          );
-        })}
+      {entries.filter((entry) => !isWording(entry)).map(row)}
+      {wording.length > 0 ? <p className="studio-ins-rows__caption">Small labels</p> : null}
+      {wording.map(row)}
     </div>
   );
 }
@@ -1723,12 +1737,15 @@ export function SectionEditor({
      that follows a save re-renders this component without remounting it - the
      `version` prop would still be the one the page first loaded. */
   const versionRef = useRef(version);
+  const markedRef = useRef<Element | null>(null);
   const [activePath, setActivePath] = useState<readonly (string | number)[]>(initialPath);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
-  // Whole section in view by default; the other choice fits the width and scrolls.
-  const [previewWhole, setPreviewWhole] = useState(true);
-  const [previewScale, setPreviewScale] = useState(1);
+  /* Until one is picked, the preview shows the whole section when that keeps it
+     readable and otherwise fits the width and scrolls. */
+  const [previewChoice, setPreviewChoice] = useState<boolean | null>(null);
+  const [previewFit, setPreviewFit] = useState({ scale: 1, whole: true });
+  const previewWhole = previewFit.whole;
   const { formState, handleSubmit, reset, setValue } = useForm<{ data: unknown }>({
     defaultValues: { data: savedData },
   });
@@ -1770,11 +1787,21 @@ export function SectionEditor({
     return true;
   };
 
+  /* Outlines the piece of the preview that the open field belongs to. Only a click
+     on the preview knows which element that is, so moving the panel any other way
+     clears the outline rather than leave it on the wrong thing. */
+  const markSelected = (node: Element | null) => {
+    markedRef.current?.removeAttribute("data-studio-selected");
+    node?.setAttribute("data-studio-selected", "");
+    markedRef.current = node;
+  };
+
   /* Shows `path` in the panel. The panel only shows groups and lists, so a path
      that ends on something narrower - a photo, a link, a single word - shows its
      parent with that row opened. */
   const showInPanel = (path: readonly (string | number)[]) => {
-    if (holdForUpload()) return;
+    if (holdForUpload()) return false;
+    markSelected(null);
     let target = path;
     let key: string | null = null;
     while (target.length > 0) {
@@ -1786,6 +1813,7 @@ export function SectionEditor({
     }
     setActivePath(target);
     setOpenKey(key);
+    return true;
   };
 
   /* A new list entry copies the shape of one that already exists. When the list
@@ -1855,6 +1883,19 @@ export function SectionEditor({
 
   const selectedPath =
     activePath.length === 0 || valueAtPath(currentData, activePath) !== undefined ? activePath : [];
+  /* The tab this editor was opened from names the panel. A tab that owns one part
+     of a shared draft (Navbar, Footer, Room entrance) is also where the trail
+     starts, and a tab that leaves a part to another (the Room page, whose home-page
+     invitation has the Room entrance tab) keeps that part out of its list. */
+  const tab = studioTabFor(section, initialPath);
+  const panelTitle = tab?.label ?? studioSectionLabels[section];
+  const trailBase = initialPath.every((segment, index) => selectedPath[index] === segment)
+    ? initialPath.length
+    : 0;
+  const elsewhere = selectedPath.length === 0 ? tab?.part?.except : undefined;
+  const panelData = elsewhere
+    ? Object.fromEntries(Object.entries(currentData).filter(([key]) => key !== elsewhere))
+    : currentData;
   /* A list entry is named by what it holds ("Jar app launch film"), a group or
      list by its label. */
   const nameAt = (path: readonly (string | number)[]) =>
@@ -1936,14 +1977,14 @@ export function SectionEditor({
           <header className="studio-canvas__topbar">
             <span>{previewNote ?? sectionDocs[section].summary}</span>
             <div className="studio-canvas__tools">
-              <output aria-label="Preview zoom">{Math.round(previewScale * 100)}%</output>
+              <output aria-label="Preview zoom">{Math.round(previewFit.scale * 100)}%</output>
               <div className="studio-device-switch" role="group" aria-label="Preview size">
                 <button
                   className={previewWhole ? "is-active" : ""}
                   type="button"
                   aria-pressed={previewWhole}
                   title="Show the whole section at once"
-                  onClick={() => setPreviewWhole(true)}
+                  onClick={() => setPreviewChoice(true)}
                 >
                   Fit
                 </button>
@@ -1952,7 +1993,7 @@ export function SectionEditor({
                   type="button"
                   aria-pressed={!previewWhole}
                   title="Fill the width and scroll down the section"
-                  onClick={() => setPreviewWhole(false)}
+                  onClick={() => setPreviewChoice(false)}
                 >
                   Full width
                 </button>
@@ -2007,11 +2048,12 @@ export function SectionEditor({
                  switches the scene as well as opening its role. */
               const entry = target.closest<HTMLElement>("[data-studio-path]");
               if (entry) {
-                showInPanel(
+                const shown = showInPanel(
                   (entry.dataset.studioPath ?? "")
                     .split(".")
                     .map((segment) => (/^\d+$/.test(segment) ? Number(segment) : segment)),
                 );
+                if (shown) markSelected(entry);
                 return;
               }
 
@@ -2041,12 +2083,16 @@ export function SectionEditor({
               if (!path || !initialPath.every((segment, index) => path[index] === segment)) return;
               event.preventDefault();
               event.stopPropagation();
-              showInPanel(path);
+              if (showInPanel(path)) {
+                markSelected(target.closest("h1, h2, h3, p, blockquote, li, a, button") ?? target);
+              }
             }}
           >
-            <PreviewFit device={previewDevice} whole={previewWhole} onScale={setPreviewScale}>
+            <PreviewFit device={previewDevice} whole={previewChoice} onFit={setPreviewFit}>
               {previewDevice === "mobile" ? (
-                <PreviewFrame title="Mobile preview">{preview}</PreviewFrame>
+                <PreviewFrame title="Mobile preview" artboard={section === "room" && !roomEntrance}>
+                  {preview}
+                </PreviewFrame>
               ) : (
                 preview
               )}
@@ -2058,12 +2104,12 @@ export function SectionEditor({
             <div className="studio-ins__headline">
               <div className="studio-ins__title">
                 <span>Editing</span>
-                <h2>{studioSectionLabels[section]}</h2>
+                <h2>{panelTitle}</h2>
               </div>
               <SaveBar />
             </div>
           </header>
-          {selectedPath.length > 0 ? (
+          {selectedPath.length > trailBase ? (
             <nav className="studio-ins__trail" aria-label="Where you are">
               <button
                 className="studio-ins-icon"
@@ -2076,11 +2122,15 @@ export function SectionEditor({
               </button>
               <ol>
                 <li>
-                  <button type="button" onClick={() => showInPanel([])}>
-                    {studioSectionLabels[section]}
+                  <button
+                    type="button"
+                    onClick={() => showInPanel(selectedPath.slice(0, trailBase))}
+                  >
+                    {panelTitle}
                   </button>
                 </li>
-                {selectedPath.map((_, index) => {
+                {selectedPath.slice(trailBase).map((_, offset) => {
+                  const index = trailBase + offset;
                   const crumbPath = selectedPath.slice(0, index + 1);
                   const isCurrent = index === selectedPath.length - 1;
                   return (
@@ -2101,12 +2151,12 @@ export function SectionEditor({
           ) : null}
           <div className="studio-ins__body">
             <p className="studio-ins__lead">
-              {selectedPath.length === 0
+              {selectedPath.length === trailBase
                 ? "Click a row to edit it, or click anything on the page to jump straight to it."
                 : (describeField(selectedPath).hint ?? "The preview updates as you type.")}
             </p>
             <InspectorBody
-              data={currentData}
+              data={panelData}
               path={selectedPath}
               onChange={updateValue}
               onNavigate={showInPanel}

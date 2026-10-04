@@ -8,7 +8,8 @@
    own palette: the accent overrides below stop at the chrome's containers.
    ========================================================================== */
 
-.studio-shell {
+.studio-shell,
+.login-page {
   --st-bg: #0e0e0f;
   --st-panel: #141415;
   --st-raised: #1a1a1c;
@@ -16,12 +17,14 @@
   --st-line-strong: #333336;
   --st-text: #ececec;
   --st-text-2: #bababd;
-  --st-muted: #7f7f84;
+  --st-muted: #98989d;
   --st-pending: #d9a441;
   --st-live: #4ade80;
   --st-gutter: clamp(0.75rem, 1vw, 1rem);
   --st-bar: 48px;
+}
 
+.studio-shell {
   display: flex;
   flex-direction: column;
   height: 100dvh;
@@ -36,7 +39,8 @@
 .studio-ins,
 .studio-settings,
 .studio-canvas__topbar,
-.studio-toasts {
+.studio-toasts,
+.login-page {
   --accent: var(--st-text);
   --accent-text: var(--st-text);
   --on-accent: var(--st-bg);
@@ -76,19 +80,6 @@
   backdrop-filter: none;
 }
 
-.studio-topbar__brand {
-  display: flex;
-  align-items: center;
-  min-height: var(--st-bar);
-  padding-right: 1rem;
-  border-right: 1px solid var(--st-line);
-  color: var(--st-text);
-  font-family: var(--f-body);
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
 .studio-topbar__actions {
   display: flex;
   flex: 0 0 auto;
@@ -107,8 +98,8 @@
   align-items: center;
   gap: 0.45rem;
   margin: 0 0.5rem 0 0;
-  color: var(--st-muted);
-  font-size: 0.78rem;
+  color: var(--st-text-2);
+  font-size: 0.8rem;
   white-space: nowrap;
 }
 
@@ -178,8 +169,8 @@
 
 /* Section tabs -------------------------------------------------------------- */
 
-/* Inside the top bar, between the brand and the actions. When there is not room
-   for every tab the strip scrolls sideways rather than pushing the actions out. */
+/* Leads the top bar, ahead of the actions. When there is not room for every tab
+   the strip scrolls sideways rather than pushing the actions out. */
 .studio-tabs {
   display: flex;
   flex: 1 1 0;
@@ -203,6 +194,30 @@
 .studio-tabs li {
   display: flex;
   flex: 0 0 auto;
+}
+
+/* The Studio's own page: the wordmark, and the way home. */
+.studio-tabs__home a {
+  color: var(--st-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.studio-tabs__home::after {
+  width: 1px;
+  margin: 0.9rem 0.4rem;
+  background: var(--st-line-strong);
+  content: "";
+}
+
+/* Saved edits on this tab that are not live yet. */
+.studio-tabs__edited {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-left: 0.4rem;
+  border-radius: 50%;
+  background: var(--st-pending);
 }
 
 /* A separate page, set apart from the sections of the landing page. */
@@ -243,31 +258,92 @@
   outline-offset: -3px;
 }
 
-.studio-tabs__guard {
-  position: fixed;
-  z-index: 60;
-  bottom: 1.25rem;
-  left: 50%;
-  display: grid;
-  gap: 0.75rem;
-  width: min(30rem, calc(100vw - 2rem));
-  padding: 1rem;
+/* Dialogs and notices ------------------------------------------------------- */
+
+/* One box for every question the Studio stops to ask. It opens as a modal, so the
+   browser centres it over a dimmed page. */
+.studio-dialog {
+  width: min(28rem, calc(100vw - 2rem));
+  margin: auto;
+  padding: 1.25rem;
   border: 1px solid var(--st-line-strong);
   border-radius: 12px;
   background: var(--st-raised);
+  color: var(--st-text);
+  font-family: var(--f-body);
+}
+
+.studio-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.studio-dialog h2 {
+  margin: 0 0 0.5rem;
+  font-family: var(--f-body);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.studio-dialog p,
+.studio-dialog li {
+  margin: 0;
+  color: var(--st-text-2);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.studio-dialog p + p {
+  margin-top: 0.6rem;
+}
+
+.studio-dialog ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.studio-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.1rem;
+}
+
+/* Bottom centre, clear of the Publish button and the panel's Save. */
+.studio-toasts {
+  top: auto;
+  right: auto;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: 50%;
+  margin: 0;
+  padding: 0;
   transform: translateX(-50%);
 }
 
-.studio-tabs__guard p {
-  margin: 0;
-  color: var(--st-text-2);
-  font-size: 0.85rem;
+.studio-toast button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
 }
 
-.studio-tabs__guard div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+.studio-toast button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Stands in for the preview and the panel while a tab loads. */
+.studio-skeleton {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 3fr) minmax(300px, 1fr);
+  gap: var(--st-gutter, 1rem);
+  min-height: 60dvh;
+}
+
+.studio-skeleton .skeleton {
+  border-radius: 12px;
 }
 
 /* Workspace ------------------------------------------------------------------ */
@@ -435,7 +511,7 @@
   background: var(--st-panel);
 }
 
-/* Menu page ---------------------------------------------------------------------- */
+/* Studio page -------------------------------------------------------------------- */
 
 /* Fills the window under the top bar and never scrolls as a page: the head takes
    what it needs and the three columns share the rest. A column that still cannot
@@ -499,7 +575,7 @@
 
 .studio-settings__tile span {
   color: var(--st-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .studio-settings__tile strong {
@@ -563,7 +639,7 @@
   border-radius: 999px;
   background: rgba(74, 222, 128, 0.1);
   color: var(--st-live);
-  font-size: 0.72rem;
+  font-size: 0.78rem;
   font-weight: 500;
 }
 
@@ -628,9 +704,10 @@
   font-size: 0.88rem;
 }
 
-.studio-settings__sections small {
+.studio-settings__sections small,
+.studio-activity small {
   color: var(--st-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .studio-settings__sections b {
@@ -684,7 +761,7 @@
 .studio-settings__card > .studio-settings__caption {
   margin: 0.6rem 0 0.35rem;
   color: var(--st-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 /* The card a pasted link unfurls into, as a chat app would draw it. */
@@ -802,7 +879,7 @@ div.studio-maintenance__row,
 
 .studio-maintenance__row small {
   color: var(--st-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .studio-maintenance__row .studio-account-card__form {
@@ -881,7 +958,7 @@ div.studio-maintenance__row,
 
 .studio-settings__links small {
   color: var(--st-muted);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
 }
 
 .studio-settings__links b {
@@ -1000,21 +1077,19 @@ div.studio-maintenance__row,
 
 /* Narrow windows -------------------------------------------------------------------- */
 
-@media (max-width: 1500px) {
-  .studio-topbar__state span {
-    display: none;
-  }
-}
-
-/* Too narrow for the tabs to share the bar: they drop to a row of their own. */
-@media (max-width: 1380px) {
+/* Too narrow for the tabs to share the bar: they drop to a row of their own, and
+   the status moves to the left of the row the actions keep. */
+@media (max-width: 1320px) {
   .studio-topbar {
     flex-wrap: wrap;
   }
 
-  .studio-topbar__brand {
-    padding-right: 0;
-    border-right: 0;
+  .studio-topbar__actions {
+    flex: 1 1 100%;
+  }
+
+  .studio-topbar__state {
+    margin-right: auto;
   }
 
   .studio-tabs {
@@ -1051,7 +1126,8 @@ div.studio-maintenance__row,
     overflow: visible;
   }
 
-  .studio-editor__layout {
+  .studio-editor__layout,
+  .studio-skeleton {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -1073,4 +1149,58 @@ div.studio-maintenance__row,
   .studio-canvas__topbar {
     justify-content: flex-end;
   }
+}
+
+/* Sign-in -------------------------------------------------------------------------- */
+
+/* The door to the Studio wears the Studio's palette rather than the site's. */
+.login-page {
+  background: var(--st-bg);
+}
+
+.login-form {
+  border-color: var(--st-line);
+  border-radius: 12px;
+  background: var(--st-panel);
+  box-shadow: none;
+}
+
+.login-form .slate {
+  color: var(--st-muted);
+}
+
+.login-form h1 {
+  color: var(--st-text);
+  font-family: var(--f-body);
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.login-form p {
+  color: var(--st-text-2);
+}
+
+.login-form label {
+  color: var(--st-text-2);
+  font-family: var(--f-body);
+  font-size: 0.85rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.login-form input {
+  border-color: var(--st-line-strong);
+  border-radius: 8px;
+  background: var(--st-bg);
+  color: var(--st-text);
+}
+
+.login-form .button {
+  border-radius: 8px;
+}
+
+.login-form .button--primary:hover {
+  background: #fff;
+  box-shadow: none;
 }

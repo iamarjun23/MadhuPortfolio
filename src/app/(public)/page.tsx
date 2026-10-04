@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AboutBlock } from "@/components/public/AboutBlock";
 import { ClientsMarquee } from "@/components/public/ClientsMarquee";
 import { ContactBlock } from "@/components/public/ContactBlock";
@@ -27,6 +27,14 @@ import {
    search engines at the homepage. Resolved against the layout's metadataBase (Settings → domain). */
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
+};
+
+/* The home page has a phone layout (mobile.css), so phones get their real width here
+   instead of the public layout's pinned 1280px artboard. The layout's scale script
+   reads this tag to know the page can be left unzoomed at phone widths. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default async function PortfolioPage() {

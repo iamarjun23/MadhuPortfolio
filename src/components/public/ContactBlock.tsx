@@ -184,6 +184,65 @@ export function ContactBlock({
               </p>
             ) : null}
           </div>
+
+          {/* Phone layout only (the tabbed card above is hidden there): every way to get
+              in touch as its own row, so none sits behind a tab. */}
+          <div className="contact__list">
+            {contact.availableForFreelance ? (
+              <p className="contact__list-status">
+                <span className="contact__status-dot" aria-hidden="true" />
+                <b>{contact.footerStatus}</b>
+                {time ? (
+                  <span>
+                    {time} in {cityOf(contact.location)}
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
+            <ul>
+              {whatsApp ? (
+                <li>
+                  <a href={whatsApp} target="_blank" rel="noreferrer">
+                    <b>WhatsApp</b>
+                    <span>{contact.socials.whatsapp}</span>
+                  </a>
+                </li>
+              ) : null}
+              <li>
+                <a
+                  href={`mailto:${contact.email}?subject=${encodeURIComponent("Project enquiry")}`}
+                >
+                  <b>Email</b>
+                  <span>{contact.email}</span>
+                </a>
+                <button type="button" onClick={copyEmail}>
+                  {copy === "copied" ? "Copied" : copy === "failed" ? "Copy failed" : "Copy"}
+                </button>
+              </li>
+              <li>
+                <a href={callbackHref(contact.email)}>
+                  <b>{contact.callbackCtaLabel}</b>
+                  <span>{contact.callbackNote}</span>
+                </a>
+              </li>
+              {contact.phone ? (
+                <li>
+                  <a href={telHref(contact.phone)}>
+                    <b>Call</b>
+                    <span>{contact.phone}</span>
+                  </a>
+                </li>
+              ) : null}
+              {linkedIn ? (
+                <li>
+                  <a href={linkedIn} target="_blank" rel="noreferrer">
+                    <b>LinkedIn</b>
+                    <span>{profilePath(linkedIn)}</span>
+                  </a>
+                </li>
+              ) : null}
+            </ul>
+          </div>
         </div>
       </div>
     </section>

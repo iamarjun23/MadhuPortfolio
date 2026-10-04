@@ -6,6 +6,7 @@ import { changePassword } from "@/actions/account";
 import { getUnusedMedia, purgeUnusedMedia } from "@/actions/media";
 import { revertDraftsToPublished } from "@/actions/publish";
 import type { UnusedMediaSummary } from "@/actions/media-types";
+import { StudioDialog } from "@/components/studio/StudioDialog";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 function formatBytes(bytes: number) {
@@ -26,10 +27,11 @@ export function SettingsDangerZone() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  // Both of these throw work or files away, so each is confirmed before it runs.
+  const [confirming, setConfirming] = useState<"revert" | "remove" | null>(null);
 
   const revertDrafts = () => {
-    if (!window.confirm("Replace every draft with the last published version?")) return;
-
+    setConfirming(null);
     startTransition(async () => {
       const result = await revertDraftsToPublished();
       if (!result.ok) {
@@ -45,7 +47,7 @@ export function SettingsDangerZone() {
   };
 
   /* Asked for rather than run on load: this reads every section's JSON to work
-     out what is referenced, which is not worth doing on every visit to the Menu
+     out what is referenced, which is not worth doing on every visit to the Studio
      page for a row that is usually just passed over. */
   const checkUnused = useCallback(async () => {
     setIsChecking(true);
@@ -60,14 +62,8 @@ export function SettingsDangerZone() {
 
   const removeUnused = async () => {
     if (!unused || unused.count === 0 || isSweeping) return;
-    if (
-      !window.confirm(
-        `Permanently delete ${unused.count} unused upload${unused.count === 1 ? "" : "s"}? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
 
+    setConfirming(null);
     setIsSweeping(true);
     const result = await purgeUnusedMedia();
     setIsSweeping(false);
@@ -165,7 +161,7 @@ export function SettingsDangerZone() {
           <button
             type="button"
             className="studio-ins-btn studio-ins-btn--danger"
-            onClick={() => void removeUnused()}
+            onClick={() => setConfirming("remove")}
             disabled={isSweeping || uploadBlocked}
           >
             {isSweeping ? "Removing..." : `Remove ${unused.count}`}
@@ -181,12 +177,37 @@ export function SettingsDangerZone() {
         <button
           type="button"
           className="studio-ins-btn studio-ins-btn--danger"
-          onClick={revertDrafts}
+          onClick={() => setConfirming("revert")}
           disabled={isReverting || Boolean(dirtySection) || uploadBlocked}
         >
           {isReverting ? "Reverting..." : "Revert"}
         </button>
       </div>
+
+      {confirming ? (
+        <StudioDialog
+          title={confirming === "revert" ? "Revert every draft?" : "Delete unused uploads?"}
+          onClose={() => setConfirming(null)}
+        >
+          <p>
+            {confirming === "revert"
+              ? "Every draft goes back to what is live on the site. Saved changes that were never published are lost."
+              : `${unused?.count ?? 0} unused upload${unused?.count === 1 ? "" : "s"} will be deleted from storage for good. This cannot be undone.`}
+          </p>
+          <div className="studio-dialog__actions">
+            <button className="studio-ins-btn" type="button" onClick={() => setConfirming(null)}>
+              Cancel
+            </button>
+            <button
+              className="studio-ins-btn studio-ins-btn--danger"
+              type="button"
+              onClick={confirming === "revert" ? revertDrafts : () => void removeUnused()}
+            >
+              {confirming === "revert" ? "Revert drafts" : "Delete for good"}
+            </button>
+          </div>
+        </StudioDialog>
+      ) : null}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
 import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
 import { preconnectReelHosts, ReelEmbed } from "@/components/public/ReelEmbed";
@@ -8,6 +8,7 @@ import { SectionTimeline } from "@/components/public/SectionTimeline";
 import { pageZoom } from "@/lib/page-zoom";
 import { reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
 import type { TimelinePosition } from "@/lib/section-timeline";
+import { useScrollPager } from "@/lib/use-scroll-pager";
 import type { Work } from "@/schemas";
 
 type WorkProject = Work["lanes"][number]["projects"][number];
@@ -168,6 +169,47 @@ function getBoardBounds(card: HTMLElement, rendered: CardOffset) {
   };
 }
 
+/* One category on the phone layout: its cards in a row that moves a pair at a time. */
+function WorkShelf({
+  label,
+  count,
+  children,
+}: Readonly<{ label: string; count: number; children: ReactNode }>) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const pager = useScrollPager(rowRef, count);
+
+  return (
+    <div className="work__shelf" role="group" aria-label={label}>
+      <div className="work__shelf-head">
+        <h3>{label}</h3>
+        {pager.pages > 1 ? (
+          <span className="work__shelf-nav">
+            <button
+              type="button"
+              aria-label={`Earlier in ${label}`}
+              disabled={pager.page === 0}
+              onClick={() => pager.step(-1)}
+            >
+              &#8249;
+            </button>
+            <button
+              type="button"
+              aria-label={`More in ${label}`}
+              disabled={pager.page === pager.pages - 1}
+              onClick={() => pager.step(1)}
+            >
+              &#8250;
+            </button>
+          </span>
+        ) : null}
+      </div>
+      <div className="work__shelf-row" ref={rowRef}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function WorkConsole({
   data,
   contactEmail,
@@ -210,6 +252,7 @@ export function WorkConsole({
   const drag = useRef<DragState | null>(null);
   const boardHintId = useId();
   const allProjects = orderAllProjects(data);
+  const featured = allProjects[0];
   /* Renaming a category in the studio would otherwise leave the filter pointing
      at a label that no longer exists, and the board would read as empty. */
   const selectedLane =
@@ -566,6 +609,45 @@ export function WorkConsole({
           <h2>{data.heading}</h2>
           <p className="lede">{data.intro}</p>
         </header>
+        {/* Phone layout only (the panel below is hidden there): the lead project large,
+            then one sideways shelf per category.
+            ponytail: both layouts stay in the markup and CSS shows one. Render by
+            matchMedia instead if the hidden cards ever weigh on the page. */}
+        <div className="work__shelves">
+          <h2>{data.eyebrow}</h2>
+          {featured ? (
+            <button
+              type="button"
+              className="work__shelf-card work__shelf-card--featured"
+              onClick={() => cardClick(featured.project, featured.laneLabel)}
+              aria-label={`Preview ${featured.project.title}`}
+            >
+              {cardFace(
+                featured.project,
+                featured.laneLabel,
+                `${featured.laneLabel}-${featured.project.id}`,
+                "100vw",
+              )}
+            </button>
+          ) : null}
+          {data.lanes.map((shelf) =>
+            shelf.projects.length > 0 ? (
+              <WorkShelf key={shelf.id} label={shelf.label} count={shelf.projects.length}>
+                {shelf.projects.map((project) => (
+                  <button
+                    type="button"
+                    className="work__shelf-card"
+                    key={project.id}
+                    onClick={() => cardClick(project, shelf.label)}
+                    aria-label={`Preview ${project.title}`}
+                  >
+                    {cardFace(project, shelf.label, `${shelf.label}-${project.id}`, "50vw")}
+                  </button>
+                ))}
+              </WorkShelf>
+            ) : null,
+          )}
+        </div>
         <article className="work__panel work__panel--all">
           <div className="work__panel-head">
             <div className="work__panel-meta">

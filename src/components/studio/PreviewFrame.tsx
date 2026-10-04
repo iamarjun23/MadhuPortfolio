@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-/* The phone preview has to be a real iframe, because a phone does not get a
-   reflowed page: the public layout pins its viewport to the 1280px design width,
-   so a phone lays out the desktop artboard and scales it down to its screen. The
-   frame is that viewport - 1280px wide and phone-shaped, zoomed to phone size by
-   its CSS - so width breakpoints stay in desktop mode, `vh` and
-   `orientation: portrait` read as they do on a phone, and the page scrolls
-   inside the frame rather than the pane.
+/* The phone preview has to be a real iframe: the frame is the phone's viewport, so
+   width breakpoints, `vh` and `orientation: portrait` read inside it as they do on
+   a phone, and the page scrolls inside the frame rather than the pane.
+
+   The home page has a phone layout, so its sections get a phone-sized viewport.
+   The Drawing Room does not: the public layout pins its viewport to the 1280px
+   design width, and a phone lays out that desktop artboard and scales it down.
+   `artboard` gives that page the same thing - a 1280px-wide, phone-shaped frame
+   zoomed to phone size by its CSS - so its width breakpoints stay in desktop mode.
 
    The page still renders from this React tree, through a portal into the
    frame's document. That is what keeps click-to-edit alive: React dispatches
@@ -71,8 +73,14 @@ function syncRoot(frameDoc: Document) {
 
 export function PreviewFrame({
   title,
+  artboard = false,
   children,
-}: Readonly<{ title: string; children: ReactNode }>) {
+}: Readonly<{
+  title: string;
+  /** Show the 1280px artboard scaled down, for a page with no phone layout. */
+  artboard?: boolean;
+  children: ReactNode;
+}>) {
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [mount, setMount] = useState<HTMLElement | null>(null);
   /* A blank frame's own load event can hand back a fresh document, discarding
@@ -122,7 +130,7 @@ export function PreviewFrame({
       <iframe
         ref={frameRef}
         title={title}
-        className="studio-preview-frame"
+        className={`studio-preview-frame${artboard ? " studio-preview-frame--artboard" : ""}`}
         onLoad={() => setLoads((count) => count + 1)}
       />
       {mount ? createPortal(children, mount) : null}

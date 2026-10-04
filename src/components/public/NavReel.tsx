@@ -10,6 +10,8 @@ const TIMECODE_ZERO = "00:00:00:00";
 
 type Chapter = Readonly<{
   number: string;
+  /** Where the chapter's strip sits among the strips in the markup. */
+  slot: number;
   label: string;
   heading: string;
   start: number;
@@ -35,7 +37,7 @@ function chapterSlates() {
 }
 
 function measureChapters(): Chapter[] {
-  const found = chapterSlates().flatMap((slate) => {
+  const found = chapterSlates().flatMap((slate, slot) => {
     const section = slate.closest("section");
     const label = slate.querySelector(".timeline-slate__label");
     const number = label?.querySelector("b")?.textContent?.trim();
@@ -47,9 +49,18 @@ function measureChapters(): Chapter[] {
       .trim();
     const heading = section.querySelector("h2")?.textContent?.trim() || name;
     return [
-      { number, label: name, heading, start: section.getBoundingClientRect().top + window.scrollY },
+      {
+        number,
+        slot,
+        label: name,
+        heading,
+        start: section.getBoundingClientRect().top + window.scrollY,
+      },
     ];
   });
+  // In the order they sit on screen: the phone layout shows the sections in a
+  // different order from the markup.
+  found.sort((a, b) => a.start - b.start);
   // The last chapter ends where the probe line stops at the bottom of the page.
   const pageEnd = document.documentElement.scrollHeight - window.innerHeight * (1 - PROBE);
   return found.map((chapter, index) => ({
@@ -201,8 +212,11 @@ export function NavReel({ availability, contactLabel, ownerName }: NavReelProps)
   const reelStart = chapters[0]?.start ?? 0;
   const reelLength = Math.max(1, (chapters[chapters.length - 1]?.end ?? 1) - reelStart);
 
-  const jumpTo = (index: number) =>
-    chapterSlates()[index]?.closest("section")?.scrollIntoView({ block: "start" });
+  const jumpTo = (index: number) => {
+    const slot = chapters[index]?.slot;
+    if (slot === undefined) return;
+    chapterSlates()[slot]?.closest("section")?.scrollIntoView({ block: "start" });
+  };
 
   return (
     <>

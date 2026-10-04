@@ -42,7 +42,7 @@ export const sectionDocs: Record<SectionKey, Readonly<{ summary: string; media: 
     summary:
       "The full-screen opening scene: the headline, the two buttons, and the film-strip labels around the frame.",
     media:
-      "One background video that loops silently behind the headline, plus a poster photo shown until it starts.",
+      "One background video that loops silently behind the headline, plus a poster photo shown until it starts. An optional vertical cut of it plays on phones.",
   },
   about: {
     summary: "Your story panel: portrait, paragraphs, current status and the tools you work in.",
@@ -116,6 +116,14 @@ const fieldRules: readonly FieldRule[] = [
       label: "Background video",
       media: "video",
       hint: "Plays muted and on a loop behind the hero headline. Add a poster image below so something is visible while it loads.",
+    },
+  },
+  {
+    key: "bgVideoMobile",
+    doc: {
+      label: "Phone video (optional)",
+      media: "video",
+      hint: "A vertical cut of the reel that fills a phone screen behind the headline. Leave it empty and phones play the background video above, cropped to fit.",
     },
   },
   {
@@ -746,7 +754,7 @@ const fieldRules: readonly FieldRule[] = [
     key: "footerStatus",
     doc: {
       label: "Status line",
-      hint: "Shown in the navbar, on the contact card and in the footer while you are marked available. The switch for that is on the Menu page.",
+      hint: "Shown in the navbar, on the contact card and in the footer while you are marked available. The switch for that is on the Studio page.",
     },
   },
   { key: "footerTagline", doc: { label: "Footer tagline" } },

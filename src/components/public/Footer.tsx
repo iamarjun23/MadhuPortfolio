@@ -125,6 +125,10 @@ export function Footer({ contact, settings }: FooterProps) {
           {footer.copyrightPrefix} {year} {site.ownerName ?? defaultSiteSettings.ownerName}
         </span>
         <span>{footer.closingLine}</span>
+        {/* Phone layout only, where the page is long enough to want the way back. */}
+        <a className="public-footer__top" href="#top">
+          Back to top <span aria-hidden="true">↑</span>
+        </a>
       </div>
     </footer>
   );

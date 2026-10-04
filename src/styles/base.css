@@ -1389,7 +1389,12 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
     radial-gradient(circle at 80% 20%, rgba(255, 138, 51, 0.24), transparent 44%), #030303;
 }
 /* The poster is a real <img> under the video rather than the video's `poster`
-   attribute, so it can be preloaded as the page's LCP image; both share one look. */
+   attribute, so it can be preloaded as the page's LCP image; both share one look.
+   Its <picture> (which swaps in the phone still) is the box the image fills. */
+.hero__background picture {
+  position: absolute;
+  inset: 0;
+}
 .hero__poster,
 .hero__video {
   position: absolute;
@@ -1584,54 +1589,7 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
   padding-left: 1rem;
   border-left: 1px solid rgba(255, 255, 255, 0.22);
 }
-/* A phone held upright gets the 1280px artboard scaled to about a third, so
-   the hero's text is zoomed back up to read (as the mood player does) and
-   stacks in one column. Offsets are divided by the zoom, which scales them too. */
-@media (hover: none) and (pointer: coarse) and (orientation: portrait) {
-  .hero {
-    --hero-zoom: 2.2;
-    --hero-mark: 4px;
-    --hero-mark-size: 44px;
-  }
-  .hero__content,
-  .hero__hud,
-  .hero__meta {
-    zoom: var(--hero-zoom);
-  }
-  .hero__content {
-    grid-template-columns: minmax(0, 1fr);
-    padding-top: calc((var(--hero-top) + 4rem) / var(--hero-zoom));
-    padding-right: calc(var(--hero-gutter) / var(--hero-zoom));
-    padding-bottom: calc((var(--hero-row) + var(--hero-mark-size)) / var(--hero-zoom) + 6.5rem);
-    padding-left: calc(var(--hero-gutter) / var(--hero-zoom));
-  }
-  .hero__content p,
-  .hero__actions {
-    grid-column: 1;
-  }
-  .hero__actions {
-    align-items: stretch;
-    flex-direction: column;
-    margin-top: 1.5rem;
-  }
-  .hero__actions .button {
-    justify-content: center;
-  }
-  .hero__hud {
-    top: calc((var(--hero-top) + 1.1rem) / var(--hero-zoom));
-    right: calc(var(--hero-gutter) / var(--hero-zoom));
-    left: calc(var(--hero-gutter) / var(--hero-zoom));
-  }
-  .hero__meta {
-    right: calc(var(--hero-gutter) / var(--hero-zoom));
-    /* Clear of the phone-sized bottom crop marks. */
-    bottom: calc((var(--hero-row) + var(--hero-mark-size)) / var(--hero-zoom));
-    left: calc(var(--hero-gutter) / var(--hero-zoom));
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.35rem;
-  }
-}
+/* The hero's phone layout is in mobile.css. */
 
 .about {
   display: grid;
@@ -4946,6 +4904,12 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
   outline-offset: 5px;
 }
 
+/* The piece of the page whose field is open in the panel. */
+.studio-canvas__viewport--editable [data-studio-selected] {
+  outline: 2px solid rgba(255, 126, 50, 0.9);
+  outline-offset: 5px;
+}
+
 .studio-editor__layout {
   grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
 }
@@ -5084,15 +5048,12 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
   padding: 1.1rem 0;
 }
 
-/* A phone shows the public page as the 1280px artboard scaled to its screen (see
-   the public layout's viewport), so the frame is that artboard at a phone's
-   proportions, zoomed down to a 390px-wide screen. The bezel is divided by the
-   zoom, which would otherwise shrink it too. */
+/* The home page has a phone layout (mobile.css), so the frame for its sections is a
+   phone's own viewport and the width breakpoint fires inside it as it does on a phone. */
 .studio-preview-frame {
-  --phone-fit: calc(390 / 1280);
-  width: 1280px;
-  height: 2560px;
-  zoom: var(--phone-fit);
+  --phone-fit: 1;
+  width: 390px;
+  height: 780px;
   border: 0;
   border-radius: calc(20px / var(--phone-fit));
   background: var(--bg);
@@ -5100,6 +5061,16 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
     0 0 0 calc(7px / var(--phone-fit)) #16191d,
     0 0 0 calc(8px / var(--phone-fit)) rgba(255, 255, 255, 0.12),
     0 calc(20px / var(--phone-fit)) calc(44px / var(--phone-fit)) rgba(0, 0, 0, 0.45);
+}
+/* The Drawing Room has none: a phone shows it as the 1280px artboard scaled to its
+   screen (see the public layout's viewport), so that frame is the artboard at a
+   phone's proportions, zoomed down to a 390px-wide screen. The bezel is divided by
+   the zoom, which would otherwise shrink it too. */
+.studio-preview-frame--artboard {
+  --phone-fit: calc(390 / 1280);
+  width: 1280px;
+  height: 2560px;
+  zoom: var(--phone-fit);
 }
 
 .studio-canvas-hero {
@@ -7840,18 +7811,6 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
 }
 
 /* Studio loading skeleton ------------------------------------------------- */
-.studio-skeleton {
-  display: grid;
-  gap: 1rem;
-}
-
-.studio-skeleton__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
 .skeleton {
   display: block;
   border-radius: 6px;

@@ -44,6 +44,9 @@ export function Experience({
   const [pausedByVisitor, setPausedByVisitor] = useState<boolean | null>(null);
   const stillByDefault = useSyncExternalStore(subscribeToMotion, prefersStillReel, () => false);
   const trackRef = useRef<HTMLOListElement>(null);
+  const sheetRef = useRef<HTMLDialogElement>(null);
+  const sheetTouchY = useRef<number | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const roles = data.roles;
   /* Deleting roles in the studio can leave the selection past the end of the
      list. Clamping keeps the reel on its last scene instead of blanking the
@@ -51,7 +54,8 @@ export function Experience({
   const activeIndex = roles.length === 0 ? 0 : Math.min(selectedIndex, roles.length - 1);
   const activeRole = roles[activeIndex];
   const canPlay = autoPlay && roles.length > 1;
-  const playing = canPlay && !(pausedByVisitor ?? stillByDefault);
+  // The reel holds still while a scene is open in the phone layout's sheet.
+  const playing = canPlay && !isSheetOpen && !(pausedByVisitor ?? stillByDefault);
   const remainingMsRef = useRef(SCENE_MS);
 
   // A new scene starts with its full running time. Declared before the timer
@@ -97,6 +101,12 @@ export function Experience({
 
   function moveChapter(direction: -1 | 1) {
     setSelectedIndex((activeIndex + direction + roles.length) % roles.length);
+  }
+
+  function openSheet(index: number) {
+    setSelectedIndex(index);
+    setIsSheetOpen(true);
+    sheetRef.current?.showModal();
   }
 
   return (
@@ -246,6 +256,86 @@ export function Experience({
             })}
           </ol>
         </div>
+        {/* Phone layout only (the reel above is hidden there): every role as a short
+            timeline entry, and a tap opens that scene in a sheet. */}
+        <ol className="experience-list">
+          {roles.map((role, index) => (
+            <li key={role.id} data-studio-path={editable ? `roles.${index}` : undefined}>
+              <button type="button" onClick={() => openSheet(index)}>
+                <b>{role.company}</b>
+                <span className="experience-list__dates">
+                  {role.start} — {role.end}
+                </span>
+                <span className="experience-list__did">{role.description}</span>
+                <i aria-hidden="true">&#8250;</i>
+              </button>
+            </li>
+          ))}
+        </ol>
+        {/* A native modal dialog, so it sits in the top layer, clear of the scroll-entrance
+            transforms on the section, and brings its own focus trap and Escape. */}
+        <dialog
+          ref={sheetRef}
+          className="experience-sheet"
+          aria-label={`${activeRole.company}, ${activeRole.role}`}
+          onClose={() => setIsSheetOpen(false)}
+          // A tap on the backdrop lands on the dialog itself; anything inside is a child.
+          onClick={(event) => {
+            if (event.target === event.currentTarget) event.currentTarget.close();
+          }}
+          onTouchStart={(event) => {
+            sheetTouchY.current = event.touches[0]?.clientY ?? null;
+          }}
+          onTouchEnd={(event) => {
+            const from = sheetTouchY.current;
+            const to = event.changedTouches[0]?.clientY;
+            sheetTouchY.current = null;
+            // A downward swipe closes it, but only from the top, where it cannot be a scroll.
+            if (from === null || to === undefined) return;
+            if (to - from > 80 && event.currentTarget.scrollTop === 0) event.currentTarget.close();
+          }}
+        >
+          <div className="experience-sheet__bar">
+            <span>
+              {data.sceneLabel} {sceneNumber(activeIndex)} · {activeIndex + 1} / {roles.length}
+            </span>
+            <button type="button" onClick={() => sheetRef.current?.close()}>
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3 3l10 10M13 3L3 13" />
+              </svg>
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
+          {/* The picture is only fetched once the sheet has been opened. */}
+          {isSheetOpen && sceneImage ? (
+            <div className="experience-sheet__image" style={focal(activeRole)}>
+              <MediaImage src={sceneImage.url} alt="" fill sizes="100vw" />
+            </div>
+          ) : null}
+          <div className="experience-reel__title-row">
+            <h3>{activeRole.company}</h3>
+            <span className={`experience__logo ${activeRole.logoHint}`}>{activeRole.initials}</span>
+          </div>
+          <p className="experience-reel__role-title">{activeRole.role}</p>
+          <p className="experience-reel__dates">
+            {activeRole.start} — {activeRole.end} · {activeRole.duration}
+          </p>
+          <p className="experience-sheet__description">{activeRole.description}</p>
+          {roles.length > 1 ? (
+            <div className="experience-sheet__steps">
+              <button type="button" onClick={() => moveChapter(-1)}>
+                <span aria-hidden="true">&#8249;</span>
+                <span className="sr-only">{data.previousLabel}: </span>
+                {roles[(activeIndex - 1 + roles.length) % roles.length]!.company}
+              </button>
+              <button type="button" onClick={() => moveChapter(1)}>
+                <span className="sr-only">{data.nextLabel}: </span>
+                {roles[(activeIndex + 1) % roles.length]!.company}
+                <span aria-hidden="true">&#8250;</span>
+              </button>
+            </div>
+          ) : null}
+        </dialog>
       </div>
     </section>
   );

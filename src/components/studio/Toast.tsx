@@ -1,5 +1,6 @@
 "use client";
 
+import { X } from "lucide-react";
 import { useEffect } from "react";
 import { useStudioStore } from "@/stores/studio-store";
 
@@ -18,10 +19,13 @@ function ToastMessage({
   }, [dismissToast, id, tone]);
 
   return (
-    <li className={`studio-toast studio-toast--${tone}`} role="status">
+    <li
+      className={`studio-toast studio-toast--${tone}`}
+      role={tone === "error" ? "alert" : "status"}
+    >
       <span>{message}</span>
       <button type="button" onClick={() => dismissToast(id)} aria-label="Dismiss notification">
-        x
+        <X aria-hidden="true" />
       </button>
     </li>
   );

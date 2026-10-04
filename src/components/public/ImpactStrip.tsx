@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { MediaImage } from "@/components/public/MediaImage";
 import { SectionTimeline } from "@/components/public/SectionTimeline";
 import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
+import { ScrollPager } from "@/components/public/ScrollPager";
 import { realImage } from "@/lib/placeholders";
 import type { TimelinePosition } from "@/lib/section-timeline";
 import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
+import { useScrollPager } from "@/lib/use-scroll-pager";
 import type { Impact } from "@/schemas";
 
 /* The stand-in on a collaborator tile that has no photo yet: the first letter of
@@ -113,6 +115,7 @@ export function ImpactStrip({
     };
   }, [activeIndex]);
   const collaborators = data.worked;
+  const pager = useScrollPager(gridRef, collaborators.length);
   /* A phone has no hover to warm a photo before its tap, so once the strip is on screen
      every pop-up photo is fetched in the background (the originals are small: ~20-40KB each). */
   useEffect(() => {
@@ -249,6 +252,13 @@ export function ImpactStrip({
                 );
               })}
             </div>
+            {/* Phone layout only: the grid there is a sideways scroller, four to a page. */}
+            <ScrollPager
+              page={pager.page}
+              pages={pager.pages}
+              onStep={pager.step}
+              label={data.collaboratorsLabel}
+            />
           </div>
           {activePerson && activeImage && activeSlot >= 0 ? (
             <MediaViewer

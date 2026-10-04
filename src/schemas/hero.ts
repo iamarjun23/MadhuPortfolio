@@ -21,6 +21,12 @@ export const HeroSchema = z.object({
     poster: ImageUrlSchema.optional(),
     duotone: z.boolean().default(true),
   }),
+  // A vertical cut of the reel for phones, where the landscape video above would be
+  // cropped to a sliver. Without one, phones play the landscape video.
+  bgVideoMobile: z
+    .object({ url: VideoUrlSchema, poster: ImageUrlSchema.optional() })
+    .nullable()
+    .default(null),
 });
 
 export type Hero = z.infer<typeof HeroSchema>;

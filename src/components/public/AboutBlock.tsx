@@ -15,6 +15,7 @@ export function AboutBlock({
   const sectionRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const portraitVideo = data.portraitVideo;
   const portraitImage = imageOrFallback(data.portrait, fallbackImage, "N Madhu Kumar");
   // With no portrait, no clip and no site-wide stand-in, the frame is dropped
@@ -91,11 +92,20 @@ export function AboutBlock({
             ) : null}
           </div>
         ) : null}
-        <div className="about__text">
+        <div className={`about__text${isExpanded ? " is-expanded" : ""}`}>
           <h2>{data.heading}</h2>
           {data.paragraphs.map((paragraph) => (
             <p key={paragraph}>{paragraph}</p>
           ))}
+          {/* Phone layout only: the story opens on its first lines and unfolds from here. */}
+          <button
+            type="button"
+            className="about__more"
+            aria-expanded={isExpanded}
+            onClick={() => setIsExpanded((expanded) => !expanded)}
+          >
+            {isExpanded ? "Show less" : "Read more"}
+          </button>
           <div className="about__specs">
             <div>
               <span className="about__specs-label">{data.statusLabel}</span>

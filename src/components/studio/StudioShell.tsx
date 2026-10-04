@@ -33,8 +33,8 @@ export function StudioShell({ children, shellData, publicSiteUrl }: StudioShellP
 
   return (
     <div className="studio-shell">
-      <Topbar publicSiteUrl={publicSiteUrl}>
-        <Rail />
+      <Topbar publicSiteUrl={publicSiteUrl} edited={shellData.edited} flagged={shellData.flagged}>
+        <Rail edited={shellData.edited} />
       </Topbar>
       <main className="studio-main">{children}</main>
       <Toast />

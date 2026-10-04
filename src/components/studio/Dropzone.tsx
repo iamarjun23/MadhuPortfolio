@@ -199,7 +199,8 @@ export function Dropzone({
               </small>
             ) : (
               <small>
-                Remove keeps the file, so Undo can bring it back. Delete forever cannot be undone.
+                Remove keeps the file, so Discard can bring it back. Delete forever cannot be
+                undone.
               </small>
             )}
             <button

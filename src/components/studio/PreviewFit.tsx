@@ -8,7 +8,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { previewScale } from "@/lib/preview-fit";
+import { previewScale, wholeIsReadable } from "@/lib/preview-fit";
 
 // The live site's design width (DESIGN_WIDTH in the public layout): below it the
 // site zooms the desktop layout down instead of reflowing, and so does this.
@@ -17,9 +17,10 @@ const DESIGN_WIDTH = 1280;
 type PreviewFitProps = Readonly<{
   /** Desktop lays the section out at page width; the phone frame brings its own size. */
   device: "desktop" | "mobile";
-  /** Show the whole section at once, rather than fitting its width and scrolling. */
-  whole: boolean;
-  onScale: (scale: number) => void;
+  /** Show the whole section at once, or fit its width and scroll; `null` picks whichever
+      keeps it readable. */
+  whole: boolean | null;
+  onFit: (fit: Readonly<{ scale: number; whole: boolean }>) => void;
   children: ReactNode;
 }>;
 
@@ -28,10 +29,10 @@ type PreviewFitProps = Readonly<{
    the pane scrolls by what is actually on screen, and nothing has to be
    positioned by hand. The outer box is never zoomed itself, so its size is the
    on-screen size in every browser and dividing by the zoom gives the real one. */
-export function PreviewFit({ device, whole, onScale, children }: PreviewFitProps) {
+export function PreviewFit({ device, whole, onFit, children }: PreviewFitProps) {
   const sizerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState({ width: DESIGN_WIDTH, scale: 1 });
+  const [fit, setFit] = useState({ width: DESIGN_WIDTH, scale: 1, whole: whole ?? true });
 
   useLayoutEffect(() => {
     const sizer = sizerRef.current;
@@ -48,13 +49,17 @@ export function PreviewFit({ device, whole, onScale, children }: PreviewFitProps
         width: device === "desktop" ? width : sizer.offsetWidth / applied,
         height: sizer.offsetHeight / applied,
       };
-      const scale = previewScale(paneSize, content, whole);
+      // The phone frame scrolls its own page, so it is always shown whole.
+      const showWhole = whole ?? (device === "mobile" || wholeIsReadable(paneSize, content));
+      const scale = previewScale(paneSize, content, showWhole);
       /* Sizes are whole pixels, so the same content measures a hair differently
          at each zoom. Ignoring that hair is what stops the two chasing each other. */
       setFit((current) =>
-        width === current.width && Math.abs(scale - current.scale) < 0.002
+        width === current.width &&
+        showWhole === current.whole &&
+        Math.abs(scale - current.scale) < 0.002
           ? current
-          : { width, scale },
+          : { width, scale, whole: showWhole },
       );
     };
 
@@ -66,7 +71,7 @@ export function PreviewFit({ device, whole, onScale, children }: PreviewFitProps
     return () => observer.disconnect();
   }, [device, whole]);
 
-  useEffect(() => onScale(fit.scale), [fit.scale, onScale]);
+  useEffect(() => onFit({ scale: fit.scale, whole: fit.whole }), [fit.scale, fit.whole, onFit]);
 
   // --vw stands in for 1vw across the site's CSS, so it follows the preview's width, not the window's.
   // --preview-zoom lets content that cannot be zoomed (an embedded PDF) undo the zoom for itself.

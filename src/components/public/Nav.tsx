@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NavReel } from "@/components/public/NavReel";
 import { defaultSiteSettings } from "@/schemas/settings";
@@ -52,6 +52,7 @@ export function Nav({ contact, settings, resumeUrl, previewPath }: NavProps) {
   const pathname = previewPath ?? routePath;
   const [isScrolled, setIsScrolled] = useState(false);
   const [hasClearedHero, setHasClearedHero] = useState(false);
+  const menuRef = useRef<HTMLDialogElement>(null);
   // Only the landing page has a hero to clear, so derive it rather than
   // resetting the flag from an effect on every other route.
   const isPastHero = pathname === "/" && hasClearedHero;
@@ -126,6 +127,10 @@ export function Nav({ contact, settings, resumeUrl, previewPath }: NavProps) {
     return () => observer.disconnect();
   }, [pathname]);
 
+  const workHref = isPortfolioHome ? "#work" : "/#work";
+  const contactHref = isPortfolioHome ? "#contact" : "/#contact";
+  const closeMenu = () => menuRef.current?.close();
+
   const showCaption = isDrawingRoom || contact?.availableForFreelance;
   const caption = isDrawingRoom
     ? navigation.drawingRoomCaption
@@ -169,7 +174,7 @@ export function Nav({ contact, settings, resumeUrl, previewPath }: NavProps) {
         ) : null}
 
         <nav className="public-nav__right nav-stagger" aria-label="Primary navigation">
-          <Link className="public-nav__link" href={isPortfolioHome ? "#work" : "/#work"}>
+          <Link className="public-nav__link" href={workHref}>
             <span className="link-underline">{navigation.workLabel}</span>
           </Link>
           <Link className="public-nav__link" href="/room">
@@ -186,14 +191,81 @@ export function Nav({ contact, settings, resumeUrl, previewPath }: NavProps) {
               <span className="link-underline">{navigation.resumeLabel}</span>
             </a>
           ) : null}
-          <Link className="public-nav__cta" href={isPortfolioHome ? "#contact" : "/#contact"}>
+          <Link className="public-nav__cta" href={contactHref}>
             {navigation.contactLabel}
             <span className="public-nav__cta-arrow" aria-hidden="true">
               ↗
             </span>
           </Link>
+          {/* Phone layout only: the links above fold into this menu. */}
+          <button
+            type="button"
+            className="public-nav__menu"
+            aria-haspopup="dialog"
+            onClick={() => menuRef.current?.showModal()}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M1 4h14M1 8h14M1 12h14" />
+            </svg>
+            Menu
+          </button>
         </nav>
       </div>
+      {/* A native modal dialog: it traps focus, closes on Escape and sits in the top
+          layer, clear of the scroll-entrance transforms on the page's sections. */}
+      <dialog ref={menuRef} className="nav-menu" aria-label="Menu">
+        <div className="nav-menu__bar">
+          <span className="brand" aria-hidden="true">
+            <span className="brand__name">{brand.name}</span>
+            <span className="brand__suffix">{brand.suffix}</span>
+          </span>
+          <button type="button" className="nav-menu__close" onClick={closeMenu}>
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 3l10 10M13 3L3 13" />
+            </svg>
+            <span className="sr-only">Close menu</span>
+          </button>
+        </div>
+        <ul className="nav-menu__links">
+          <li>
+            <Link href={workHref} onClick={closeMenu}>
+              {navigation.workLabel}
+            </Link>
+          </li>
+          <li>
+            <Link href="/room" onClick={closeMenu}>
+              {navigation.drawingRoomLabel}
+            </Link>
+          </li>
+          {resumeUrl ? (
+            <li>
+              <a
+                href={resumeUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => {
+                  downloadResume(resumeUrl);
+                  closeMenu();
+                }}
+              >
+                {navigation.resumeLabel}
+              </a>
+            </li>
+          ) : null}
+        </ul>
+        <div className="nav-menu__foot">
+          {contact?.availableForFreelance ? (
+            <span className="footer-status">
+              <span className="footer-status__blip" aria-hidden="true" />
+              {formatAvailability(contact.footerStatus).replace(/\s*·$/, "")}
+            </span>
+          ) : null}
+          <Link className="button button--primary" href={contactHref} onClick={closeMenu}>
+            {navigation.contactLabel}
+            <span aria-hidden="true">↗</span>
+          </Link>
+        </div>
+      </dialog>
     </header>
   );
 }

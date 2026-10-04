@@ -3,42 +3,12 @@ import { AvailabilityCard } from "@/components/studio/AvailabilityCard";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { ShareImage } from "@/components/studio/ShareImage";
 import { Status } from "@/generated/prisma/client";
-import { getContact, getResume, getSettings, getWork } from "@/lib/content";
+import { getContact, getSettings } from "@/lib/content";
 import { type DraftPart, partEdited } from "@/lib/draft-diff";
-import { publishChecks } from "@/lib/publish-checks";
-import { type SectionKey, sectionKeys } from "@/lib/sections";
-import { getRecentActivity, getSectionRows, getStorageUsage } from "@/lib/studio";
+import type { SectionKey } from "@/lib/sections";
+import { getPublishChecks, getRecentActivity, getSectionRows, getStorageUsage } from "@/lib/studio";
 import { getStudioDraftVersion } from "@/lib/studio-drafts";
-import { studioHref, studioTabs } from "@/lib/studio-nav";
-
-/* The settings editors with no tab of their own. Between them and the Navbar and
-   Footer tabs every key of the settings draft is covered, so an edit anywhere in
-   it shows up as "Edited" on exactly one row of this page. */
-const siteDetails: ReadonlyArray<{
-  href: string;
-  label: string;
-  detail: string;
-  part: DraftPart;
-}> = [
-  {
-    href: studioHref("/settings?open=seo"),
-    label: "Google and sharing",
-    detail: "Page title, description and share image",
-    part: { only: ["seo"] },
-  },
-  {
-    href: studioHref("/settings?open=site.brand"),
-    label: "Brand",
-    detail: "The wordmark in the navbar and footer",
-    part: { only: ["site.brand"] },
-  },
-  {
-    href: studioHref("/settings"),
-    label: "Look and domain",
-    detail: "Motion, stand-in photo, owner name and domain",
-    part: { only: ["appearance", "fallbackImage", "domain", "site.ownerName"] },
-  },
-];
+import { foldRepeats, siteDetails, studioHref, studioTabs } from "@/lib/studio-nav";
 
 function getRelativeTime(date: Date) {
   const minutes = Math.floor(Math.max(0, Date.now() - date.getTime()) / 60000);
@@ -61,18 +31,19 @@ function StatusPill({ edited }: Readonly<{ edited: boolean }>) {
   );
 }
 
-export default async function StudioMenuPage() {
-  const [activity, rows, storage, contact, contactVersion, settings, resume, work] =
-    await Promise.all([
-      getRecentActivity(),
-      getSectionRows(),
-      getStorageUsage(),
-      getContact(Status.DRAFT),
-      getStudioDraftVersion("contact"),
-      getSettings(Status.DRAFT),
-      getResume(Status.DRAFT),
-      getWork(Status.DRAFT),
-    ]);
+export default async function StudioHomePage() {
+  const [log, rows, storage, contact, contactVersion, settings, allChecks] = await Promise.all([
+    getRecentActivity(),
+    getSectionRows(),
+    getStorageUsage(),
+    getContact(Status.DRAFT),
+    getStudioDraftVersion("contact"),
+    getSettings(Status.DRAFT),
+    getPublishChecks(),
+  ]);
+  const activity = foldRepeats(log).slice(0, 6);
+  // What needs fixing leads the list; what already passes follows it.
+  const checks = [...allChecks].sort((a, b) => Number(a.ok) - Number(b.ok));
 
   const drafts = rows.filter((row) => row.status === Status.DRAFT);
   const isEdited = (section: SectionKey, part?: DraftPart) => partEdited(rows, section, part);
@@ -98,24 +69,14 @@ export default async function StudioMenuPage() {
       (latest, row) => (latest && latest > row.updatedAt ? latest : row.updatedAt),
       null,
     );
-  const checks = publishChecks({
-    resume,
-    settings,
-    work,
-    contact,
-    drafts: sectionKeys.flatMap((key) => {
-      const draft = drafts.find((row) => row.key === key);
-      return draft ? [{ key, data: draft.data }] : [];
-    }),
-  });
   const { title, description, ogImage } = settings.seo;
 
   return (
-    <section className="studio-page studio-settings" aria-labelledby="studio-menu-title">
+    <section className="studio-page studio-settings" aria-labelledby="studio-home-title">
       <div className="studio-settings__head">
         <header className="studio-settings__intro">
           <span className="slate">{settings.domain || "Whole site"}</span>
-          <h1 id="studio-menu-title">Menu</h1>
+          <h1 id="studio-home-title">Studio</h1>
           <p>
             {editedCount === 0
               ? "Everything here is live."
@@ -189,7 +150,10 @@ export default async function StudioMenuPage() {
               <ul className="studio-activity">
                 {activity.map((item) => (
                   <li key={item.id}>
-                    <span>{item.message}</span>
+                    <span>
+                      {item.message}
+                      {item.count > 1 ? <small>{` × ${item.count}`}</small> : null}
+                    </span>
                     <time dateTime={item.createdAt.toISOString()}>
                       {getRelativeTime(item.createdAt)}
                     </time>

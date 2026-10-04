@@ -36,7 +36,7 @@ export function SaveBar() {
       </div>
       <div>
         <button className="button button--ghost" type="button" onClick={discard} disabled={blocked}>
-          Undo
+          Discard
         </button>
         <button
           className="button button--primary"

@@ -4,10 +4,27 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { isUploadedMediaSrc, transformedVideoSrc } from "@/lib/media-src";
+import { PHONE_MAX_WIDTH } from "@/lib/site-scale";
 import { initialTimecode, useTimecode } from "@/lib/use-timecode";
 import type { Hero as HeroData } from "@/schemas";
 
 type HeroProps = Readonly<{ data: HeroData }>;
+
+const PHONE = `(max-width: ${PHONE_MAX_WIDTH}px)`;
+
+/* The still shown before a video plays. An uploaded poster wins. Otherwise an uploaded
+   video supplies its own first frame, so the still always matches the clip (an external
+   stock poster would not, and can go dead). */
+function posterOf(video: Readonly<{ url: string; poster?: string }>, width: number) {
+  const uploaded = video.poster && isUploadedMediaSrc(video.poster) ? video.poster : null;
+  return {
+    uploaded,
+    src:
+      uploaded ??
+      transformedVideoSrc(video.url, `mode=frame,time=0s,width=${width}`) ??
+      video.poster,
+  };
+}
 
 export function Hero({ data }: HeroProps) {
   const [wordIndex, setWordIndex] = useState(0);
@@ -19,14 +36,12 @@ export function Hero({ data }: HeroProps) {
   const timecodeRef = useTimecode();
   const parallaxRef = useRef({ allowed: false, frame: 0, x: 0, y: 0 });
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
-  /* An uploaded poster wins. Otherwise an uploaded video supplies its own first frame, so the
-     still always matches the clip (an external stock poster would not, and can go dead). */
-  const uploadedPoster =
-    data.bgVideo.poster && isUploadedMediaSrc(data.bgVideo.poster) ? data.bgVideo.poster : null;
-  const poster =
-    uploadedPoster ??
-    transformedVideoSrc(data.bgVideo.url, "mode=frame,time=0s,width=1280") ??
-    data.bgVideo.poster;
+  // The untransformed address of whichever video is attached, for when its re-encode fails.
+  const originalSrc = useRef(data.bgVideo.url);
+  const [pausedByVisitor, setPausedByVisitor] = useState(false);
+  const { uploaded: uploadedPoster, src: poster } = posterOf(data.bgVideo, 1280);
+  const phoneVideoUrl = data.bgVideoMobile?.url;
+  const phonePoster = data.bgVideoMobile ? posterOf(data.bgVideoMobile, 720).src : null;
 
   /* The background video runs to tens of megabytes, and an autoplaying <video> starts
      downloading the moment it is parsed, whatever `preload` says - competing with the
@@ -39,15 +54,15 @@ export function Hero({ data }: HeroProps) {
     let cancelPending = () => {};
     /* An upload is swapped for an edge-cached re-encode: the originals run to ~20 Mbit/s, and
        R2's own responses are not cached at the edge. 1920 keeps full HD on desktop at about
-       half the bytes; phones get 1280, about a fifth. `screen` rather than `innerWidth`, since
-       the public layout pins phones to a 1280px viewport. */
-    const attach = () =>
-      setVideoSrc(
-        transformedVideoSrc(
-          data.bgVideo.url,
-          `mode=video,width=${window.screen.width > 900 ? 1920 : 1280}`,
-        ) ?? data.bgVideo.url,
-      );
+       half the bytes; phones get 1280, about a fifth. A phone plays the vertical cut when
+       there is one, at 720 wide. */
+    const attach = () => {
+      const onPhone = window.matchMedia(PHONE).matches;
+      const source = onPhone && phoneVideoUrl ? phoneVideoUrl : data.bgVideo.url;
+      const width = source === phoneVideoUrl ? 720 : window.screen.width > 900 ? 1920 : 1280;
+      originalSrc.current = source;
+      setVideoSrc(transformedVideoSrc(source, `mode=video,width=${width}`) ?? source);
+    };
     // Safari has no requestIdleCallback; a short timeout after `load` is close enough there.
     const whenIdle = () => {
       if (typeof window.requestIdleCallback === "function") {
@@ -65,21 +80,26 @@ export function Hero({ data }: HeroProps) {
       window.removeEventListener("load", whenIdle);
       cancelPending();
     };
-  }, [data.bgVideo.url]);
+  }, [data.bgVideo.url, phoneVideoUrl]);
 
   // A muted play() is what autoplay policies allow; if it is still refused the poster stays.
   // Paused once scrolled past so it stops decoding under the rest of the page. Re-run when the
   // source arrives: observing fires straight away, which starts playback if the hero is in view.
+  // A visitor's own pause holds until they press play again.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !videoSrc) return;
+    if (pausedByVisitor) {
+      video.pause();
+      return;
+    }
     const observer = new IntersectionObserver(([entry]) => {
       if (entry?.isIntersecting) video.play().catch(() => {});
       else video.pause();
     });
     observer.observe(video);
     return () => observer.disconnect();
-  }, [videoSrc]);
+  }, [videoSrc, pausedByVisitor]);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -142,18 +162,24 @@ export function Hero({ data }: HeroProps) {
         {/* The first thing a visitor sees, so it is preloaded from <head> at high priority and
             becomes the LCP element; the video, attached after load, covers it from its first frame. */}
         {poster ? (
-          <Image
-            className="hero__poster"
-            src={poster}
-            alt=""
-            fill
-            sizes="100vw"
-            preload
-            fetchPriority="high"
-            // Only an uploaded poster can go through the image loader; Cloudflare will not
-            // resize a video frame a second time.
-            unoptimized={!uploadedPoster}
-          />
+          /* The <source> hands a phone the vertical cut's still instead. A preload cannot be
+             limited to one screen size, so with two stills the image is left to the browser's
+             own scan of the markup, which still finds it first. */
+          <picture>
+            {phonePoster ? <source media={PHONE} srcSet={phonePoster} /> : null}
+            <Image
+              className="hero__poster"
+              src={poster}
+              alt=""
+              fill
+              sizes="100vw"
+              preload={!phonePoster}
+              fetchPriority="high"
+              // Only an uploaded poster can go through the image loader; Cloudflare will not
+              // resize a video frame a second time.
+              unoptimized={!uploadedPoster}
+            />
+          </picture>
         ) : null}
         <video
           className="hero__video"
@@ -164,7 +190,7 @@ export function Hero({ data }: HeroProps) {
           preload="none"
           src={videoSrc ?? undefined}
           // If the re-encode fails (say, a source past Cloudflare's size limit), play the original.
-          onError={() => setVideoSrc((current) => (current ? data.bgVideo.url : current))}
+          onError={() => setVideoSrc((current) => (current ? originalSrc.current : current))}
         />
         {data.bgVideo.duotone ? <div className="hero__tint" /> : null}
         <div className="hero__scrim" />
@@ -202,6 +228,21 @@ export function Hero({ data }: HeroProps) {
             {data.secondaryCta.label}
             <span aria-hidden="true">&rarr;</span>
           </Link>
+          {/* Phone layout only, where the video fills the screen behind the headline. */}
+          <button
+            type="button"
+            className="hero__pause"
+            aria-label={pausedByVisitor ? "Play background video" : "Pause background video"}
+            onClick={() => setPausedByVisitor((paused) => !paused)}
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              {pausedByVisitor ? (
+                <path d="M4 2l10 6-10 6z" />
+              ) : (
+                <path d="M4 2h3v12H4zM9 2h3v12H9z" />
+              )}
+            </svg>
+          </button>
         </div>
       </div>
       <div className="hero__meta">
