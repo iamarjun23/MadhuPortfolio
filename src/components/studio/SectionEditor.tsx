@@ -780,6 +780,9 @@ function getMediaConfig(
   if (key === "pdf" && (value === null || isEditorObject(value))) {
     return { endpoint: "resumeFile", acceptsAlt: false, isDocument: true, isOptional: true };
   }
+  if (key === "imageMobile" && (value === null || isEditorObject(value))) {
+    return { endpoint: "roomImage", acceptsAlt: true, isOptional: true };
+  }
   if (key === "image" && (value === null || isEditorObject(value))) {
     const endpoint =
       arrayKey === "roles"

@@ -38,11 +38,21 @@ export function DrawingRoomTeaser({
             <span className="drawing-teaser__photo">
               {teaser.image && (
                 <MediaImage
-                  className="drawing-teaser__image"
+                  className={`drawing-teaser__image${teaser.imageMobile ? " drawing-teaser__image--wide" : ""}`}
                   src={teaser.image.url}
                   alt={teaser.image.alt}
                   fill
-                  sizes="(max-width: 560px) 14rem, 22rem"
+                  sizes="(max-width: 640px) 100vw, 22rem"
+                />
+              )}
+              {/* Phone layout only. Each is lazy, so a screen fetches just the one it shows. */}
+              {teaser.imageMobile && (
+                <MediaImage
+                  className="drawing-teaser__image drawing-teaser__image--phone"
+                  src={teaser.imageMobile.url}
+                  alt={teaser.imageMobile.alt}
+                  fill
+                  sizes="100vw"
                 />
               )}
             </span>

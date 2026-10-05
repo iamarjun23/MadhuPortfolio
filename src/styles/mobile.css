@@ -13,6 +13,7 @@
 .scroll-pager,
 .work__shelves,
 .experience-list,
+.drawing-teaser__image--phone,
 .contact__list,
 .public-footer__top {
   display: none;
@@ -777,19 +778,31 @@
   .drawing-teaser::after {
     background: linear-gradient(180deg, rgba(8, 10, 12, 0.35), var(--ink-950) 60%);
   }
+  /* The frame takes the photo's own shape, so the whole picture shows. */
   .drawing-teaser__archive {
     order: -1;
     width: 100%;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: auto;
   }
   .drawing-teaser__archive::before,
   .drawing-teaser__archive::after {
     display: none;
   }
   .drawing-teaser__photo {
+    position: relative;
+    display: block;
     border-width: 1px;
     border-color: rgba(255, 255, 255, 0.24);
     box-shadow: none;
+  }
+  /* next/image sets a `fill` image's position and height inline. */
+  .drawing-teaser__image {
+    position: relative !important;
+    display: block;
+    height: auto !important;
+  }
+  .drawing-teaser__image--wide {
+    display: none;
   }
   .drawing-teaser h2 {
     max-width: none;

@@ -191,7 +191,15 @@ const fieldRules: readonly FieldRule[] = [
     doc: {
       label: "Invitation photo",
       media: "photo",
-      hint: "The upright photo on the home page teaser. A portrait (3:4) shot fits best. Leave empty for a plain card.",
+      hint: "The upright photo on the home page teaser. A portrait (3:4) shot fits best; a phone shows the whole photo, whatever its shape. Leave empty for a plain card.",
+    },
+  },
+  {
+    key: "imageMobile",
+    doc: {
+      label: "Phone photo (optional)",
+      media: "photo",
+      hint: "A different photo for phones, shown whole across the width of the screen. Leave it empty and phones show the invitation photo above.",
     },
   },
   { key: "image", doc: { label: "Photo", media: "photo", hint: "Image shown in this section." } },

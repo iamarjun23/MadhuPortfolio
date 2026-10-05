@@ -230,6 +230,10 @@ export function ImpactStrip({
                     <span className="impact__worked-thumb" aria-hidden={!image}>
                       {image ? (
                         /* Square tiles, about 8-10rem wide; two to a row under 900px.
+                           The loader sizes a photo by its width and the tile crops it
+                           to a square, so a 16:9 photo has to arrive 16/9 times wider
+                           than the tile for its height to fill it sharply - hence
+                           `sizes` nearly double the tile's real width.
                            Decorative here: the button already reads the name. The
                            preview dialog below carries the photo's own alt. */
                         <MediaImage
@@ -237,7 +241,7 @@ export function ImpactStrip({
                           alt=""
                           width={384}
                           height={384}
-                          sizes="(max-width: 900px) 45vw, 160px"
+                          sizes="(max-width: 900px) 80vw, 288px"
                           draggable={false}
                         />
                       ) : (

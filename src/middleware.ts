@@ -21,13 +21,16 @@ export default async function middleware(req: NextRequest) {
     process.env.VERCEL && !isPassthrough
       ? `/studio${externalPathname === "/" ? "" : externalPathname}`
       : externalPathname;
+  // The query has to ride along: a Navbar or Footer tab is `/settings?open=...`, and a
+  // rewrite to the bare path alone opens the whole settings editor instead of that part.
+  const studioUrl = new URL(`${studioPathname}${nextUrl.search}`, nextUrl);
 
   // Everything below needs a session lookup, which needs AUTH_SECRET - unset on the Worker, which
   // never serves /studio. Bailing out here before touching auth keeps every public/API request on
   // that deployment exactly as cheap and secret-free as before this file grew a catch-all matcher.
   if (!studioPathname.startsWith("/studio")) {
     return studioPathname !== externalPathname
-      ? NextResponse.rewrite(new URL(studioPathname, nextUrl))
+      ? NextResponse.rewrite(studioUrl)
       : undefined;
   }
 
@@ -44,7 +47,7 @@ export default async function middleware(req: NextRequest) {
   }
 
   if (studioPathname !== externalPathname) {
-    return NextResponse.rewrite(new URL(studioPathname, nextUrl));
+    return NextResponse.rewrite(studioUrl);
   }
 }
 

@@ -82,6 +82,9 @@ export const RoomSchema = z.object({
       ctaLabel: z.string().max(60),
       stamp: z.string().max(40),
       image: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable().default(null),
+      // A photo framed for a phone, where the card runs the full width of the screen.
+      // Without one, phones show the photo above.
+      imageMobile: z.object({ url: ImageUrlSchema, alt: z.string() }).nullable().default(null),
     })
     .default({
       eyebrow: "Off the clock",
@@ -91,6 +94,7 @@ export const RoomSchema = z.object({
       ctaLabel: "Open the Drawing Room",
       stamp: "Private archive",
       image: null,
+      imageMobile: null,
     }),
   eyebrow: z.string().max(40).default("Off the clock"),
   title: z.string().max(80).default("The Drawing Room"),
