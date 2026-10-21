@@ -326,32 +326,6 @@ button {
   pointer-events: none;
 }
 
-.whatsapp-fab {
-  position: fixed;
-  z-index: 150;
-  right: clamp(1rem, calc(4 * var(--vw)), 2rem);
-  bottom: max(1rem, env(safe-area-inset-bottom));
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: #25d366;
-  color: #fff;
-  box-shadow: var(--sh-lg, 0 8px 28px -12px rgba(0, 0, 0, 0.5));
-  transition: transform 0.2s var(--e-cut, ease);
-}
-
-.whatsapp-fab:hover {
-  color: #fff;
-  transform: scale(1.08);
-}
-
-.whatsapp-fab svg {
-  width: 28px;
-  height: 28px;
-}
-
 :root {
   --nav-glow: 22%;
   --nav-h: 64px;
@@ -2290,8 +2264,8 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
     0 24px 44px -22px rgba(0, 0, 0, 0.92),
     0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent);
 }
-.work__rail-card:hover .work__card-media > img,
-.work__rail-card:focus-visible .work__card-media > img {
+.work__rail-card:hover .work__card-media > :is(img, video),
+.work__rail-card:focus-visible .work__card-media > :is(img, video) {
   filter: none;
   transform: scale(1.06);
 }
@@ -2421,7 +2395,7 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
 .work__card-media.bd-4 {
   background: linear-gradient(135deg, var(--ink-500), var(--signal-700));
 }
-.work__card-media > img {
+.work__card-media > :is(img, video) {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2435,8 +2409,8 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
     transform 0.6s var(--e-reveal),
     filter 0.4s var(--e-cut);
 }
-#work .work__card:hover .work__card-media > img,
-#work .work__card:focus-visible .work__card-media > img {
+#work .work__card:hover .work__card-media > :is(img, video),
+#work .work__card:focus-visible .work__card-media > :is(img, video) {
   filter: none;
   transform: scale(1.06);
 }

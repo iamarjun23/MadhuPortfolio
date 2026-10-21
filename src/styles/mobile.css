@@ -1,9 +1,8 @@
-/* Phone layout for the public home page.
+/* Phone layout for the public home page and the Drawing Room.
 
-   The home page is the one public page with a real phone viewport (see its
-   `viewport` export); the Drawing Room still shows phones the 1280px artboard, where
-   none of this applies. Everything below 640px wide is laid out here rather than
-   zoomed (PHONE_MAX_WIDTH in src/lib/site-scale.ts keeps the script in step).
+   Both pages have a real phone viewport (see their `viewport` exports).
+   Everything below 640px wide is laid out here rather than zoomed
+   (PHONE_MAX_WIDTH in src/lib/site-scale.ts keeps the script in step).
 
    A few pieces of markup exist only for this layout. They are hidden first, for
    every width, and switched on inside the media query. */
@@ -15,7 +14,8 @@
 .experience-list,
 .drawing-teaser__image--phone,
 .contact__list,
-.public-footer__top {
+.public-footer__top,
+.sketchbook {
   display: none;
 }
 
@@ -931,10 +931,6 @@
     gap: 0.4rem;
     color: var(--text-2);
   }
-  /* Room under the last line for the floating WhatsApp button. */
-  body:has(.whatsapp-fab) .public-footer {
-    padding-bottom: calc(env(safe-area-inset-bottom) + 4.5rem);
-  }
 
   /* ---------- The media pop-up, stacked ---------- */
   .mood-player {
@@ -963,5 +959,143 @@
   .mood-player__panel,
   .mood-player__step {
     zoom: 1;
+  }
+}
+
+/* ---------- Drawing Room: the board as a spiral sketchbook ---------- */
+@media (max-width: 640px) {
+  .room-hero {
+    padding: 2rem 0 1.25rem;
+    text-align: left;
+  }
+  .room-hero .slate {
+    justify-content: flex-start;
+  }
+  .room-hero h1 {
+    font-size: 2.25rem;
+  }
+  /* Shuffle and reset belong to the draggable board, which phones don't get. */
+  .room-hero > .wrap > div,
+  .room-board {
+    display: none;
+  }
+
+  .sketchbook {
+    display: block;
+  }
+  .sketchbook__pages {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+  }
+  .sketchbook__pages::-webkit-scrollbar {
+    display: none;
+  }
+  /* Pages share the tallest page's height, so a page grows to fit its cards
+     instead of cutting one off. The holes along the top are the spiral. */
+  .sketchbook__page {
+    position: relative;
+    display: flex;
+    flex: 0 0 100%;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-height: min(60svh, 28rem);
+    padding: 2.75rem 1.25rem 2.5rem;
+    border-radius: 4px 10px 10px 4px;
+    background:
+      radial-gradient(circle, var(--bg) 0 4px, var(--paper-500) 5px, transparent 6px) 0 0.6rem /
+        calc(100% / 7) 12px repeat-x,
+      repeating-linear-gradient(transparent 0 27px, var(--paper-300) 27px 28px) 0 2.5rem / 100%
+        no-repeat,
+      var(--paper-100);
+    color: var(--paper-900);
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+  .sketchbook__card {
+    position: relative;
+    width: 80%;
+    cursor: default;
+    touch-action: auto;
+    user-select: auto;
+    transition: none;
+  }
+  .sketchbook__card.is-viewable {
+    cursor: pointer;
+  }
+  .sketchbook__card:nth-child(even) {
+    align-self: flex-end;
+  }
+  .sketchbook__card.mood-card--note,
+  .sketchbook__card.mood-card--tags {
+    width: 64%;
+  }
+  .sketchbook__card.mood-card--quote {
+    width: 88%;
+  }
+  .sketchbook__folio {
+    position: absolute;
+    right: 0;
+    bottom: 0.75rem;
+    left: 0;
+    color: var(--paper-600);
+    font-family: var(--f-mono);
+    font-size: 0.65rem;
+    text-align: center;
+  }
+  .sketchbook__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 1rem;
+  }
+  .sketchbook__nav button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1.1rem;
+  }
+  .sketchbook__nav button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .sketchbook__dots {
+    display: flex;
+    gap: 6px;
+  }
+  .sketchbook__dots i {
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border-strong);
+    transition: width 0.2s;
+  }
+  .sketchbook__dots .is-current {
+    width: 16px;
+    background: var(--accent);
+  }
+
+  .room-close {
+    /* Matches .wrap at phone widths, so it lines up with the sketchbook. */
+    padding: 3rem max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left));
+    text-align: left;
+  }
+  .room-close .slate {
+    justify-content: flex-start;
+  }
+  .room-close__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .room-close .drawing-teaser__link {
+    justify-content: center;
   }
 }

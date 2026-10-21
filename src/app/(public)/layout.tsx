@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { preconnect } from "react-dom";
 import { Footer } from "@/components/public/Footer";
 import { Nav } from "@/components/public/Nav";
-import { WhatsAppButton } from "@/components/public/WhatsAppButton";
 import { getContact, getResume, getSettings } from "@/lib/content";
 import { realImage } from "@/lib/placeholders";
 import { DESIGN_WIDTH, PHONE_MAX_WIDTH, siteScale } from "@/lib/site-scale";
@@ -115,7 +114,6 @@ export default async function PublicLayout({ children }: PublicLayoutProps) {
         <Nav contact={contact} settings={settings} resumeUrl={resume.pdf?.url} />
         {children}
         <Footer contact={contact} settings={settings} />
-        <WhatsAppButton contact={contact} />
       </div>
     </>
   );

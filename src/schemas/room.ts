@@ -97,7 +97,7 @@ export const RoomSchema = z.object({
       imageMobile: null,
     }),
   eyebrow: z.string().max(40).default("Off the clock"),
-  title: z.string().max(80).default("The Drawing Room"),
+  title: z.string().max(80).default("Mood board"),
   intro: z.string().max(240),
   shuffleLabel: z.string().max(40).default("Shuffle the board"),
   resetLabel: z.string().max(30).default("Reset"),

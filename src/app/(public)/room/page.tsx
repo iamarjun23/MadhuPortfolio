@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { MoodBoard } from "@/components/public/MoodBoard";
 import { getContact, getRoom, getSettings } from "@/lib/content";
 import { realImage } from "@/lib/placeholders";
@@ -20,6 +20,13 @@ export async function generateMetadata(): Promise<Metadata> {
     },
   };
 }
+
+/* Phones get the sketchbook layout (mobile.css) at their real width, as on the home
+   page, instead of the public layout's pinned 1280px artboard. */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export default async function DrawingRoomPage() {
   const [room, settings, contact] = await Promise.all([getRoom(), getSettings(), getContact()]);

@@ -19,6 +19,8 @@ export type Reel = Readonly<{
      be fetched, so a card whose still cannot be worked out automatically falls
      back to this - and a cover set deliberately outranks an automatic one. */
   cover: string | null;
+  /** Still to try when `thumbnail` does not load: the automatic one a cover stands in front of. */
+  fallback: string | null;
   /** Page to embed in the pop-up. Null for an upload, which plays directly. */
   embed: string | null;
   /** Uploaded file to play in the pop-up, when the reel is an upload. */
@@ -44,6 +46,7 @@ const empty: Reel = {
   kind: "none",
   thumbnail: null,
   cover: null,
+  fallback: null,
   embed: null,
   file: null,
   poster: null,
@@ -70,6 +73,7 @@ export function resolveReel({ href = null, video = null, image = null }: ReelInp
       poster: video.poster ?? null,
       thumbnail: cover ?? video.poster ?? null,
       cover,
+      fallback: cover ? (video.poster ?? null) : null,
       href,
       playable: true,
     };
@@ -83,6 +87,7 @@ export function resolveReel({ href = null, video = null, image = null }: ReelInp
       kind: "youtube",
       thumbnail: cover ?? getYouTubeThumbnail(href),
       cover,
+      fallback: cover ? getYouTubeThumbnail(href) : null,
       embed: `https://www.youtube-nocookie.com/embed/${getYouTubeId(href)}?rel=0`,
       href,
       playable: true,
@@ -96,6 +101,7 @@ export function resolveReel({ href = null, video = null, image = null }: ReelInp
       kind: "instagram",
       thumbnail: cover ?? getInstagramThumbnail(href),
       cover,
+      fallback: cover ? getInstagramThumbnail(href) : null,
       embed: instagram,
       href,
       playable: true,
@@ -111,6 +117,7 @@ export function resolveReel({ href = null, video = null, image = null }: ReelInp
       kind: "linkedin",
       thumbnail: cover ?? getLinkedInThumbnail(href),
       cover,
+      fallback: cover ? getLinkedInThumbnail(href) : null,
       embed: linkedIn,
       href,
       playable: true,
@@ -154,10 +161,10 @@ export function reelSourceLabel(kind: ReelKind) {
   }
 }
 
-/* What to actually put on the card once the browser has had its say: a fetched
-   still that failed to load steps aside for the editor's cover photo, and only
+/* What to actually put on the card once the browser has had its say: any still
+   can fail to load (a cover whose file has gone from storage, a fetched preview
+   that never resolves), so a failed one steps aside for the fallback, and only
    then does the card fall back to its gradient. */
-export function reelThumbnail(reel: Reel, fetchFailed: boolean) {
-  if (fetchFailed && reel.thumbnailCanFail) return reel.cover;
-  return reel.thumbnail;
+export function reelThumbnail(reel: Reel, failed: ReadonlySet<string>) {
+  return [reel.thumbnail, reel.fallback].find((src) => src && !failed.has(src)) ?? null;
 }

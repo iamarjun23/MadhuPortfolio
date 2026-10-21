@@ -243,8 +243,7 @@ export function WorkConsole({
   const [cardStack, setCardStack] = useState<Record<string, number>>({});
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [railDrag, setRailDrag] = useState<{ from: string; over: string | null } | null>(null);
-  // A LinkedIn thumbnail is fetched, not computed, so it can fail where a
-  // YouTube one never does. Cards that fail here fall back to their gradient.
+  // Stills that would not load, by address; see reelThumbnail.
   const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
   const boardRef = useRef<HTMLDivElement>(null);
   const railRef = useRef<HTMLDivElement>(null);
@@ -498,9 +497,9 @@ export function WorkConsole({
 
   /* The face of a card - still, badge and caption - is the same whichever
      layout is holding it, so every layout draws it from here. */
-  function cardFace(project: WorkProject, laneLabel: string, cardId: string, sizes: string) {
+  function cardFace(project: WorkProject, laneLabel: string, sizes: string) {
     const reel = resolveReel(project);
-    const thumbnail = reelThumbnail(reel, failedThumbs.has(cardId));
+    const thumbnail = reelThumbnail(reel, failedThumbs);
     const badge = reelBadge(reel.kind);
 
     return (
@@ -512,14 +511,21 @@ export function WorkConsole({
               alt={`${project.title} still`}
               fill
               sizes={sizes}
-              onError={
-                reel.thumbnailCanFail
-                  ? () =>
-                      setFailedThumbs((current) =>
-                        current.has(cardId) ? current : new Set(current).add(cardId),
-                      )
-                  : undefined
+              onError={() =>
+                setFailedThumbs((current) =>
+                  current.has(thumbnail) ? current : new Set(current).add(thumbnail),
+                )
               }
+            />
+          ) : reel.file ? (
+            /* An upload with no still of its own shows its opening frame; the
+               #t nudge makes Safari paint one from metadata alone. */
+            <video
+              src={`${reel.file}#t=0.1`}
+              preload="metadata"
+              muted
+              playsInline
+              aria-hidden="true"
             />
           ) : null}
           <span className="work__card-scrim" aria-hidden="true" />
@@ -622,12 +628,7 @@ export function WorkConsole({
               onClick={() => cardClick(featured.project, featured.laneLabel)}
               aria-label={`Preview ${featured.project.title}`}
             >
-              {cardFace(
-                featured.project,
-                featured.laneLabel,
-                `${featured.laneLabel}-${featured.project.id}`,
-                "100vw",
-              )}
+              {cardFace(featured.project, featured.laneLabel, "100vw")}
             </button>
           ) : null}
           {data.lanes.map((shelf) =>
@@ -641,7 +642,7 @@ export function WorkConsole({
                     onClick={() => cardClick(project, shelf.label)}
                     aria-label={`Preview ${project.title}`}
                   >
-                    {cardFace(project, shelf.label, `${shelf.label}-${project.id}`, "50vw")}
+                    {cardFace(project, shelf.label, "50vw")}
                   </button>
                 ))}
               </WorkShelf>
@@ -835,7 +836,7 @@ export function WorkConsole({
                                 }
                               : {})}
                           >
-                            {cardFace(project, laneLabel, cardId, "200px")}
+                            {cardFace(project, laneLabel, "200px")}
                           </button>
                         );
                       })}
@@ -896,7 +897,7 @@ export function WorkConsole({
                     onClick={() => cardClick(project, laneLabel)}
                     aria-label={`Preview ${project.title}`}
                   >
-                    {cardFace(project, laneLabel, cardId, "(max-width: 560px) 45vw, 190px")}
+                    {cardFace(project, laneLabel, "(max-width: 560px) 45vw, 190px")}
                     <span
                       className="work__card-grip"
                       title="Drag to move this card"

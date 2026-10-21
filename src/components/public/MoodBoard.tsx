@@ -10,6 +10,7 @@ import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
 import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
 import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
 import { type ReelKind, reelBadge, resolveReel } from "@/lib/reel";
+import { sketchbookPages } from "@/lib/sketchbook-pages";
 import type { Contact, Room } from "@/schemas";
 
 type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage; contact: Contact }>;
@@ -201,6 +202,99 @@ function cardMedia(card: ViewableCard, fallbackImage: FallbackImage) {
     <div className="mood-player__unavailable">
       <span>This card has no video that can play here yet.</span>
     </div>
+  );
+}
+
+type SketchbookProps = Readonly<{
+  cards: RoomCard[];
+  fallbackImage: FallbackImage;
+  isViewable: (card: RoomCard) => card is ViewableCard;
+  onOpen: (card: ViewableCard) => void;
+}>;
+
+/* Phones get the board as a spiral sketchbook instead (mobile.css): the same cards,
+   a few to a page, one page turned at a time by swiping or the arrows. */
+function Sketchbook({ cards, fallbackImage, isViewable, onOpen }: SketchbookProps) {
+  const bookRef = useRef<HTMLDivElement>(null);
+  const [current, setCurrent] = useState(0);
+  const pages = sketchbookPages(cards);
+
+  function turnTo(index: number) {
+    const book = bookRef.current;
+    if (book) book.scrollTo({ left: index * book.clientWidth, behavior: "smooth" });
+  }
+
+  return (
+    <section className="wrap sketchbook" aria-label="Sketchbook">
+      <div
+        className="sketchbook__pages"
+        ref={bookRef}
+        onScroll={(event) =>
+          setCurrent(Math.round(event.currentTarget.scrollLeft / event.currentTarget.clientWidth))
+        }
+      >
+        {pages.map((page, pageIndex) => (
+          <div className="sketchbook__page" key={page[0]!.id}>
+            {page.map((card) => {
+              const viewable = isViewable(card);
+              const label = getCardLabel(card);
+              return (
+                <div
+                  key={card.id}
+                  className={`mood-card mood-card--${card.type} mood-card--${card.pinType} sketchbook__card ${viewable ? "is-viewable" : ""}`}
+                  style={{ rotate: `${card.rot / 2}deg` }}
+                  onClick={viewable ? () => onOpen(card) : undefined}
+                  onKeyDown={
+                    viewable
+                      ? (event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          onOpen(card);
+                        }
+                      : undefined
+                  }
+                  tabIndex={viewable ? 0 : undefined}
+                  role={viewable ? "button" : undefined}
+                  aria-label={
+                    viewable ? `${card.type === "video" ? "Play" : "View"} ${label}` : undefined
+                  }
+                >
+                  {cardContent(card, fallbackImage)}
+                </div>
+              );
+            })}
+            <span className="sketchbook__folio">
+              p. {pageIndex + 1} / {pages.length}
+            </span>
+          </div>
+        ))}
+      </div>
+      {pages.length > 1 ? (
+        <div className="sketchbook__nav">
+          <button
+            type="button"
+            aria-label="Previous page"
+            disabled={current === 0}
+            onClick={() => turnTo(current - 1)}
+          >
+            <span aria-hidden="true">&larr;</span>
+          </button>
+          <span className="sketchbook__dots" aria-hidden="true">
+            {pages.map((page, index) => (
+              <i key={page[0]!.id} className={index === current ? "is-current" : undefined} />
+            ))}
+          </span>
+          <button
+            type="button"
+            aria-label="Next page"
+            disabled={current === pages.length - 1}
+            onClick={() => turnTo(current + 1)}
+          >
+            <span aria-hidden="true">&rarr;</span>
+          </button>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -479,7 +573,7 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
           ) : null}
         </div>
       </section>
-      <section className="wrap">
+      <section className="wrap room-board">
         <div className="mood-board" ref={boardRef}>
           <p className="sr-only" id="mood-board-instructions">
             On larger screens, focus a card and use the arrow keys to reposition it.
@@ -532,6 +626,12 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
           })}
         </div>
       </section>
+      <Sketchbook
+        cards={data.cards}
+        fallbackImage={fallbackImage}
+        isViewable={isViewable}
+        onOpen={setPlaying}
+      />
       {playing && playingIndex >= 0 ? (
         <MediaViewer
           item={viewerItem(playing, fallbackImage)}
