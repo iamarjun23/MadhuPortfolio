@@ -31,6 +31,8 @@ enum Role {
   OWNER
 }
 
+// One row per Studio sign-in; the session JWT carries its `sessionToken` and is only honoured
+// while the row exists (src/lib/studio-sessions.ts). Logout deletes it, a password change all.
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique

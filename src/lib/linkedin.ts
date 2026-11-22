@@ -50,5 +50,8 @@ export function getLinkedInEmbed(value: string | null) {
    failed <img> load the same as a missing thumbnail. */
 export function getLinkedInThumbnail(value: string | null) {
   const urn = getLinkedInUrn(value);
-  return urn ? `/api/linkedin-thumb?url=${encodeURIComponent(value!)}` : null;
+  // Rebuilt from the urn, so every way of linking one post (tracking hash, share slug) shares
+  // one thumbnail address - and one cached image - instead of one per spelling.
+  const canonical = urn ? `https://www.linkedin.com/feed/update/${urn}/` : null;
+  return canonical ? `/api/linkedin-thumb?url=${encodeURIComponent(canonical)}` : null;
 }

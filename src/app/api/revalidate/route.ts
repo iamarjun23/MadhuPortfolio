@@ -1,22 +1,11 @@
-import { timingSafeEqual } from "node:crypto";
 import { revalidatePath, revalidateTag } from "next/cache";
-import { contentTag, publicPaths } from "@/lib/revalidate";
+import { contentTag, hasRevalidateSecret, publicPaths } from "@/lib/revalidate";
 import { sectionKeys } from "@/lib/sections";
-
-function isAuthorised(request: Request) {
-  const secret = process.env.REVALIDATE_SECRET;
-  const given = request.headers.get("authorization");
-  if (!secret || !given) return false;
-
-  const expected = Buffer.from(`Bearer ${secret}`);
-  const actual = Buffer.from(given);
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
-}
 
 // Called by the studio deployment after a publish - see `refreshLiveSite` in lib/revalidate.ts.
 // Nothing renders here, so it stays well inside the Worker's CPU budget.
 export async function POST(request: Request) {
-  if (!isAuthorised(request)) {
+  if (!hasRevalidateSecret(request)) {
     return Response.json({ error: "Unauthorised" }, { status: 401 });
   }
 
@@ -28,7 +17,7 @@ export async function POST(request: Request) {
 // Used by the studio's /api/health: confirms the secret matches without clearing anything.
 export function GET(request: Request) {
   return new Response(null, {
-    status: isAuthorised(request) ? 204 : 401,
+    status: hasRevalidateSecret(request) ? 204 : 401,
     headers: { "cache-control": "no-store" },
   });
 }

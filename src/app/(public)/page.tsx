@@ -77,7 +77,11 @@ export default async function PortfolioPage() {
       <ImpactStrip data={impact} timeline={timeline.get("impact")} />
       <ClientsMarquee data={clients} timeline={timeline.get("clients")} />
       <WorkConsole data={work} contactEmail={contact.email} timeline={timeline.get("work")} />
-      <Testimonials data={praise} timeline={timeline.get("praise")} />
+      {/* A client component's props ship in the page payload, so hidden quotes are not sent at all. */}
+      <Testimonials
+        data={praise.visible ? praise : { ...praise, quotes: [] }}
+        timeline={timeline.get("praise")}
+      />
       <Experience
         data={experience}
         fallbackImage={settings.fallbackImage}

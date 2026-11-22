@@ -57,6 +57,9 @@ function describeLimits(endpoint: UploadEndpoint) {
 
 async function discard(key: string) {
   try {
+    /* A repeated `finishUpload` running alongside may already have recorded this key;
+       its row would then point at nothing. Leave the object to it. */
+    if (await getDb().media.findUnique({ where: { key }, select: { id: true } })) return;
     await deleteObject(key);
   } catch (error) {
     console.error(`Could not remove the orphaned upload ${key}`, error);
@@ -89,7 +92,7 @@ export async function createUpload(
     if (!isMediaUploadConfigured()) return { ok: false, error: "Uploads are not configured." };
 
     const key = `${endpoint}/${randomUUID()}`;
-    return { ok: true, key, uploadUrl: await signUpload(key) };
+    return { ok: true, key, uploadUrl: await signUpload(key, contentType) };
   } catch {
     return { ok: false, error: "Could not start the upload. Please try again." };
   }
@@ -138,7 +141,7 @@ export async function finishUpload(key: string): Promise<FinishUploadResult> {
     }
 
     // The stored type is still only the browser's claim, so check it against the bytes.
-    const actualMime = verifiedMimeType(await readObjectStart(key, SIGNATURE_BYTES), mime);
+    const actualMime = verifiedMimeType(await readObjectStart(key, SIGNATURE_BYTES), mime, bytes);
     if (!actualMime) {
       await discard(key);
       return {

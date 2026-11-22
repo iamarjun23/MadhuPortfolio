@@ -1,6 +1,5 @@
 import { getDb } from "@/lib/db";
 import { studioSectionLabels } from "@/lib/studio-nav";
-import { uploadEndpointNames } from "@/lib/upload-endpoints";
 import { type Prisma, Status } from "@/generated/prisma/client";
 
 /* Nothing joins an upload to the section using it: media rows carry a key and
@@ -12,8 +11,10 @@ import { type Prisma, Status } from "@/generated/prisma/client";
    appears in a string, not by the address around it: the media domain's URL, a
    hand-typed variant and a pre-migration `/api/media/...` path all name the same
    file. Keying on a URL prefix instead would make every file look unused - and
-   swept - the moment that prefix changed or was unset. */
-const uploadedKey = new RegExp(`(?:${uploadEndpointNames.join("|")})/[0-9a-f-]{36}`, "g");
+   swept - the moment that prefix changed or was unset. The slot name is matched by
+   shape, not against today's list: a slot that has since been renamed or retired
+   still names files a section may point at, and a stray match only keeps a file. */
+const uploadedKey = /[A-Za-z]+\/[0-9a-f-]{36}/g;
 
 function collectUploadedKeys(value: unknown, into: Set<string>) {
   if (typeof value === "string") {
@@ -75,11 +76,11 @@ export async function getMediaUsageForKey(
   return places;
 }
 
-/* Saving a draft is the only write that can add a reference to an upload; publish
-   and revert copy between rows the usage check already reads. So a save holds the
-   shared side of this Postgres advisory lock and a file delete holds the exclusive
-   side from its last usage check until the file is gone: no save can slip a
-   reference in between. Both are released when their transaction ends. */
+/* Saving a draft, publishing and reverting are the writes that can add a reference to
+   an upload. Each holds the shared side of this Postgres advisory lock and a file
+   delete holds the exclusive side from its last usage check until the file is gone:
+   no write can slip a reference in between. Both are released when their
+   transaction ends. */
 const MEDIA_REFERENCE_LOCK = 7_318_402;
 
 /** For a draft save. Any number of saves hold it at once; each waits only for a delete in progress. */

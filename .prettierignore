@@ -1,2 +1,5 @@
 # Written by pnpm; a formatter must never rewrite it.
 pnpm-lock.yaml
+
+# Installed agent skills (vendored third-party files).
+.agents/

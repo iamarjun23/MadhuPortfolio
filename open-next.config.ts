@@ -16,7 +16,13 @@ import memoryQueue from "@opennextjs/cloudflare/overrides/queue/memory-queue";
 // RSC prefetch checked each tag on each shard), which exhausted the free plan's daily DO quota -
 // after that, publishes stopped reaching the live site. D1 does one batched query per request.
 export default defineCloudflareConfig({
-  incrementalCache: withRegionalCache(r2IncrementalCache, { mode: "long-lived" }),
+  // No lazy refresh on a hit: by default every regional hit also re-reads the entry from R2 in
+  // the background - one R2 read per page view. Pages here only change on publish, and the tag
+  // cache already marks those entries stale, so the extra read buys nothing.
+  incrementalCache: withRegionalCache(r2IncrementalCache, {
+    mode: "long-lived",
+    shouldLazilyUpdateOnCacheHit: false,
+  }),
   tagCache: d1NextTagCache,
   // ponytail: per-isolate de-dupe only; a handful of pages and rare publishes don't need more.
   queue: memoryQueue,

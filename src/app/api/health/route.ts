@@ -1,11 +1,18 @@
 import { getDb, isDatabaseConfigured } from "@/lib/db";
 import { headObject, isMediaUploadConfigured } from "@/lib/media-config";
+import { hasRevalidateSecret } from "@/lib/revalidate";
 
 /* One request that says whether the parts a publish depends on are reachable, for an uptime
    monitor or a quick look after a deploy. `/api/ping` stays the cheap liveness probe the studio
    polls. Each check runs only where its settings exist: the Worker has the database; the studio
-   (Vercel) also has the R2 credentials and the live-site refresh. The body says only ok / failed
-   per check; the reason goes to the log ("Health check"). */
+   (Vercel) also has the R2 credentials and the live-site refresh. Anyone gets the overall status
+   (200 / 503); which check failed is only shown with `Authorization: Bearer <REVALIDATE_SECRET>`,
+   and the reason goes to the log ("Health check"). */
+
+// ponytail: per-instance cache, so a burst of requests to one instance runs the checks once.
+// Each new instance still runs them on its first request.
+const RESULT_TTL_MS = 10_000;
+let lastResult: { at: number; ok: boolean; checks: Record<string, CheckResult> } | undefined;
 
 export const dynamic = "force-dynamic";
 
@@ -45,26 +52,33 @@ async function checkMedia() {
 }
 
 // The Worker's GET /api/revalidate only confirms the secret; it clears nothing.
-async function checkLiveRefresh(siteUrl: string) {
+async function checkLiveRefresh(siteUrl: string, secret: string) {
   const response = await fetch(new URL("/api/revalidate", siteUrl), {
-    headers: { authorization: `Bearer ${process.env.REVALIDATE_SECRET}` },
+    headers: { authorization: `Bearer ${secret}` },
     cache: "no-store",
   });
   if (response.status !== 204) throw new Error(`the live site answered ${response.status}`);
 }
 
-export async function GET() {
+async function runChecks() {
+  if (lastResult && Date.now() - lastResult.at < RESULT_TTL_MS) return lastResult;
   const siteUrl = process.env.PUBLIC_SITE_URL;
+  const secret = process.env.REVALIDATE_SECRET;
+  const skipped: CheckResult = "not configured";
   const [database, media, liveRefresh] = await Promise.all([
-    isDatabaseConfigured() ? runCheck("database", checkDatabase) : "not configured",
-    isMediaUploadConfigured() ? runCheck("media", checkMedia) : "not configured",
-    siteUrl ? runCheck("liveRefresh", () => checkLiveRefresh(siteUrl)) : "not configured",
+    isDatabaseConfigured() ? runCheck("database", checkDatabase) : skipped,
+    isMediaUploadConfigured() ? runCheck("media", checkMedia) : skipped,
+    siteUrl && secret ? runCheck("liveRefresh", () => checkLiveRefresh(siteUrl, secret)) : skipped,
   ]);
-  const checks = { database, media, liveRefresh };
-  const ok = !Object.values(checks).includes("failed");
+  const checks: Record<string, CheckResult> = { database, media, liveRefresh };
+  lastResult = { at: Date.now(), ok: !Object.values(checks).includes("failed"), checks };
+  return lastResult;
+}
 
-  return Response.json(
-    { ok, checks },
-    { status: ok ? 200 : 503, headers: { "cache-control": "no-store" } },
-  );
+export async function GET(request: Request) {
+  const { ok, checks } = await runChecks();
+  return Response.json(hasRevalidateSecret(request) ? { ok, checks } : { ok }, {
+    status: ok ? 200 : 503,
+    headers: { "cache-control": "no-store" },
+  });
 }

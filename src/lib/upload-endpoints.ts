@@ -1,9 +1,8 @@
 /* The slots an upload can land in. The name is part of the object key
-   (`<endpoint>/<id>`), so this list is what both the upload actions and the
-   media-usage sweep that finds those keys read from - a slot added in one place
-   and forgotten in the other would mean a file the sweep deletes while it is
-   still in use. Kept free of Prisma imports so a client bundle can name a slot
-   without dragging the database client along. */
+   (`<endpoint>/<id>`). The media-usage sweep matches keys by that shape rather than
+   by this list, so renaming or retiring a slot never makes its old files look
+   unused. Kept free of Prisma imports so a client bundle can name a slot without
+   dragging the database client along. */
 export const uploadEndpointNames = [
   "heroVideo",
   "portrait",

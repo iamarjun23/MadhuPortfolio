@@ -35,12 +35,16 @@ export function mediaPublicUrl(key: string) {
   return `${mediaUrl}/${key}`;
 }
 
-export async function signUpload(key: string) {
+/* The Content-Type is part of the signature (aws4fetch leaves it out unless `allHeaders`
+   is set), so the URL can only store a file of the type that was checked here. Without it,
+   anyone holding the URL could re-PUT the verified object as, say, text/html until it expires. */
+export async function signUpload(key: string, contentType: string) {
   const url = new URL(objectUrl(key));
   url.searchParams.set("X-Amz-Expires", String(UPLOAD_URL_TTL_SECONDS));
   const signed = await requireClient().sign(url.toString(), {
     method: "PUT",
-    aws: { signQuery: true },
+    headers: { "content-type": contentType },
+    aws: { signQuery: true, allHeaders: true },
   });
   return signed.url;
 }

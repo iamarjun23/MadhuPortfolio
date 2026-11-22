@@ -1,4 +1,10 @@
-import { fetchAllowed, readCappedBody, readHtmlPrefix, withThumbLimits } from "@/lib/thumb-proxy";
+import {
+  fetchAllowed,
+  rasterImageType,
+  readCappedBody,
+  readHtmlPrefix,
+  withThumbLimits,
+} from "@/lib/thumb-proxy";
 import { getInstagramShortcode } from "@/lib/instagram";
 
 /* The same arrangement as `/api/linkedin-thumb`, for the same reason: an
@@ -15,20 +21,24 @@ import { getInstagramShortcode } from "@/lib/instagram";
 export const dynamic = "force-dynamic";
 
 const OG_IMAGE_PATTERN =
-  /<meta[^>]+(?:property|name)=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image(?::secure_url)?["']/i;
+  /<meta[^>]{1,2000}(?:property|name)=["']og:image(?::secure_url)?["'][^>]{1,2000}content=["']([^"']+)["']|<meta[^>]{1,2000}content=["']([^"']+)["'][^>]{1,2000}(?:property|name)=["']og:image(?::secure_url)?["']/i;
 
 /* The embed's own poster. Matched as "any img tag, then check it" rather than as
    one expression, because the class and src attributes do not appear in a fixed
    order and an expression pinning that order silently stops matching the day
-   Instagram reshuffles them. */
-const IMG_TAG_PATTERN = /<img\s[^>]*>/gi;
-const SRC_PATTERN = /\ssrc=["']([^"']+)["']/i;
+   Instagram reshuffles them. Attributes are read whole and in order, each up to its own
+   closing quote, so a caption's `alt` text containing `src='...'` cannot stand in for the
+   real `src`. */
+const IMG_TAG_PATTERN = /<img\s[^>]{0,4000}>/gi;
+const ATTRIBUTE_PATTERN = /\s([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 
 function findEmbeddedMediaImage(html: string) {
   for (const [tag] of html.matchAll(IMG_TAG_PATTERN)) {
     if (!tag.includes("EmbeddedMediaImage")) continue;
-    const src = SRC_PATTERN.exec(tag)?.[1];
-    if (src) return src;
+    for (const [, name, doubleQuoted, singleQuoted] of tag.matchAll(ATTRIBUTE_PATTERN)) {
+      const value = doubleQuoted ?? singleQuoted;
+      if (name?.toLowerCase() === "src" && value) return value;
+    }
   }
   return undefined;
 }
@@ -140,11 +150,12 @@ async function lookupThumbnail(request: Request) {
         : "redirect refused or too many hops";
       return unavailable(shortcode, "Preview image unavailable.", cause);
     }
-    contentType = imageResponse.headers.get("content-type") ?? "";
-    if (!contentType.startsWith("image/")) {
+    const rasterType = rasterImageType(imageResponse.headers.get("content-type"));
+    if (!rasterType) {
       await imageResponse.body?.cancel();
       return unavailable(shortcode, "Preview image unavailable.");
     }
+    contentType = rasterType;
     imageBody = await readCappedBody(imageResponse, MAX_IMAGE_BYTES);
   } catch (error) {
     return unavailable(shortcode, "Preview image unavailable.", error);

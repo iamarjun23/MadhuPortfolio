@@ -25,13 +25,35 @@ if (process.env.VERCEL) {
         "PUBLIC_SITE_URL must be set to the live site's https:// origin for production builds.",
       );
     }
-    if (!process.env.REVALIDATE_SECRET) {
+    if ((process.env.REVALIDATE_SECRET ?? "").length < 32) {
       throw new Error(
-        "REVALIDATE_SECRET must be set (same value as the Worker secret) for production builds.",
+        "REVALIDATE_SECRET must be at least 32 characters (openssl rand -base64 32), the same value as the Worker secret, for production builds.",
+      );
+    }
+    // Without it the media schema has no upload host to check stored addresses against.
+    if (!process.env.NEXT_PUBLIC_MEDIA_URL?.startsWith("https://")) {
+      throw new Error(
+        "NEXT_PUBLIC_MEDIA_URL must be set to the media https:// origin for production builds.",
       );
     }
   }
 }
+
+/* The Worker build (OpenNext sets NEXT_PRIVATE_STANDALONE before it runs `next build`) needs
+   STUDIO_URL baked in: without it the Worker gets no /studio, /login or /api/auth redirects and
+   would serve the Studio sign-in itself. For a local `pnpm preview`, use http://localhost:3000. */
+if (
+  !process.env.VERCEL &&
+  process.env.NEXT_PRIVATE_STANDALONE === "true" &&
+  !process.env.STUDIO_URL
+) {
+  throw new Error("STUDIO_URL must be set for the Worker build (see DEPLOYMENT.md).");
+}
+
+// The studio PUTs uploads to this account's R2 endpoint only; any other account's is refused.
+const r2Endpoint = process.env.R2_ACCOUNT_ID
+  ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+  : "https://*.r2.cloudflarestorage.com";
 
 // The same host lists src/schemas/media.ts validates stored media addresses against, so the
 // studio can only save an image or video the CSP below will let the page load.
@@ -61,6 +83,9 @@ const nextConfig = {
     qualities: [90],
     // Includes i.ytimg.com: work project cards fall back to their YouTube video's thumbnail.
     remotePatterns: mediaHosts.image.map((hostname) => ({ protocol: "https", hostname })),
+    /* The loader is custom, so the app never requests /_next/image, but OpenNext's Worker still
+       answers it. Its redirect hops are not re-checked against remotePatterns, so follow none. */
+    maximumRedirects: 0,
   },
   async headers() {
     const isDev = process.env.NODE_ENV === "development";
@@ -81,16 +106,27 @@ const nextConfig = {
       // fetches the PDF's download copy from R2 in a hidden frame.
       `frame-src 'self' https://www.youtube-nocookie.com https://www.linkedin.com https://www.instagram.com ${mediaUrl}`,
       // The studio PUTs uploads straight to R2 through a signed URL (actions/media.ts).
-      "connect-src 'self' https://cloudflareinsights.com https://*.r2.cloudflarestorage.com",
+      `connect-src 'self' https://cloudflareinsights.com ${r2Endpoint}`,
     ].join("; ");
+
+    /* This policy, with 'unsafe-inline' scripts, is the public site's: its pages are cached
+       ahead of time, so they cannot carry a per-request nonce. The Studio deployment (Vercel)
+       renders per request and gets a nonce-only policy from src/middleware.ts instead, so this
+       one is not sent there. Local dev serves both with this one. */
+    const policyHeader = process.env.VERCEL
+      ? []
+      : [{ key: "Content-Security-Policy", value: contentSecurityPolicy }];
 
     return [
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: contentSecurityPolicy },
+          ...policyHeader,
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
+          // Both sites are https-only; a dev server on http://localhost is left alone. Not
+          // includeSubDomains: that would also bind every other name in the zone to https.
+          ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=31536000" }]),
         ],
       },
     ];

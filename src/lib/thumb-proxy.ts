@@ -12,11 +12,17 @@ const MAX_IN_FLIGHT = 6;
 let inFlight = 0;
 
 async function withinRateLimit(request: Request) {
+  /* The Studio's Vercel deployment builds these routes too but has no rate limiter, and only
+     the owner's preview ever asks it for a thumbnail. So there they serve the owner alone. */
+  if (process.env.VERCEL) {
+    const { getOwner } = await import("@/auth");
+    return (await getOwner()) !== null;
+  }
   let limiter: RateLimit | undefined;
   try {
     limiter = getCloudflareContext().env.THUMB_RATE_LIMITER;
   } catch {
-    // Not inside a Worker request (e.g. `next start`); nothing to rate limit with.
+    // Not inside a Worker request (`next dev` / `next start`); nothing to rate limit with.
     return true;
   }
   if (!limiter) return true;
@@ -60,7 +66,8 @@ export async function fetchAllowed(
 ): Promise<Response | null> {
   let current = url;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    if (current.protocol !== "https:" || !isAllowed(current)) return null;
+    // The default port only: an allowed host on another port is a different service.
+    if (current.protocol !== "https:" || current.port !== "" || !isAllowed(current)) return null;
     const response = await fetch(current, { ...init, redirect: "manual" });
     if (response.status < 300 || response.status > 399) return response;
 
@@ -70,6 +77,16 @@ export async function fetchAllowed(
     current = new URL(location, current);
   }
   return null;
+}
+
+/* The upstream's Content-Type is served back from this site's own origin, so only plain
+   raster formats are passed on: an `image/svg+xml` answer would be a document that can run
+   script here. Returns the bare type to send, or null to refuse the image. */
+const RASTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
+
+export function rasterImageType(contentType: string | null) {
+  const type = (contentType ?? "").split(";")[0]?.trim().toLowerCase() ?? "";
+  return RASTER_TYPES.has(type) ? type : null;
 }
 
 /* Both helpers count the bytes actually received. `Content-Length` is only the

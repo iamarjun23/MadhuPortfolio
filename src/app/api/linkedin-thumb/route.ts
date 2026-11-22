@@ -1,4 +1,10 @@
-import { fetchAllowed, readCappedBody, readHtmlPrefix, withThumbLimits } from "@/lib/thumb-proxy";
+import {
+  fetchAllowed,
+  rasterImageType,
+  readCappedBody,
+  readHtmlPrefix,
+  withThumbLimits,
+} from "@/lib/thumb-proxy";
 import { getLinkedInUrn } from "@/lib/linkedin";
 
 /* A LinkedIn post carries no thumbnail at a predictable URL the way a YouTube
@@ -15,7 +21,7 @@ import { getLinkedInUrn } from "@/lib/linkedin";
 export const dynamic = "force-dynamic";
 
 const OG_IMAGE_PATTERN =
-  /<meta[^>]+(?:property|name)=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']|<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image(?::secure_url)?["']/i;
+  /<meta[^>]{1,2000}(?:property|name)=["']og:image(?::secure_url)?["'][^>]{1,2000}content=["']([^"']+)["']|<meta[^>]{1,2000}content=["']([^"']+)["'][^>]{1,2000}(?:property|name)=["']og:image(?::secure_url)?["']/i;
 
 const PAGE_FETCH_TIMEOUT_MS = 6000;
 const IMAGE_FETCH_TIMEOUT_MS = 6000;
@@ -127,11 +133,12 @@ async function lookupThumbnail(request: Request) {
         : "redirect refused or too many hops";
       return unavailable(urn, "Preview image unavailable.", cause);
     }
-    contentType = imageResponse.headers.get("content-type") ?? "";
-    if (!contentType.startsWith("image/")) {
+    const rasterType = rasterImageType(imageResponse.headers.get("content-type"));
+    if (!rasterType) {
       await imageResponse.body?.cancel();
       return unavailable(urn, "Preview image unavailable.");
     }
+    contentType = rasterType;
     imageBody = await readCappedBody(imageResponse, MAX_IMAGE_BYTES);
   } catch (error) {
     return unavailable(urn, "Preview image unavailable.", error);

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requireOwnerOrSignIn } from "@/auth";
 import { Status } from "@/generated/prisma/client";
 import { SectionEditor } from "@/components/studio/SectionEditor";
 import { getContact, getResume, getSettings } from "@/lib/content";
@@ -12,7 +13,7 @@ type StudioSectionPageProps = Readonly<{
 }>;
 
 export default async function StudioSectionPage({ params, searchParams }: StudioSectionPageProps) {
-  const [{ section }, { open }] = await Promise.all([params, searchParams]);
+  const [{ section }, { open }] = await Promise.all([params, searchParams, requireOwnerOrSignIn()]);
 
   if (!sectionKeys.includes(section as (typeof sectionKeys)[number])) {
     notFound();

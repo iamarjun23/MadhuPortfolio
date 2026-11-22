@@ -7,6 +7,7 @@ import { getUnusedMedia, purgeUnusedMedia } from "@/actions/media";
 import { revertDraftsToPublished } from "@/actions/publish";
 import type { UnusedMediaSummary } from "@/actions/media-types";
 import { StudioDialog } from "@/components/studio/StudioDialog";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "@/lib/credential-limits";
 import { useStudioStore, useUploadBlock } from "@/stores/studio-store";
 
 function formatBytes(bytes: number) {
@@ -91,9 +92,8 @@ export function SettingsDangerZone() {
       pushToast(result.error, "error");
       return;
     }
-    setCurrentPassword("");
-    setNewPassword("");
-    pushToast("Password changed", "success");
+    // Changing the password signs out every session, this one too.
+    router.push("/login");
   };
 
   return (
@@ -104,7 +104,9 @@ export function SettingsDangerZone() {
         <summary>
           <span>
             <strong>Change password</strong>
-            <small>The password used to sign in to the Studio.</small>
+            <small>
+              The password used to sign in to the Studio. Changing it signs you out everywhere.
+            </small>
           </span>
         </summary>
         <form onSubmit={submitPasswordChange} className="studio-account-card__form">
@@ -114,6 +116,7 @@ export function SettingsDangerZone() {
               id="current-password"
               type="password"
               autoComplete="current-password"
+              maxLength={MAX_PASSWORD_LENGTH}
               value={currentPassword}
               onChange={(event) => setCurrentPassword(event.target.value)}
               required
@@ -125,7 +128,8 @@ export function SettingsDangerZone() {
               id="new-password"
               type="password"
               autoComplete="new-password"
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
+              maxLength={MAX_PASSWORD_LENGTH}
               value={newPassword}
               onChange={(event) => setNewPassword(event.target.value)}
               required

@@ -1,6 +1,7 @@
 import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { studioContentSecurityPolicy } from "@/lib/studio-csp";
 
 // On Vercel this deployment serves only the studio (see DEPLOYMENT.md), at the bare path instead
 // of /studio, so /login, /api/*, Next's own assets, and old /studio links must NOT get re-prefixed.
@@ -9,6 +10,27 @@ import type { NextRequest } from "next/server";
 // runtime, and OpenNext's Cloudflare adapter marks Node.js middleware experimental and unmaintained.
 // This file compiles to edge middleware, which the Worker build supports. Rename it once it does.
 const STUDIO_PASSTHROUGH = ["/login", "/api", "/_next", "/favicon.ico", "/studio"];
+
+/* On the Studio deployment every page gets a fresh nonce and a CSP that allows only scripts
+   carrying it (src/lib/studio-csp.ts). The policy goes on the request too: that is where
+   Next.js reads the nonce from to stamp its own scripts. API responses and Next's assets are
+   not documents and are left alone, as is every request on the Worker. */
+function continueRequest(req: NextRequest, rewriteTo?: URL) {
+  const { pathname } = req.nextUrl;
+  const isDocument = !pathname.startsWith("/api/") && !pathname.startsWith("/_next/");
+  if (!process.env.VERCEL || !isDocument) {
+    return rewriteTo ? NextResponse.rewrite(rewriteTo) : undefined;
+  }
+
+  const nonce = btoa(crypto.randomUUID());
+  const policy = studioContentSecurityPolicy(nonce, process.env.NODE_ENV === "development");
+  const headers = new Headers(req.headers);
+  headers.set("content-security-policy", policy);
+  const init = { request: { headers } };
+  const response = rewriteTo ? NextResponse.rewrite(rewriteTo, init) : NextResponse.next(init);
+  response.headers.set("Content-Security-Policy", policy);
+  return response;
+}
 
 export default async function middleware(req: NextRequest) {
   const { nextUrl } = req;
@@ -24,15 +46,12 @@ export default async function middleware(req: NextRequest) {
   // The query has to ride along: a Navbar or Footer tab is `/settings?open=...`, and a
   // rewrite to the bare path alone opens the whole settings editor instead of that part.
   const studioUrl = new URL(`${studioPathname}${nextUrl.search}`, nextUrl);
+  const rewriteTo = studioPathname !== externalPathname ? studioUrl : undefined;
 
   // Everything below needs a session lookup, which needs AUTH_SECRET - unset on the Worker, which
   // never serves /studio. Bailing out here before touching auth keeps every public/API request on
   // that deployment exactly as cheap and secret-free as before this file grew a catch-all matcher.
-  if (!studioPathname.startsWith("/studio")) {
-    return studioPathname !== externalPathname
-      ? NextResponse.rewrite(studioUrl)
-      : undefined;
-  }
+  if (!studioPathname.startsWith("/studio")) return continueRequest(req, rewriteTo);
 
   // Auth.js prefixes the session cookie with __Secure- over HTTPS; getToken assumes plain HTTP unless told.
   const token = await getToken({
@@ -46,9 +65,7 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (studioPathname !== externalPathname) {
-    return NextResponse.rewrite(studioUrl);
-  }
+  return continueRequest(req, rewriteTo);
 }
 
 // Next requires this matcher to be statically analyzable, so it can't branch on process.env.VERCEL

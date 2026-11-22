@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requireOwnerOrSignIn } from "@/auth";
 import { AvailabilityCard } from "@/components/studio/AvailabilityCard";
 import { SettingsDangerZone } from "@/components/studio/SettingsDangerZone";
 import { ShareImage } from "@/components/studio/ShareImage";
@@ -32,6 +33,7 @@ function StatusPill({ edited }: Readonly<{ edited: boolean }>) {
 }
 
 export default async function StudioHomePage() {
+  await requireOwnerOrSignIn();
   const [log, rows, storage, contact, contactVersion, settings, allChecks] = await Promise.all([
     getRecentActivity(),
     getSectionRows(),

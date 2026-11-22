@@ -45,5 +45,8 @@ export function isInstagramReel(value: string | null) {
 
 export function getInstagramThumbnail(value: string | null) {
   const shortcode = getInstagramShortcode(value);
-  return shortcode ? `/api/instagram-thumb?url=${encodeURIComponent(value!)}` : null;
+  // One address per post however it was linked (reel, profile path, query string), so they
+  // share one cached image. The route serves the same embed for /p/, /reel/ and /tv/.
+  const canonical = shortcode ? `https://www.instagram.com/p/${shortcode}/` : null;
+  return canonical ? `/api/instagram-thumb?url=${encodeURIComponent(canonical)}` : null;
 }

@@ -5,6 +5,7 @@ import { Prisma, Status } from "@/generated/prisma/client";
 import { requireOwner } from "@/auth";
 import { sectionDefaults } from "@/lib/content";
 import { getDb } from "@/lib/db";
+import { shareMediaReferenceLock } from "@/lib/media-usage";
 import { publicPaths, refreshLiveSite, updateContent } from "@/lib/revalidate";
 import { sectionKeys } from "@/lib/sections";
 import type { PublishResult, RevertResult } from "@/actions/publish-types";
@@ -42,6 +43,8 @@ export async function publishAll(): Promise<PublishResult> {
   try {
     const user = await requireOwner();
     const publishedSections = await getDb().$transaction(async (tx) => {
+      // Copying rows can add a reference to an upload, so a file delete must not run alongside.
+      await shareMediaReferenceLock(tx);
       const drafts = await tx.section.findMany({
         where: { key: { in: [...sectionKeys] }, status: Status.DRAFT },
       });
@@ -102,6 +105,7 @@ export async function revertDraftsToPublished(): Promise<RevertResult> {
   try {
     const user = await requireOwner();
     const revertedSections = await getDb().$transaction(async (tx) => {
+      await shareMediaReferenceLock(tx);
       const publishedSections = await tx.section.findMany({
         where: { key: { in: [...sectionKeys] }, status: Status.PUBLISHED },
       });

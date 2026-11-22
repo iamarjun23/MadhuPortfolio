@@ -4,6 +4,10 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Served only on its custom domain. The workers.dev and preview hostnames sit outside that
+  // zone's /cdn-cgi handling, where OpenNext's /cdn-cgi/image route is an open image proxy.
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS",
@@ -31,6 +35,14 @@
       "name": "THUMB_RATE_LIMITER",
       "namespace_id": "1001",
       "simple": { "limit": 60, "period": 60 },
+    },
+  ],
+  // memoryQueue (open-next.config.ts) revalidates a stale page by calling this same Worker
+  // through this binding; without it every such attempt failed and fell back to a full render.
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "madhuportfolio",
     },
   ],
   // Uploads (bucket `images`) are no longer bound here: they are served from R2's custom domain

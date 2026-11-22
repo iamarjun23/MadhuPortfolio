@@ -21,6 +21,13 @@ dist/
 # env — never commit real secrets
 .env
 .env.*
+# Keys and credential files, should one ever be dropped into the repo.
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
 # the template has placeholders only, and is the documented list of variables
 !.env.example
 

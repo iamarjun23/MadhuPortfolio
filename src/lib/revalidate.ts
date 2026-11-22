@@ -1,6 +1,18 @@
+import { timingSafeEqual } from "node:crypto";
 import { updateTag } from "next/cache";
 import { after } from "next/server";
 import type { SectionKey } from "@/lib/sections";
+
+/** True when the request carries `Bearer <REVALIDATE_SECRET>`; compared in constant time. */
+export function hasRevalidateSecret(request: Request) {
+  const secret = process.env.REVALIDATE_SECRET;
+  const given = request.headers.get("authorization");
+  if (!secret || !given) return false;
+
+  const expected = Buffer.from(`Bearer ${secret}`);
+  const actual = Buffer.from(given);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
 
 export function contentTag(key: SectionKey) {
   return `content:${key}`;
@@ -25,11 +37,16 @@ export async function refreshLiveSite() {
     console.error("Refreshing the live site skipped: PUBLIC_SITE_URL is not set");
     return false;
   }
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!secret) {
+    console.error("Refreshing the live site skipped: REVALIDATE_SECRET is not set");
+    return false;
+  }
 
   try {
     const response = await fetch(new URL("/api/revalidate", siteUrl), {
       method: "POST",
-      headers: { authorization: `Bearer ${process.env.REVALIDATE_SECRET}` },
+      headers: { authorization: `Bearer ${secret}` },
     });
     if (response.ok) {
       /* The first request after a clear re-renders the page (~3-4s). Make that request ourselves,

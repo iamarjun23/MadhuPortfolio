@@ -52,6 +52,15 @@ export function needsRehash(stored: string) {
   return !stored.startsWith(`${ALGORITHM}$${ITERATIONS}$`);
 }
 
+let dummyHash: Promise<string> | undefined;
+
+/** Runs the same PBKDF2 work as a real check against a throwaway hash, so a sign-in for an
+    unknown email takes as long as one for the owner's and timing cannot reveal which email is real. */
+export async function verifyAgainstDummy(password: string) {
+  dummyHash ??= hashPassword("dummy password that matches nothing");
+  await verifyPassword(password, await dummyHash);
+}
+
 export async function verifyPassword(password: string, stored: string) {
   if (LEGACY_BCRYPT_PREFIX.test(stored)) {
     const { compare } = await import("bcryptjs");
