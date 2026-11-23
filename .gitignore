@@ -95,9 +95,11 @@ docker-compose.override.yml
 tmp/
 temp/
 
-# docs, tests and legacy static references stay local
-*.md
-tests/
-scripts/browser-smoke.mjs
+# design research notes and legacy static references stay local
+reports/
+research_notes/
 index_6.html
 admin_1.html
+
+# agent tooling (local only)
+.agents/
