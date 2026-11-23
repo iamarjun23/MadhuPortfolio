@@ -41,8 +41,12 @@ export function maxAtPath(schema: z.core.$ZodType, path: Path): number | undefin
     const leaf = unwrap(candidate);
     if (leaf instanceof z.ZodString && leaf.maxLength !== null) return leaf.maxLength;
     if (leaf instanceof z.ZodArray) {
-      const { maximum } = leaf._zod.bag;
-      if (typeof maximum === "number") return maximum;
+      for (const check of leaf.def.checks ?? []) {
+        const { def } = check._zod;
+        if (def.check === "max_length" && "maximum" in def && typeof def.maximum === "number") {
+          return def.maximum;
+        }
+      }
     }
   }
   return undefined;
