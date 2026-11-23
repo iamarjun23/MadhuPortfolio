@@ -50,3 +50,24 @@ export function getInstagramThumbnail(value: string | null) {
   const canonical = shortcode ? `https://www.instagram.com/p/${shortcode}/` : null;
   return canonical ? `/api/instagram-thumb?url=${encodeURIComponent(canonical)}` : null;
 }
+
+/* The embed page's own poster, the `<img class="EmbeddedMediaImage">` it renders.
+   Matched as "any img tag, then check it" rather than as one expression, because the
+   class and src attributes do not appear in a fixed order and an expression pinning
+   that order silently stops matching the day Instagram reshuffles them. Attributes
+   are read whole and in order, each up to its own closing quote, so a caption's `alt`
+   text containing `src='...'` cannot stand in for the real `src`. The tag bound is
+   generous because the poster's `srcset` alone runs ~9KB. */
+const IMG_TAG_PATTERN = /<img\s[^>]{0,32000}>/gi;
+const ATTRIBUTE_PATTERN = /\s([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+
+export function findEmbeddedMediaImage(html: string) {
+  for (const [tag] of html.matchAll(IMG_TAG_PATTERN)) {
+    if (!tag.includes("EmbeddedMediaImage")) continue;
+    for (const [, name, doubleQuoted, singleQuoted] of tag.matchAll(ATTRIBUTE_PATTERN)) {
+      const value = doubleQuoted ?? singleQuoted;
+      if (name?.toLowerCase() === "src" && value) return value;
+    }
+  }
+  return undefined;
+}

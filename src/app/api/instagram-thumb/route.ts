@@ -5,7 +5,7 @@ import {
   readHtmlPrefix,
   withThumbLimits,
 } from "@/lib/thumb-proxy";
-import { getInstagramShortcode } from "@/lib/instagram";
+import { findEmbeddedMediaImage, getInstagramShortcode } from "@/lib/instagram";
 
 /* The same arrangement as `/api/linkedin-thumb`, for the same reason: an
    Instagram reel's still lives only inside the post's own page markup. Unlike
@@ -22,26 +22,6 @@ export const dynamic = "force-dynamic";
 
 const OG_IMAGE_PATTERN =
   /<meta[^>]{1,2000}(?:property|name)=["']og:image(?::secure_url)?["'][^>]{1,2000}content=["']([^"']+)["']|<meta[^>]{1,2000}content=["']([^"']+)["'][^>]{1,2000}(?:property|name)=["']og:image(?::secure_url)?["']/i;
-
-/* The embed's own poster. Matched as "any img tag, then check it" rather than as
-   one expression, because the class and src attributes do not appear in a fixed
-   order and an expression pinning that order silently stops matching the day
-   Instagram reshuffles them. Attributes are read whole and in order, each up to its own
-   closing quote, so a caption's `alt` text containing `src='...'` cannot stand in for the
-   real `src`. */
-const IMG_TAG_PATTERN = /<img\s[^>]{0,4000}>/gi;
-const ATTRIBUTE_PATTERN = /\s([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-
-function findEmbeddedMediaImage(html: string) {
-  for (const [tag] of html.matchAll(IMG_TAG_PATTERN)) {
-    if (!tag.includes("EmbeddedMediaImage")) continue;
-    for (const [, name, doubleQuoted, singleQuoted] of tag.matchAll(ATTRIBUTE_PATTERN)) {
-      const value = doubleQuoted ?? singleQuoted;
-      if (name?.toLowerCase() === "src" && value) return value;
-    }
-  }
-  return undefined;
-}
 
 const PAGE_FETCH_TIMEOUT_MS = 6000;
 const IMAGE_FETCH_TIMEOUT_MS = 6000;

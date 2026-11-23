@@ -44,13 +44,18 @@ export function PreviewFit({ device, whole, onFit, children }: PreviewFitProps) 
       // Read back from the node: a measurement can land before the last scale has rendered.
       const applied = Number(page.style.zoom) || 1;
       const paneSize = { width: pane.clientWidth, height: pane.clientHeight };
-      const width = Math.max(paneSize.width, DESIGN_WIDTH);
+      /* Only the scrolling mode reserves a scrollbar gutter, so clientWidth differs
+         between the two modes. Laying out and choosing a mode by it let a section
+         near the threshold pick the other mode each time, flickering forever;
+         offsetWidth counts the gutter and is the same in both. */
+      const steadyPane = { width: pane.offsetWidth, height: paneSize.height };
+      const width = Math.max(steadyPane.width, DESIGN_WIDTH);
       const content = {
         width: device === "desktop" ? width : sizer.offsetWidth / applied,
         height: sizer.offsetHeight / applied,
       };
       // The phone frame scrolls its own page, so it is always shown whole.
-      const showWhole = whole ?? (device === "mobile" || wholeIsReadable(paneSize, content));
+      const showWhole = whole ?? (device === "mobile" || wholeIsReadable(steadyPane, content));
       const scale = previewScale(paneSize, content, showWhole);
       /* Sizes are whole pixels, so the same content measures a hair differently
          at each zoom. Ignoring that hair is what stops the two chasing each other. */

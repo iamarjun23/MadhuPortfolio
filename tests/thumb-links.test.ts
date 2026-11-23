@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getInstagramThumbnail } from "@/lib/instagram";
+import { findEmbeddedMediaImage, getInstagramThumbnail } from "@/lib/instagram";
 import { getLinkedInThumbnail } from "@/lib/linkedin";
 
 test("every spelling of one LinkedIn post shares one thumbnail address", () => {
@@ -23,4 +23,13 @@ test("reel, profile and query-string Instagram links share one thumbnail address
     canonical,
   );
   assert.equal(getInstagramThumbnail("https://instagram.com/reels/C0deAbC123"), canonical);
+});
+
+test("the Instagram embed's poster is found even when its srcset runs past 4KB", () => {
+  const srcset = Array.from(
+    { length: 40 },
+    (_, i) => `https://x.fbcdn.net/${"a".repeat(200)}${i}.jpg ${i}w`,
+  ).join(",");
+  const html = `<img class="EmbeddedMediaImage" alt="caption src='https://evil/'" src="https://x.fbcdn.net/poster.jpg?a=1&amp;b=2" srcset="${srcset}">`;
+  assert.equal(findEmbeddedMediaImage(html), "https://x.fbcdn.net/poster.jpg?a=1&amp;b=2");
 });

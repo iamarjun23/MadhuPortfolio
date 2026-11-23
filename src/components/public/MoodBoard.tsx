@@ -9,7 +9,7 @@ import { pageZoom } from "@/lib/page-zoom";
 import { imageOrFallback, type FallbackImage } from "@/lib/placeholders";
 import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
 import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
-import { type ReelKind, reelBadge, resolveReel } from "@/lib/reel";
+import { type ReelKind, reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
 import { sketchbookPages } from "@/lib/sketchbook-pages";
 import type { Contact, Room } from "@/schemas";
 
@@ -39,42 +39,53 @@ function getCardLabel(card: Room["cards"][number]) {
 
 /* The face of a reel card: the reel's own still where the link or upload brings
    one, the editor's chosen photo where they set one, and nothing at all
-   otherwise. Resolved through the same helper the work board uses, so a link
-   pinned here behaves exactly as it does there. */
-function videoCardFace(card: VideoCard, fallbackImage: FallbackImage) {
+   otherwise. Resolved through the same helpers the work board uses, so a link
+   pinned here behaves exactly as it does there - including a still that fails
+   to load stepping aside instead of leaving a broken image on the card. */
+function VideoCardFace({ card, fallbackImage }: { card: VideoCard; fallbackImage: FallbackImage }) {
+  const [failed, setFailed] = useState<ReadonlySet<string>>(new Set());
   const reel = resolveReel(card);
-  if (!reel.thumbnail) {
-    // The stand-in is not a still from this video, so it is decorative.
-    return fallbackImage ? { url: fallbackImage.url, alt: "" } : null;
-  }
+  const still = reelThumbnail(reel, failed);
+  // The stand-in is not a still from this video, so it is decorative.
+  const face = still
+    ? {
+        url: still,
+        alt: card.image?.alt || (card.caption.trim() ? `Still from ${card.caption.trim()}` : ""),
+      }
+    : fallbackImage && !failed.has(fallbackImage.url)
+      ? { url: fallbackImage.url, alt: "" }
+      : null;
 
-  return {
-    url: reel.thumbnail,
-    alt: card.image?.alt || (card.caption.trim() ? `Still from ${card.caption.trim()}` : ""),
-  };
+  return (
+    <>
+      {/* No still to show is the tint wash on its own - the card still reads
+          as a reel through its label and play badge. */}
+      <span className={`mood-card__image ${card.tint}`}>
+        {face ? (
+          <MediaImage
+            key={face.url}
+            src={face.url}
+            alt={face.alt}
+            fill
+            sizes="220px"
+            onError={() => setFailed((current) => new Set(current).add(face.url))}
+          />
+        ) : null}
+        <span className="mood-card__image-label">{card.tag}</span>
+        <span className="mood-card__play" aria-hidden="true">
+          {reelBadge(reel.kind)}
+        </span>
+      </span>
+      <b>{card.caption}</b>
+      <small>{card.subCaption}</small>
+    </>
+  );
 }
 
 function cardContent(card: Room["cards"][number], fallbackImage: FallbackImage) {
   switch (card.type) {
-    case "video": {
-      const face = videoCardFace(card, fallbackImage);
-
-      return (
-        <>
-          {/* No still to show is the tint wash on its own - the card still reads
-              as a reel through its label and play badge. */}
-          <span className={`mood-card__image ${card.tint}`}>
-            {face ? <MediaImage src={face.url} alt={face.alt} fill sizes="220px" /> : null}
-            <span className="mood-card__image-label">{card.tag}</span>
-            <span className="mood-card__play" aria-hidden="true">
-              {reelBadge(resolveReel(card).kind)}
-            </span>
-          </span>
-          <b>{card.caption}</b>
-          <small>{card.subCaption}</small>
-        </>
-      );
-    }
+    case "video":
+      return <VideoCardFace card={card} fallbackImage={fallbackImage} />;
     case "polaroid": {
       const image = imageOrFallback(card.image, fallbackImage, card.caption);
 
