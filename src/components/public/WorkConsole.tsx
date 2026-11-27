@@ -9,6 +9,7 @@ import { pageZoom } from "@/lib/page-zoom";
 import { reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
 import type { TimelinePosition } from "@/lib/section-timeline";
 import { useScrollPager } from "@/lib/use-scroll-pager";
+import { useWarmTarget } from "@/lib/use-warm-target";
 import type { Work } from "@/schemas";
 
 type WorkProject = Work["lanes"][number]["projects"][number];
@@ -237,6 +238,14 @@ export function WorkConsole({
   preconnectReelHosts();
   const [activeLane, setActiveLane] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewSelection | null>(null);
+  /* The embedded reel under the pointer or focus: its viewer mounts hidden so the player
+     boots before the click, which then only has to show it. */
+  const {
+    warm,
+    warmSoon,
+    cancel: cancelWarm,
+    clear: clearWarm,
+  } = useWarmTarget<PreviewSelection>(({ project, laneLabel }) => `${laneLabel}/${project.id}`);
   // The freeform canvas is a desktop flourish; a phone always gets the grid.
   const [isMobile, setIsMobile] = useState(false);
   const [cardOffsets, setCardOffsets] = useState<Record<string, LocalOffset>>({});
@@ -349,6 +358,7 @@ export function WorkConsole({
   function filterProjects(laneLabel: string | null) {
     setActiveLane(laneLabel);
     setPreview(null);
+    clearWarm();
     resetBoard();
   }
 
@@ -458,6 +468,25 @@ export function WorkConsole({
     setPreview({ project, laneLabel });
   }
 
+  // Spread onto every card button.
+  function warmOn(project: WorkProject, laneLabel: string) {
+    const prepare = (pointerType?: string) => {
+      if (interactive && resolveReel(project).embed) warmSoon({ project, laneLabel }, pointerType);
+    };
+    return {
+      onPointerEnter: (event: React.PointerEvent) => prepare(event.pointerType),
+      onFocus: () => prepare(),
+      onPointerLeave: cancelWarm,
+      onBlur: cancelWarm,
+    };
+  }
+
+  function closePreview() {
+    setPreview(null);
+    // Hiding a player that is playing would leave its sound running, so it goes too.
+    clearWarm();
+  }
+
   function cardKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, id: string) {
     const direction = NUDGE_KEYS[event.key];
     if (!direction) return;
@@ -559,18 +588,12 @@ export function WorkConsole({
 
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPreview(null);
-    };
-
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
 
     return () => {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
     };
   }, [preview]);
 
@@ -585,11 +608,12 @@ export function WorkConsole({
         (_, i) => projects[(Math.floor(projects.length / 2) + i) % projects.length]!,
       );
   const brief = `mailto:${contactEmail}?subject=${encodeURIComponent("Brief: Selected work")}`;
-  const previewReel = preview ? resolveReel(preview.project) : null;
-  const previewSlot = preview
+  const shown = preview ?? warm;
+  const previewReel = shown ? resolveReel(shown.project) : null;
+  const previewSlot = shown
     ? projects.findIndex(
         ({ project, laneLabel }) =>
-          project.id === preview.project.id && laneLabel === preview.laneLabel,
+          project.id === shown.project.id && laneLabel === shown.laneLabel,
       )
     : -1;
   const stepPreview = (direction: 1 | -1) =>
@@ -626,6 +650,7 @@ export function WorkConsole({
               type="button"
               className="work__shelf-card work__shelf-card--featured"
               onClick={() => cardClick(featured.project, featured.laneLabel)}
+              {...warmOn(featured.project, featured.laneLabel)}
               aria-label={`Preview ${featured.project.title}`}
             >
               {cardFace(featured.project, featured.laneLabel, "100vw")}
@@ -640,6 +665,7 @@ export function WorkConsole({
                     className="work__shelf-card"
                     key={project.id}
                     onClick={() => cardClick(project, shelf.label)}
+                    {...warmOn(project, shelf.label)}
                     aria-label={`Preview ${project.title}`}
                   >
                     {cardFace(project, shelf.label, "50vw")}
@@ -810,6 +836,7 @@ export function WorkConsole({
                             tabIndex={scenery ? -1 : undefined}
                             aria-hidden={(pad && !echo) || undefined}
                             onClick={() => cardClick(project, laneLabel)}
+                            {...warmOn(project, laneLabel)}
                             aria-label={`Preview ${project.title}`}
                             {...(canReorder
                               ? {
@@ -895,6 +922,7 @@ export function WorkConsole({
                     onDragStart={(event) => event.preventDefault()}
                     onKeyDown={(event) => cardKeyDown(event, cardId)}
                     onClick={() => cardClick(project, laneLabel)}
+                    {...warmOn(project, laneLabel)}
                     aria-label={`Preview ${project.title}`}
                   >
                     {cardFace(project, laneLabel, "(max-width: 560px) 45vw, 190px")}
@@ -910,9 +938,10 @@ export function WorkConsole({
               })
             )}
           </div>
-          {preview && previewSlot >= 0 ? (
+          {shown && previewSlot >= 0 ? (
             <MediaViewer
-              item={toViewerItem(preview)}
+              warming={!preview}
+              item={toViewerItem(shown)}
               next={
                 projects.length > 1
                   ? toViewerItem(projects[(previewSlot + 1) % projects.length]!)
@@ -921,7 +950,7 @@ export function WorkConsole({
               index={previewSlot}
               total={projects.length}
               onStep={stepPreview}
-              onClose={() => setPreview(null)}
+              onClose={closePreview}
             >
               {previewReel?.file ? (
                 <video
@@ -936,7 +965,7 @@ export function WorkConsole({
                 <ReelEmbed
                   key={previewReel.embed}
                   src={previewReel.embed}
-                  title={`${preview.project.title} video`}
+                  title={`${shown.project.title} video`}
                   allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share"
                   still={previewReel.thumbnail}
                   stillSizes="200px"

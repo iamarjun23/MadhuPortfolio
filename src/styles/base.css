@@ -7401,6 +7401,15 @@ body:has(.landing > .hero) .public-nav:not(.is-past-hero) {
   animation: mood-rise 380ms var(--e-cut) both;
 }
 
+/* Booting a player ahead of the click (MediaViewer `warming`): laid out and loading,
+   but unseen. Visibility, not display, so the iframe sizes and loads as it will when
+   shown; no animation, so the pop-in still plays when the class comes off. */
+.mood-player.is-warming,
+.mood-player__scrim.is-warming {
+  visibility: hidden;
+  animation: none;
+}
+
 .mood-player__stage {
   position: relative;
   display: grid;

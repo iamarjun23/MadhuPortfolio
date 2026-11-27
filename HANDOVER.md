@@ -1,6 +1,6 @@
 # Handover: madhu.edit / nmadhukumar.com
 
-Everything the new owner needs to run, edit, deploy and recover this site. Technical depth lives in [`DEPLOYMENT.md`](DEPLOYMENT.md) (hosting and env vars) and [`MEMORY.md`](MEMORY.md) (build history and decisions). This file is the entry point.
+Everything the new owner needs to run, edit, deploy and recover this site. Technical depth lives in [`DEPLOYMENT.md`](DEPLOYMENT.md) (hosting and env vars). This file is the entry point.
 
 ## 1. What you are receiving
 
@@ -79,8 +79,7 @@ pnpm prisma migrate deploy           # apply migrations (run BEFORE deploying co
 pnpm db:seed                         # first-time content only: overwrites every section, draft and published
 pnpm admin:create                    # reads ADMIN_EMAIL / ADMIN_PASSWORD; creates or resets the owner and ends all sessions
 pnpm dev                             # local server
-pnpm check                           # lint + typecheck + tests + prisma validate + build: the "done" gate
-pnpm test:browser <url>              # read-only smoke test of a deployed site
+pnpm check                           # lint + typecheck + prisma validate + build: the "done" gate
 ```
 
 Deploy:
@@ -123,31 +122,27 @@ Settings that live only in the dashboards, and must be checked after transfer (d
 
 State at handover prep (2026-11-24, branch `chore/handover-prep`):
 
-| Check                                                         | Result                                                                                                                                        |
-| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm check` (lint, typecheck, tests, Prisma validate, build) | Passes on Windows with the upgraded dependencies; 59 of 59 tests                                                                              |
-| `pnpm format`, `pnpm audit --prod`                            | Clean (`effect` pinned to 3.22.x by an override in `pnpm-workspace.yaml`)                                                                     |
-| `pnpm test:browser https://nmadhukumar.com`                   | All checks passed against the live site                                                                                                       |
-| Git history secret scan                                       | Only `.env.example` was ever committed; no secret-shaped values found (pattern scan, not a guarantee)                                         |
-| Cloudflare Worker build                                       | **Not run locally** (native Windows; WSL has no Node). The CI job `worker-build` runs `pnpm cf:build` on Linux: confirm it is green on GitHub |
-| Studio uploads on the live site                               | **Not tested live** per `MEMORY.md`. Upload one image and one video over 4.5 MB and confirm both load from `media.nmadhukumar.com`            |
-| Mobile layout (home and `/room` sketchbook)                   | **Not checked on a real phone** per `MEMORY.md`                                                                                               |
-| Studio CSP                                                    | After each Studio deploy, open every tab with DevTools open and look for `Refused to execute inline script`                                   |
-| Alerts, error tracking                                        | Not set up. Point an uptime monitor at `/api/health` on both hosts; add Sentry or a Vercel log drain only if wanted                           |
-| Backups                                                       | Not set up in this repo: enable them at the database host                                                                                     |
-
-CI (`.github/workflows/ci.yml`) runs `pnpm check` and the Worker build on every push to `main` and every pull request, against a throwaway Postgres.
+| Check                                                  | Result                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `pnpm check` (lint, typecheck, Prisma validate, build) | Passes on Windows with the upgraded dependencies                                                                    |
+| `pnpm format`, `pnpm audit --prod`                     | Clean (`effect` pinned to 3.22.x by an override in `pnpm-workspace.yaml`)                                           |
+| Git history secret scan                                | Only `.env.example` was ever committed; no secret-shaped values found (pattern scan, not a guarantee)               |
+| Cloudflare Worker build                                | **Not run locally** (native Windows; WSL has no Node). Run `pnpm cf:build` from WSL, macOS or Linux                 |
+| Studio uploads on the live site                        | **Not tested live**. Upload one image and one video over 4.5 MB and confirm both load from `media.nmadhukumar.com`  |
+| Mobile layout (home and `/room` sketchbook)            | **Not checked on a real phone**                                                                                     |
+| Studio CSP                                             | After each Studio deploy, open every tab with DevTools open and look for `Refused to execute inline script`         |
+| Alerts, error tracking                                 | Not set up. Point an uptime monitor at `/api/health` on both hosts; add Sentry or a Vercel log drain only if wanted |
+| Backups                                                | Not set up in this repo: enable them at the database host                                                           |
 
 Repo housekeeping, done:
 
-- `README.md` added; `.agents/` is no longer tracked (the files stay on disk, ignored); `.gitignore` no longer hides the docs, `tests/` or `scripts/browser-smoke.mjs`. `reports/`, `research_notes/`, `index_6.html` and `admin_1.html` stay local and ignored.
+- Repo trimmed to what runs the site: tests, CI, the browser smoke script, agent notes and legacy static references removed.
 - `docker-compose.dev.yml` is kept: a loopback-only local Postgres, documented in the README.
 
 ## 10. Acceptance checklist (run once, tick each)
 
 - [ ] `pnpm check` passes on a clean clone
 - [ ] `https://nmadhukumar.com` and `/room` load; title, canonical link, sitemap and robots use `nmadhukumar.com`
-- [ ] `pnpm test:browser https://nmadhukumar.com` passes
 - [ ] `/studio` and `/login` on the public host redirect to the Studio host; the Studio host does not serve public pages
 - [ ] Owner can sign in, save a draft, publish, and see the change on the live site
 - [ ] Owner can upload and delete an image and a video over 4.5 MB

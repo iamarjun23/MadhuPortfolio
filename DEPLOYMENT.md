@@ -174,7 +174,7 @@ The security audit (2026-11-04) left these to the dashboards, because no code ca
 
 ## Smoke Check
 
-After deployment, run `pnpm test:browser https://nmadhukumar.com` (read-only: public pages, pop-ups, console errors, the studio sign-in redirect), then verify:
+After deployment, verify:
 
 - `/` and `/room` return `200` with the expected title, metadata, sitemap, and robots output. The canonical link, `og:url`, sitemap URLs and robots `Sitemap:` line all use `https://nmadhukumar.com` (they come from Studio → Site & Navigation → domain, which must be `nmadhukumar.com`; `madhu.edit` is the brand name only, since `.edit` isn't a real top-level domain).
 - `nmadhukumar.com/studio` and `/login` redirect to the studio host at the bare path (e.g. `/studio/work` → `studio.nmadhukumar.com/work`), and an anonymous request to `studio.nmadhukumar.com/` redirects to its login. `studio.nmadhukumar.com/room` and other public-site paths do not serve the public pages.

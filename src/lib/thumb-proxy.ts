@@ -30,12 +30,39 @@ async function withinRateLimit(request: Request) {
   return (await limiter.limit({ key })).success;
 }
 
-/** Runs `lookup` only if the request passes the size, per-IP rate and concurrency limits. */
+/* Cloudflare never keeps a Worker's own responses in its CDN cache, whatever their
+   Cache-Control says, so every visitor without the still in their browser cache waited
+   on two upstream fetches (a second or more) per LinkedIn/Instagram card. The colo's
+   edge cache answers repeats instead. Null outside a Worker (`next dev`, Vercel). */
+function edgeCache() {
+  try {
+    const { ctx } = getCloudflareContext();
+    // `caches.default` is Workers-only; the DOM typings the app also loads lack it.
+    const cache = "default" in caches ? caches.default : null;
+    return cache instanceof Cache ? { cache, ctx } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Runs `lookup` only if the request passes the size, per-IP rate and concurrency limits.
+    A still already in the edge cache is served from there, ahead of every limit. */
 export async function withThumbLimits(request: Request, lookup: () => Promise<Response>) {
   const target = new URL(request.url).searchParams.get("url") ?? "";
   if (target.length > MAX_TARGET_URL_LENGTH) {
     return new Response("Link too long.", { status: 414 });
   }
+  const edge = edgeCache();
+  const cached = await edge?.cache.match(request);
+  if (cached) return cached;
+
+  const response = await limitedLookup(request, lookup);
+  // Only real stills: a failure stays short-lived so a fixed post shows up soon.
+  if (edge && response.ok) edge.ctx.waitUntil(edge.cache.put(request, response.clone()));
+  return response;
+}
+
+async function limitedLookup(request: Request, lookup: () => Promise<Response>) {
   if (!(await withinRateLimit(request))) {
     return new Response("Too many requests.", { status: 429, headers: { "retry-after": "60" } });
   }

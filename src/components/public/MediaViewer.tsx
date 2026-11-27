@@ -28,6 +28,9 @@ type MediaViewerProps = Readonly<{
   onStep: (direction: 1 | -1) => void;
   onClose: () => void;
   children: ReactNode;
+  /** Mounted but invisible and inert, so an embedded player can boot before the click
+      that shows it. Flipping this to false keeps the same iframe, already loaded. */
+  warming?: boolean;
 }>;
 
 const KIND_LABEL: Record<ViewerKind, string> = {
@@ -107,31 +110,39 @@ export function MediaViewer({
   onStep,
   onClose,
   children,
+  warming = false,
 }: MediaViewerProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(dialogRef, true);
+  useDialogFocus(dialogRef, !warming);
   const canStep = total > 1;
 
   useEffect(() => {
-    if (!canStep) return;
-    const stepOnArrow = (event: KeyboardEvent) => {
+    if (warming) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (!canStep) return;
       if (event.key === "ArrowRight") onStep(1);
       if (event.key === "ArrowLeft") onStep(-1);
     };
-    window.addEventListener("keydown", stepOnArrow);
-    return () => window.removeEventListener("keydown", stepOnArrow);
-  }, [canStep, onStep]);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canStep, onStep, onClose, warming]);
 
   /* Portalled to <body>: inside a section, the scroll-entrance transforms and
      animations on the landing page pinned the fixed pop-up to the section (or
      faded its media) instead of the screen. */
   return createPortal(
     <>
-      <div className="mood-player__scrim" aria-hidden="true" onClick={onClose} />
+      <div
+        className={`mood-player__scrim${warming ? " is-warming" : ""}`}
+        aria-hidden="true"
+        onClick={onClose}
+      />
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`mood-player mood-player--${item.kind}`}
+        inert={warming}
+        className={`mood-player mood-player--${item.kind}${warming ? " is-warming" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={`${titleOf(item)} preview`}

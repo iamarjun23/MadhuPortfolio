@@ -11,6 +11,7 @@ import { PHOTO_VIEWER_SIZES, preloadViewerPhoto } from "@/lib/preload-image";
 import { MediaViewer, type ViewerItem } from "@/components/public/MediaViewer";
 import { type ReelKind, reelBadge, reelThumbnail, resolveReel } from "@/lib/reel";
 import { sketchbookPages } from "@/lib/sketchbook-pages";
+import { useWarmTarget } from "@/lib/use-warm-target";
 import type { Contact, Room } from "@/schemas";
 
 type MoodBoardProps = Readonly<{ data: Room; fallbackImage?: FallbackImage; contact: Contact }>;
@@ -221,11 +222,20 @@ type SketchbookProps = Readonly<{
   fallbackImage: FallbackImage;
   isViewable: (card: RoomCard) => card is ViewableCard;
   onOpen: (card: ViewableCard) => void;
+  onPrepare: (card: RoomCard, pointerType?: string) => void;
+  onLeave: () => void;
 }>;
 
 /* Phones get the board as a spiral sketchbook instead (mobile.css): the same cards,
    a few to a page, one page turned at a time by swiping or the arrows. */
-function Sketchbook({ cards, fallbackImage, isViewable, onOpen }: SketchbookProps) {
+function Sketchbook({
+  cards,
+  fallbackImage,
+  isViewable,
+  onOpen,
+  onPrepare,
+  onLeave,
+}: SketchbookProps) {
   const bookRef = useRef<HTMLDivElement>(null);
   const [current, setCurrent] = useState(0);
   const pages = sketchbookPages(cards);
@@ -255,6 +265,11 @@ function Sketchbook({ cards, fallbackImage, isViewable, onOpen }: SketchbookProp
                   className={`mood-card mood-card--${card.type} mood-card--${card.pinType} sketchbook__card ${viewable ? "is-viewable" : ""}`}
                   style={{ rotate: `${card.rot / 2}deg` }}
                   onClick={viewable ? () => onOpen(card) : undefined}
+                  // A touch fires this as the finger lands, a beat before its click.
+                  onPointerEnter={(event) => onPrepare(card, event.pointerType)}
+                  onFocus={() => onPrepare(card)}
+                  onPointerLeave={onLeave}
+                  onBlur={onLeave}
                   onKeyDown={
                     viewable
                       ? (event) => {
@@ -342,6 +357,14 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     positions[card.id] ?? { fx: card.fx, fy: card.fy, rot: card.rot };
   const [dragged, setDragged] = useState<string | null>(null);
   const [playing, setPlaying] = useState<ViewableCard | null>(null);
+  /* The reel card under the pointer or focus. Its viewer mounts hidden so the player
+     boots while the visitor is still deciding; the click only has to show it. */
+  const {
+    warm,
+    warmSoon,
+    cancel: cancelWarm,
+    clear: clearWarm,
+  } = useWarmTarget<VideoCard>((card) => card.id);
   /* A card is dragged and clicked with the same button, and the click lands after
      the drag has finished. Without this the pop-up opened every time a reel card
      was moved. */
@@ -397,15 +420,9 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     if (!playing) return;
 
     const previousOverflow = document.body.style.overflow;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPlaying(null);
-    };
-
     document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
     };
   }, [playing]);
 
@@ -536,14 +553,28 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
     card.type === "video" ||
     (card.type === "polaroid" && !!imageOrFallback(card.image, fallbackImage, card.caption));
 
-  function preloadCardPhoto(card: RoomCard) {
+  /* Gets a card's pop-up ready before it is clicked: a photo is downloaded, an embedded
+     player is booted in a hidden viewer. Uploads are left alone - their file plays
+     from the first bytes anyway. `pointerType` is omitted for keyboard focus. */
+  function prepareCard(card: RoomCard, pointerType?: string) {
+    if (card.type === "video") {
+      if (resolveReel(card).embed) warmSoon(card, pointerType);
+      return;
+    }
     if (card.type !== "polaroid") return;
     const photo = imageOrFallback(card.image, fallbackImage, card.caption);
     if (photo) preloadViewerPhoto(photo.url);
   }
 
+  function closeViewer() {
+    setPlaying(null);
+    // Hiding a player that is playing would leave its sound running, so it goes too.
+    clearWarm();
+  }
+
   const viewable = data.cards.filter(isViewable);
-  const playingIndex = playing ? viewable.findIndex((card) => card.id === playing.id) : -1;
+  const shown = playing ?? warm;
+  const playingIndex = shown ? viewable.findIndex((card) => card.id === shown.id) : -1;
   const stepPlaying = (direction: 1 | -1) =>
     setPlaying(viewable[(playingIndex + direction + viewable.length) % viewable.length] ?? null);
 
@@ -607,8 +638,10 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
                 }}
                 onPointerDown={(event) => pointerDown(event, card.id)}
                 // Fires on hover, and on a touch before its click.
-                onPointerEnter={() => preloadCardPhoto(card)}
-                onFocus={() => preloadCardPhoto(card)}
+                onPointerEnter={(event) => prepareCard(card, event.pointerType)}
+                onFocus={() => prepareCard(card)}
+                onPointerLeave={cancelWarm}
+                onBlur={cancelWarm}
                 onPointerMove={pointerMove}
                 onClick={() => openCard(card)}
                 onKeyDown={(event) => {
@@ -642,10 +675,13 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
         fallbackImage={fallbackImage}
         isViewable={isViewable}
         onOpen={setPlaying}
+        onPrepare={prepareCard}
+        onLeave={cancelWarm}
       />
-      {playing && playingIndex >= 0 ? (
+      {shown && playingIndex >= 0 ? (
         <MediaViewer
-          item={viewerItem(playing, fallbackImage)}
+          warming={!playing}
+          item={viewerItem(shown, fallbackImage)}
           next={
             viewable.length > 1
               ? viewerItem(viewable[(playingIndex + 1) % viewable.length]!, fallbackImage)
@@ -654,9 +690,9 @@ export function MoodBoard({ data, fallbackImage = null, contact }: MoodBoardProp
           index={playingIndex}
           total={viewable.length}
           onStep={stepPlaying}
-          onClose={() => setPlaying(null)}
+          onClose={closeViewer}
         >
-          {cardMedia(playing, fallbackImage)}
+          {cardMedia(shown, fallbackImage)}
         </MediaViewer>
       ) : null}
       <section className="room-close">

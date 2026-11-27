@@ -10,8 +10,6 @@ Next.js 16 (App Router), React 19, TypeScript, Prisma 7 on PostgreSQL, Auth.js v
 | ---------------------------------------------------------------- | -------------------------------- |
 | Take over the site (accounts, secrets, runbook, checklist)       | [`HANDOVER.md`](HANDOVER.md)     |
 | Deploy or change hosting (env vars, Cloudflare and Vercel setup) | [`DEPLOYMENT.md`](DEPLOYMENT.md) |
-| Change the code (rules, structure, conventions)                  | [`AGENTS.md`](AGENTS.md)         |
-| See why things are the way they are (build history, decisions)   | [`MEMORY.md`](MEMORY.md)         |
 
 ## Run it locally
 
@@ -32,12 +30,10 @@ docker compose -f docker-compose.dev.yml up -d
 
 ## Checks
 
-| Command                                      | What it does                                                                |
-| -------------------------------------------- | --------------------------------------------------------------------------- |
-| `pnpm check`                                 | The "done" gate: lint, typecheck, unit tests, `prisma validate`, build      |
-| `pnpm lint`, `pnpm typecheck`, `pnpm format` | Individual checks (`pnpm format:write` fixes formatting)                    |
-| `pnpm test`                                  | Unit tests in `tests/` (pure logic; no database or R2 needed)               |
-| `pnpm test:browser <url>`                    | Read-only browser smoke test of a running site, safe to point at production |
+| Command                                      | What it does                                               |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| `pnpm check`                                 | The "done" gate: lint, typecheck, `prisma validate`, build |
+| `pnpm lint`, `pnpm typecheck`, `pnpm format` | Individual checks (`pnpm format:write` fixes formatting)   |
 
 `pnpm check` runs `next build`, which reads the published content from `DATABASE_URL`.
 

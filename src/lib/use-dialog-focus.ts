@@ -14,9 +14,9 @@ const FOCUSABLE = [
 ].join(",");
 
 /** While `open`, keeps keyboard focus inside the dialog `ref` points at: it starts on the
-    dialog's first control, Tab and Shift+Tab wrap around, and focus that escapes some other
-    way (tabbing out of an embedded iframe) is pulled back. On close, focus returns to
-    whatever opened the dialog. The dialog element needs `tabIndex={-1}` so it can take focus
+    dialog's first control that is not an iframe, Tab and Shift+Tab wrap around, and focus
+    that escapes some other way (tabbing out of an embedded iframe) is pulled back. On close,
+    focus returns to whatever opened the dialog. The dialog element needs `tabIndex={-1}` so it can take focus
     itself when it has no controls. */
 export function useDialogFocus(ref: RefObject<HTMLElement | null>, open: boolean) {
   useEffect(() => {
@@ -28,7 +28,11 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, open: boolean
       [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
         (control) => control.getClientRects().length > 0,
       );
-    (controls()[0] ?? dialog).focus();
+    /* Never an iframe: a cross-origin player keeps every keypress, so Escape and the
+       arrow keys would never reach the page while it held focus. */
+    const start = () =>
+      controls().find((control) => !(control instanceof HTMLIFrameElement)) ?? dialog;
+    start().focus();
 
     const wrapTab = (event: KeyboardEvent) => {
       if (event.key !== "Tab") return;
@@ -45,7 +49,7 @@ export function useDialogFocus(ref: RefObject<HTMLElement | null>, open: boolean
     };
     const keepInside = (event: FocusEvent) => {
       if (event.target instanceof Node && !dialog.contains(event.target)) {
-        (controls()[0] ?? dialog).focus();
+        start().focus();
       }
     };
 
